@@ -142,3 +142,4 @@ textarea.big{min-height:300px}
   .a-imgf{flex-direction:column}
   .a-imgf .pv,.a-imgf.a-isvid .pv{width:100%;max-width:320px}
 }
+.a-relog{width:min(420px,100%);display:grid;gap:14px}

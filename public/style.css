@@ -59,7 +59,7 @@ p{margin:0}
 .nav.open .burger span:nth-child(1){transform:translateY(6px) rotate(45deg)}
 .nav.open .burger span:nth-child(2){opacity:0}
 .nav.open .burger span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
-.drawer{position:fixed;inset:0;z-index:45;background:rgba(12,13,16,.97);display:flex;flex-direction:column;justify-content:center;gap:8px;padding:100px max(28px,env(safe-area-inset-left,0px)) 40px;clip-path:circle(0% at calc(100% - 40px) 40px);transition:clip-path .7s var(--ease-in);pointer-events:none}
+.drawer{position:fixed;inset:0;z-index:45;background:#0c0d10;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:100px max(28px,env(safe-area-inset-left,0px)) 40px;clip-path:circle(0% at calc(100% - 40px) 40px);transition:clip-path .7s var(--ease-in);pointer-events:none}
 .nav.open + .drawer{clip-path:circle(150% at calc(100% - 40px) 40px);pointer-events:auto}
 .drawer a{font-family:var(--f-disp);font-weight:800;font-size:44px;text-transform:uppercase;letter-spacing:.02em;opacity:0;transform:translateY(20px);transition:opacity .5s,transform .5s var(--ease)}
 .nav.open + .drawer a{opacity:1;transform:none}

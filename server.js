@@ -42,14 +42,15 @@ function listMedia() {
   return out.sort((a, b) => b.time - a.time);
 }
 
-const sessions = new Map(); // token -> { exp, csrf }
+const sessions = store.sessions; // token -> { exp, csrf }, stored in data/sessions.json
 const fails = new Map();    // ip -> { n, until }
 const SESSION_MS = 8 * 3600e3;
 
 // X-Forwarded-* headers are only believed when they come from a reverse proxy on this machine
 // (e.g. Plesk nginx), or when TRUST_PROXY=1. Anyone else could fake them.
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
-const fromProxy = req => process.env.TRUST_PROXY === '1' || LOOPBACK.has(req.socket.remoteAddress);
+// no remote address = connected over a local socket (e.g. Plesk/Passenger), which is also a local proxy
+const fromProxy = req => process.env.TRUST_PROXY === '1' || !req.socket.remoteAddress || LOOPBACK.has(req.socket.remoteAddress);
 const fwd = (req, name) => fromProxy(req) && req.headers[name] ? String(req.headers[name]).split(',').map(s => s.trim()) : null;
 const isHttps = req => !!req.socket.encrypted || (fwd(req, 'x-forwarded-proto') || [])[0] === 'https';
 const HOST_RE = /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
@@ -209,7 +210,7 @@ async function adminApi(req, res, url) {
       const next = typeof b.next === 'string' ? b.next : '';
       if (next.length < 10 || next.length > 200) return json(res, 400, { error: 'รหัสผ่านใหม่ต้องยาว 10–200 ตัวอักษร' });
       store.setPassword(next);
-      for (const k of sessions.keys()) if (k !== s.token) sessions.delete(k);
+      sessions.keepOnly(s.token);
       return json(res, 200, { ok: true });
     }
   } catch (e) {
@@ -265,7 +266,7 @@ const server = http.createServer(async (req, res) => {
 
 setInterval(() => {
   const t = Date.now();
-  for (const [k, v] of sessions) if (v.exp < t) sessions.delete(k);
+  try { sessions.prune(); } catch (e) {}
   for (const [k, v] of fails) if (v.until < t && v.last < t - 3600e3) fails.delete(k);
 }, 600e3).unref();
 // a stray error must never take the whole site down

@@ -15,12 +15,34 @@
     for (const kid of kids.flat()) if (kid != null && kid !== false) e.append(kid.nodeType ? kid : document.createTextNode(kid));
     return e;
   };
+  // when the session has expired mid-work: ask for the password in a popup, then retry the same request
   const api = async (path, method, body) => {
     const r = await fetch('/admin/api/' + path, { method: method || 'GET', credentials: 'same-origin', headers: Object.assign({ 'Content-Type': 'application/json' }, csrf ? { 'X-CSRF-Token': csrf } : {}), body: body ? JSON.stringify(body) : undefined });
+    if (r.status === 401 && C && path !== 'login' && path !== 'me') { await relogin(); return api(path, method, body); }
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(d.error || 'error'), { status: r.status });
     return d;
   };
+  let reloginP = null;
+  const relogin = () => reloginP || (reloginP = new Promise(done => {
+    const u = h('input', { type: 'text', autocomplete: 'username', required: true }), p = h('input', { type: 'password', autocomplete: 'current-password', required: true });
+    const m = h('div', { class: 'a-err' });
+    const f = h('form', { class: 'a-dlg a-relog' }, h('div', { class: 'hd' }, h('b', {}, 'เซสชันหมดอายุ')),
+      h('p', { class: 'a-note' }, 'กรุณาเข้าสู่ระบบอีกครั้ง งานที่ยังไม่บันทึกจะไม่หาย'),
+      h('label', { class: 'a-f' }, 'ชื่อผู้ใช้', u), h('label', { class: 'a-f' }, 'รหัสผ่าน', p), m, h('button', { class: 'btn', type: 'submit' }, 'เข้าสู่ระบบ'));
+    const bg = h('div', { class: 'a-modal' }, f);
+    f.addEventListener('submit', async e => {
+      e.preventDefault();
+      try {
+        const r = await fetch('/admin/api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: u.value, password: p.value }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { m.textContent = d.error || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
+        csrf = (await api('me')).csrf;
+        bg.remove(); done();
+      } catch (x) { m.textContent = x.message; }
+    });
+    document.body.append(bg); u.focus();
+  }).finally(() => { reloginP = null; }));
   const clone = o => JSON.parse(JSON.stringify(o, (k, v) => (k === '_open' ? undefined : v)));
   const getPath = (o, p) => p.split('.').reduce((a, k) => a && a[k], o);
   const setPath = (o, p, v) => { const ks = p.split('.'), last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; };
@@ -47,7 +69,9 @@
     const kind = file.type.startsWith('video/') ? 'video' : 'image';
     if (file.size > LIMIT[kind]) { alert('ไฟล์ใหญ่เกิน ' + LIMIT[kind] / 1e6 + 'MB'); return null; }
     try {
-      const r = await fetch('/admin/api/upload', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type, 'X-CSRF-Token': csrf }, body: file });
+      const send = () => fetch('/admin/api/upload', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type, 'X-CSRF-Token': csrf }, body: file });
+      let r = await send();
+      if (r.status === 401) { await relogin(); r = await send(); }
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || (r.status === 413 ? 'ไฟล์ใหญ่เกินที่เซิร์ฟเวอร์รับได้' : 'อัปโหลดไม่สำเร็จ'));
       return d.url;
@@ -292,8 +316,8 @@
       view: () => [
         box('พื้นหลังหน้าแรก (Hero)', note('วิดีโอเล่นวนเป็นพื้นหลัง รูปใช้แสดงระหว่างรอวิดีโอโหลดและเมื่อวิดีโอเล่นไม่ได้ · เว้นว่าง = ใช้ไฟล์เริ่มต้น'),
           field(C.home, 'heroVideo', 'วิดีโอพื้นหลัง (คอม)', { type: 'video', ph: '/img/rc_burn_v2.mp4', help: 'MP4 (H.264) แนะนำ 1920×1080 ไม่เกิน ~15MB ไม่มีเสียง' }),
-          field(C.home, 'heroVideoMobile', 'วิดีโอพื้นหลัง (มือถือ)', { type: 'video', ph: '/img/rc_burn_v2_720.mp4', help: 'ไฟล์เล็กสำหรับมือถือ แนะนำ 720p ไม่เกิน ~3MB · เว้นว่างและตั้งวิดีโอคอมไว้ = ใช้วิดีโอเดียวกับคอม' }),
-          field(C.home, 'heroImage', 'รูปพื้นหลัง / รูปสำรอง', { type: 'image', ph: '/img/keyart_rc_v1.png', help: 'แนะนำ 1920×1080 ขึ้นไป ควรเป็นภาพเดียวกับเฟรมแรกของวิดีโอ' })),
+          field(C.home, 'heroVideoMobile', 'วิดีโอพื้นหลัง (มือถือ)', { type: 'video', ph: '/img/rc_burn_v2_m.mp4', help: 'ไฟล์เล็กสำหรับมือถือ แนะนำ 720p ไม่เกิน ~3MB · เว้นว่างและตั้งวิดีโอคอมไว้ = ใช้วิดีโอเดียวกับคอม' }),
+          field(C.home, 'heroImage', 'รูปพื้นหลัง / รูปสำรอง', { type: 'image', ph: '/img/keyart_rc_v1_web.jpg', help: 'แนะนำ 1920×1080 ขึ้นไป ควรเป็นภาพเดียวกับเฟรมแรกของวิดีโอ' })),
         box('หัวข้อใหญ่', field(C.home, 'badge', 'ป้ายเล็กด้านบน'), field(C.home, 'h1', 'H1'), two(field(C.home, 'h2', 'H2'), field(C.home, 'h3', 'H3 (ตัวสีแดง)')), field(C.home, 'lead', 'ข้อความอธิบาย', { type: 'textarea' })),
         box('ปุ่มลงทะเบียน', two(field(C.home, 'registerText', 'ข้อความบนปุ่ม'), field(C.home, 'registerLink', 'ลิงก์ปุ่ม', { help: 'เว้นว่าง = แสดงข้อความ "เร็วๆ นี้"' })), field(C.home, 'registerMsg', 'ข้อความเมื่อกดปุ่ม (ตอนยังไม่มีลิงก์)')),
         box('ป้ายข้อความอื่นๆ', two(field(C.home, 'storesLabel', 'หัวข้อปุ่มดาวน์โหลด'), field(C.home, 'followLabel', 'หัวข้อโซเชียล')), two(field(C.home, 'soonLabel', 'คำว่า "เร็วๆ นี้บน"'), field(C.home, 'downloadLabel', 'คำว่า "ดาวน์โหลดบน"')), two(field(C.home, 'gameplayMore', 'ปุ่มใต้ส่วน Gameplay (หน้าแรก)', { help: 'หัวข้อและรายการของส่วนนี้แก้ที่เมนู Gameplay / หน้า Gameplay' }), field(C.home, 'latestNewsTitle', 'หัวข้อส่วนข่าวใต้หน้าแรก'))),
@@ -309,7 +333,7 @@
     { id: 'general', g: 'ตั้งค่าเว็บ', label: 'ข้อมูลเว็บ & SEO หลัก', desc: 'ชื่อเว็บ โดเมน รูปแชร์ และค่า SEO เริ่มต้นของทั้งเว็บ', paths: ['site'], url: '/',
       view: () => [
         box('ข้อมูลเว็บไซต์', field(C.site, 'name', 'ชื่อเว็บไซต์', { help: 'แสดงที่โลโก้ ฟุตเตอร์ และต่อท้าย title' }),
-          field(C.site, 'url', 'โดเมนหลัก (Canonical)', { help: 'เช่น https://www.rcxth.com — ใช้ใน canonical, sitemap, og:url ถ้าเว้นว่างจะใช้โดเมนที่เปิดอยู่' }),
+          field(C.site, 'url', 'โดเมนหลัก (Canonical)', { help: 'เช่น https://raycitym.com — ใช้ใน canonical, sitemap, og:url ถ้าเว้นว่างจะใช้โดเมนที่เปิดอยู่' }),
           field(C.site, 'logo', 'โลโก้เว็บ', { type: 'image', ph: '/img/logo.png', help: 'แสดงที่เมนูบน ฟุตเตอร์ และหลังบ้าน แนะนำรูปจัตุรัส PNG พื้นหลังโปร่ง อย่างน้อย 256×256 · เว้นว่าง = ใช้โลโก้เริ่มต้น' }),
           field(C.site, 'favicon', 'ไอคอนเว็บ (Favicon)', { type: 'image', ph: '/img/favicon.png', help: 'ไอคอนที่แท็บเบราว์เซอร์/ผลค้นหา Google/หน้าจอมือถือ แนะนำ PNG จัตุรัส 192×192 ขึ้นไป · เว้นว่าง = ใช้ไอคอนเริ่มต้น' }),
           field(C.site, 'ogImage', 'รูปแชร์ (Open Graph)', { type: 'image', help: 'แนะนำ 1200×630' }), field(C.site, 'footer', 'ข้อความท้ายเว็บ (Copyright)')),
@@ -367,7 +391,7 @@
     const side = h('aside', { class: 'a-side' },
       h('div', { class: 'a-brand' }, h('img', { src: C.site.logo || '/img/logo.png', alt: '' }), h('div', {}, h('b', {}, C.site.name || 'Admin'), h('small', {}, 'ADMIN'))),
       ...groups.flatMap(g => [h('div', { class: 'a-grp' }, g), ...SECTIONS.filter(x => x.g === g).map(x => {
-        const b = h('button', { class: 'a-nav' + (x.id === cur ? ' on' : '') + (dirty.has(x.id) ? ' dirty' : ''), onclick: () => { cur = x.id; render(); window.scrollTo(0, 0); } },
+        const b = h('button', { class: 'a-nav' + (x.id === cur ? ' on' : '') + (dirty.has(x.id) ? ' dirty' : ''), onclick: () => { cur = x.id; render(); if (innerWidth <= 900) document.querySelector('.a-main').scrollIntoView(); else window.scrollTo(0, 0); } },
           h('span', {}, x.label), x.count ? h('em', { class: 'n', style: 'font-style:normal' }, String(x.count())) : null, h('i'));
         navBtns[x.id] = b; return b;
       })]),
