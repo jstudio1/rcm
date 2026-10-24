@@ -4,3 +4,8 @@ public/uploads/
 .claude/
 node_modules/
 *.log
+*.rar
+*.zip
+*.7z
+*.psd
+.env

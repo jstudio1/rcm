@@ -568,19 +568,19 @@ html{scroll-padding-top:70px}
 .hero .hc{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,410px);gap:56px;align-items:end;max-width:none}
 .hero .hl{border-left:4px solid var(--red-2);padding:4px 0 4px 28px}
 .hero .htitle{margin:16px 0 0}
-.hero .hp{display:grid;gap:18px;padding:26px 26px 22px;background:rgba(14,15,18,.74);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--ln-2);border-top:3px solid var(--red-2);box-shadow:0 30px 60px -30px rgba(0,0,0,.9)}
-.hero .hp .lead{max-width:none;margin:0;font-size:16px;color:#d9dce0}
-.hero .hp .row{display:block}
-.hero .hp .btn{display:flex;width:100%}
-.hero .hp .plat-h{margin:2px 0 -6px}
-.hero .hp .stores{display:grid;grid-template-columns:1fr;gap:8px;margin:0}
-.hero .hp .store{width:100%;border-radius:0;justify-content:flex-start;padding:12px 16px;background:rgba(255,255,255,.05);transition:background .3s,border-color .3s,transform .3s var(--ease)}
-.hero .hp .store:hover{background:rgba(255,255,255,.1)}
-.hero .hp .store svg{width:24px;height:24px}
-.hero .hp .store em{position:static;margin-left:auto;font-size:10px;padding:2px 8px}
-.hero .hp .social{position:static;display:flex;align-items:center;gap:8px;margin:0;padding-top:16px;border-top:1px solid var(--ln)}
-.hero .hp .social span{margin-right:auto}
-.hero .hp .social .so{width:36px;height:36px}
+.hero .hpanel{display:grid;gap:18px;padding:26px 26px 22px;background:rgba(14,15,18,.74);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--ln-2);border-top:3px solid var(--red-2);box-shadow:0 30px 60px -30px rgba(0,0,0,.9)}
+.hero .hpanel .lead{max-width:none;margin:0;font-size:16px;color:#d9dce0}
+.hero .hpanel .row{display:block}
+.hero .hpanel .btn{display:flex;width:100%}
+.hero .hpanel .plat-h{margin:2px 0 -6px}
+.hero .hpanel .stores{display:grid;grid-template-columns:1fr;gap:8px;margin:0}
+.hero .hpanel .store{width:100%;border-radius:0;justify-content:flex-start;padding:12px 16px;background:rgba(255,255,255,.05);transition:background .3s,border-color .3s,transform .3s var(--ease)}
+.hero .hpanel .store:hover{background:rgba(255,255,255,.1)}
+.hero .hpanel .store svg{width:24px;height:24px}
+.hero .hpanel .store em{position:static;margin-left:auto;font-size:10px;padding:2px 8px}
+.hero .hpanel .social{position:static;display:flex;align-items:center;gap:8px;margin:0;padding-top:16px;border-top:1px solid var(--ln)}
+.hero .hpanel .social span{margin-right:auto}
+.hero .hpanel .social .so{width:36px;height:36px}
 @media (max-width:1100px){
   .hero .hc{grid-template-columns:minmax(0,1fr) minmax(300px,360px);gap:36px}
 }
@@ -593,16 +593,16 @@ html{scroll-padding-top:70px}
   .hero .htitle{white-space:normal;font-size:clamp(44px,15vw,76px);margin-top:12px}
   .hero .htitle .ln.sub{font-size:.4em}
   .hero .htitle .ln:nth-child(3){font-size:.7em}
-  .hero .hp{padding:16px 16px 14px;gap:14px;border-top-width:2px;background:rgba(12,13,16,.84)}
-  .hero .hp .lead{font-size:14.5px;text-align:center}
-  .hero .hp .btn{padding:14px 20px}
-  .hero .hp .plat-h{text-align:center;margin:0 0 -6px}
-  .hero .hp .stores{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-  .hero .hp .store{flex-direction:column;justify-content:center;align-items:center;gap:6px;padding:12px 4px 10px;text-align:center}
-  .hero .hp .store small{display:none}
-  .hero .hp .store b{font-size:13px}
-  .hero .hp .store em{margin:0;font-size:9px;padding:1px 6px}
-  .hero .hp .social{justify-content:center;padding-top:12px}
-  .hero .hp .social span{margin-right:6px}
+  .hero .hpanel{padding:16px 16px 14px;gap:14px;border-top-width:2px;background:rgba(12,13,16,.84)}
+  .hero .hpanel .lead{font-size:14.5px;text-align:center}
+  .hero .hpanel .btn{padding:14px 20px}
+  .hero .hpanel .plat-h{text-align:center;margin:0 0 -6px}
+  .hero .hpanel .stores{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .hero .hpanel .store{flex-direction:column;justify-content:center;align-items:center;gap:6px;padding:12px 4px 10px;text-align:center}
+  .hero .hpanel .store small{display:none}
+  .hero .hpanel .store b{font-size:13px}
+  .hero .hpanel .store em{margin:0;font-size:9px;padding:1px 6px}
+  .hero .hpanel .social{justify-content:center;padding-top:12px}
+  .hero .hpanel .social span{margin-right:6px}
 }
-@media (max-width:380px){.hero .hp .social span{display:none}}
+@media (max-width:380px){.hero .hpanel .social span{display:none}}
