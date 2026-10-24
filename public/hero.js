@@ -41,9 +41,11 @@ const nav=$('#nav');
   function snap(o){
     let src=v,sw0=v.videoWidth,sh0=v.videoHeight;
     if(v.readyState<2||!sw0){src=still;sw0=still.naturalWidth;sh0=still.naturalHeight}
-    const g=o.cv.getContext('2d');if(!sw0){g.fillStyle='#111';g.fillRect(0,0,o.cv.width,o.cv.height);return}
+    if(!sw0)return false; // nothing loaded yet: the caller skips the flip instead of showing a black tile
+    const g=o.cv.getContext('2d');
     const s=Math.max(W/sw0,H/sh0),ox=(W-sw0*s)*POSX,oy=(H-sh0*s)/2;
-    try{g.drawImage(src,(o.c*tw-ox)/s,(o.r*th-oy)/s,tw/s,th/s,0,0,o.cv.width,o.cv.height)}catch(e){}
+    try{g.drawImage(src,(o.c*tw-ox)/s,(o.r*th-oy)/s,tw/s,th/s,0,0,o.cv.width,o.cv.height)}catch(e){return false}
+    return true;
   }
   const EASE='cubic-bezier(.22,.61,.2,1)';
   function flip(i,dx,dy,delay){
@@ -51,7 +53,8 @@ const nav=$('#nav');
     const horiz=Math.abs(dx)>=Math.abs(dy), sgn=(horiz?dx:-dy)>=0?1:-1, ax=horiz?'rotateY':'rotateX';
     const dur=900+Math.random()*140;
     setTimeout(()=>{
-      snap(o);o.t.classList.toggle('x',!horiz);o.t.classList.add('fl');o.h.classList.add('on');
+      if(!snap(o)){o.busy=false;return}
+      o.t.classList.toggle('x',!horiz);o.t.classList.add('fl');o.h.classList.add('on');
       // a thick slab: lifts toward the viewer, turns a full revolution with a small damped wobble, settles back
       const P='perspective(900px) ';
       const a=o.t.animate([
