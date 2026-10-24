@@ -1,0 +1,6 @@
+data/admin.json
+data/history/
+public/uploads/
+.claude/
+node_modules/
+*.log
