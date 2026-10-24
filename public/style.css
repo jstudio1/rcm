@@ -454,12 +454,20 @@ body{overflow-x:hidden}
 .tiles .h.on{opacity:1}
 .tiles .t{position:absolute;transform-style:preserve-3d;will-change:transform}
 .tiles .t .f,.tiles .t .k{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-.tiles .t .f{overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.5)}
+/* tiles are real slabs: front + back faces pushed out by half the thickness (--d) with four edge faces between them */
+.tiles .t .f{overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.5);transform:translateZ(calc(var(--d,28px)/2))}
+.tiles .t .s{position:absolute;display:block;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.tiles .t .s.l,.tiles .t .s.r{width:var(--d,28px);height:100%;top:0;left:calc((100% - var(--d,28px))/2)}
+.tiles .t .s.u,.tiles .t .s.b{height:var(--d,28px);width:100%;left:0;top:calc((100% - var(--d,28px))/2)}
+.tiles .t .s.l{background:linear-gradient(90deg,#4a515c,#1b1f26);transform:rotateY(-90deg) translateZ(calc(var(--w,100px)/2))}
+.tiles .t .s.r{background:linear-gradient(90deg,#1b1f26,#4a515c);transform:rotateY(90deg) translateZ(calc(var(--w,100px)/2))}
+.tiles .t .s.u{background:linear-gradient(180deg,#6b7480,#2c323b);transform:rotateX(90deg) translateZ(calc(var(--h,100px)/2))}
+.tiles .t .s.b{background:linear-gradient(180deg,#1b1f26,#0c0e12);transform:rotateX(-90deg) translateZ(calc(var(--h,100px)/2))}
 .tiles .t .f canvas{position:absolute;inset:0;width:100%;height:100%;display:none}
 .tiles .t.fl .f canvas{display:block}
-.tiles .t .k{background:linear-gradient(160deg,#151a22,#07090d 60%);transform:rotateY(180deg)}
-.tiles .t.x .k{transform:rotateX(180deg)}
-.tiles .t .e{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 0 2px rgba(255,255,255,.95),0 0 10px rgba(255,255,255,.25)}
+.tiles .t .k{background:linear-gradient(160deg,#252b35,#07090d 60%);transform:rotateY(180deg) translateZ(calc(var(--d,28px)/2))}
+.tiles .t.x .k{transform:rotateX(180deg) translateZ(calc(var(--d,28px)/2))}
+.tiles .t .e{position:absolute;inset:0;transform:translateZ(calc(var(--d,28px)/2 + 1px));pointer-events:none;opacity:0;box-shadow:inset 0 0 0 2px rgba(255,255,255,.95),0 0 10px rgba(255,255,255,.25)}
 .tiles .t.fl{z-index:3}
 .tiles .dot{position:absolute;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:rgba(0,0,0,.75);pointer-events:none;z-index:1}
 .hero .shade{z-index:1}.hero .soft{z-index:1}

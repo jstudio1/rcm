@@ -23,8 +23,9 @@ const nav=$('#nav');
     for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
       const h=document.createElement('div');h.className='h';h.style.cssText='left:'+(c*tw)+'px;top:'+(r*th)+'px;width:'+(tw+.5)+'px;height:'+(th+.5)+'px';box.appendChild(h);
       const t=document.createElement('div');t.className='t';
-      t.style.cssText='left:'+(c*tw)+'px;top:'+(r*th)+'px;width:'+(tw+.5)+'px;height:'+(th+.5)+'px';
-      t.innerHTML='<div class="f"><canvas></canvas></div><div class="k"></div><div class="e"></div>';
+      const depth=Math.round(Math.max(18,Math.min(38,Math.min(tw,th)*.24)));
+      t.style.cssText='left:'+(c*tw)+'px;top:'+(r*th)+'px;width:'+(tw+.5)+'px;height:'+(th+.5)+'px;--w:'+(tw+.5)+'px;--h:'+(th+.5)+'px;--d:'+depth+'px';
+      t.innerHTML='<div class="f"><canvas></canvas></div><div class="k"></div><i class="s l"></i><i class="s r"></i><i class="s u"></i><i class="s b"></i><div class="e"></div>';
       const cv=t.querySelector('canvas');cv.width=Math.ceil(tw*dpr);cv.height=Math.ceil(th*dpr);
       box.appendChild(t);tiles.push({t,h,cv,e:t.lastChild,c,r,busy:false});
     }
@@ -44,17 +45,21 @@ const nav=$('#nav');
   function flip(i,dx,dy,delay){
     const o=tiles[i];if(!o||o.busy)return;o.busy=true;delay=delay||0;
     const horiz=Math.abs(dx)>=Math.abs(dy), sgn=(horiz?dx:-dy)>=0?1:-1, ax=horiz?'rotateY':'rotateX';
-    const dur=620+Math.random()*120;
+    const dur=900+Math.random()*140;
     setTimeout(()=>{
       snap(o);o.t.classList.toggle('x',!horiz);o.t.classList.add('fl');o.h.classList.add('on');
+      // a thick slab: lifts toward the viewer, turns a full revolution with a small damped wobble, settles back
+      const P='perspective(900px) ';
       const a=o.t.animate([
-        {transform:'perspective(700px) '+ax+'(0deg) rotateZ(0deg) translateZ(0)'},
-        {transform:'perspective(700px) '+ax+'('+(sgn*90)+'deg) rotateZ(-7deg) translateZ(12px)',offset:.22},
-        {transform:'perspective(700px) '+ax+'('+(sgn*180)+'deg) rotateZ(6deg) translateZ(18px)',offset:.45},
-        {transform:'perspective(700px) '+ax+'('+(sgn*290)+'deg) rotateZ(-4deg) translateZ(8px)',offset:.72},
-        {transform:'perspective(700px) '+ax+'('+(sgn*360)+'deg) rotateZ(0deg) translateZ(0)'}
-      ],{duration:dur+160,easing:EASE});
-      o.e.animate([{opacity:0},{opacity:1,offset:.2},{opacity:1,offset:.7},{opacity:0}],{duration:dur+160,easing:'ease-out'});
+        {transform:P+ax+'(0deg) rotateZ(0deg) translateZ(0)'},
+        {transform:P+ax+'('+(sgn*60)+'deg) rotateZ(-5deg) translateZ(30px)',offset:.16},
+        {transform:P+ax+'('+(sgn*150)+'deg) rotateZ(6deg) translateZ(46px)',offset:.36},
+        {transform:P+ax+'('+(sgn*240)+'deg) rotateZ(-5deg) translateZ(40px)',offset:.56},
+        {transform:P+ax+'('+(sgn*320)+'deg) rotateZ(3deg) translateZ(18px)',offset:.78},
+        {transform:P+ax+'('+(sgn*350)+'deg) rotateZ(-1.5deg) translateZ(6px)',offset:.9},
+        {transform:P+ax+'('+(sgn*360)+'deg) rotateZ(0deg) translateZ(0)'}
+      ],{duration:dur,easing:'cubic-bezier(.4,.1,.2,1)'});
+      o.e.animate([{opacity:0},{opacity:1,offset:.2},{opacity:1,offset:.7},{opacity:0}],{duration:dur,easing:'ease-out'});
       a.onfinish=a.oncancel=()=>{o.busy=false;o.t.classList.remove('fl');o.h.classList.remove('on')};
     },delay);
   }
