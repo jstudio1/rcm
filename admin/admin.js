@@ -222,6 +222,8 @@
       view: () => [
         box('ข้อมูลเว็บไซต์', field(C.site, 'name', 'ชื่อเว็บไซต์', { help: 'แสดงที่โลโก้ ฟุตเตอร์ และต่อท้าย title' }),
           field(C.site, 'url', 'โดเมนหลัก (Canonical)', { help: 'เช่น https://www.rcxth.com — ใช้ใน canonical, sitemap, og:url ถ้าเว้นว่างจะใช้โดเมนที่เปิดอยู่' }),
+          field(C.site, 'logo', 'โลโก้เว็บ', { type: 'image', ph: '/img/logo.png', help: 'แสดงที่เมนูบน ฟุตเตอร์ และหลังบ้าน แนะนำรูปจัตุรัส PNG พื้นหลังโปร่ง อย่างน้อย 256×256 · เว้นว่าง = ใช้โลโก้เริ่มต้น' }),
+          field(C.site, 'favicon', 'ไอคอนเว็บ (Favicon)', { type: 'image', ph: '/img/favicon.png', help: 'ไอคอนที่แท็บเบราว์เซอร์/ผลค้นหา Google/หน้าจอมือถือ แนะนำ PNG จัตุรัส 192×192 ขึ้นไป · เว้นว่าง = ใช้ไอคอนเริ่มต้น' }),
           field(C.site, 'ogImage', 'รูปแชร์ (Open Graph)', { type: 'image', help: 'แนะนำ 1200×630' }), field(C.site, 'footer', 'ข้อความท้ายเว็บ (Copyright)')),
         seoBox(C.site, 'defaultTitle', 'description', { open: true, label: 'SEO เริ่มต้น (หน้าแรก)', url: '/' }),
         box('Keywords', field(C.site, 'keywords', 'คำค้น (คั่นด้วยจุลภาค)'))] },
@@ -261,7 +263,7 @@
   function loginScreen(err) {
     const u = h('input', { type: 'text', autocomplete: 'username', required: true }), p = h('input', { type: 'password', autocomplete: 'current-password', required: true });
     const m = h('div', { class: 'a-err' }, err || '');
-    const f = h('form', {}, h('img', { src: '/img/logo_v2.png', alt: '' }), h('h1', { class: 'disp' }, 'Admin Login'),
+    const f = h('form', {}, h('img', { src: '/img/logo.png', alt: '' }), h('h1', { class: 'disp' }, 'Admin Login'),
       h('label', { class: 'a-f' }, 'ชื่อผู้ใช้', u), h('label', { class: 'a-f' }, 'รหัสผ่าน', p), m, h('button', { class: 'btn', type: 'submit' }, 'เข้าสู่ระบบ'));
     f.addEventListener('submit', async e => { e.preventDefault(); try { await api('login', 'POST', { user: u.value, password: p.value }); start(); } catch (x) { m.textContent = x.message; } });
     app.replaceChildren(h('div', { class: 'a-login' }, f)); u.focus();
@@ -273,7 +275,7 @@
     const groups = [];
     for (const x of SECTIONS) { if (!groups.includes(x.g)) groups.push(x.g); }
     const side = h('aside', { class: 'a-side' },
-      h('div', { class: 'a-brand' }, h('img', { src: '/img/logo_v2.png', alt: '' }), h('div', {}, h('b', {}, C.site.name || 'Admin'), h('small', {}, 'ADMIN'))),
+      h('div', { class: 'a-brand' }, h('img', { src: C.site.logo || '/img/logo.png', alt: '' }), h('div', {}, h('b', {}, C.site.name || 'Admin'), h('small', {}, 'ADMIN'))),
       ...groups.flatMap(g => [h('div', { class: 'a-grp' }, g), ...SECTIONS.filter(x => x.g === g).map(x => {
         const b = h('button', { class: 'a-nav' + (x.id === cur ? ' on' : '') + (dirty.has(x.id) ? ' dirty' : ''), onclick: () => { cur = x.id; render(); window.scrollTo(0, 0); } },
           h('span', {}, x.label), x.count ? h('em', { class: 'n', style: 'font-style:normal' }, String(x.count())) : null, h('i'));
