@@ -46,12 +46,23 @@ const sessions = new Map(); // token -> { exp, csrf }
 const fails = new Map();    // ip -> { n, until }
 const SESSION_MS = 8 * 3600e3;
 
+// X-Forwarded-* headers are only believed when they come from a reverse proxy on this machine
+// (e.g. Plesk nginx), or when TRUST_PROXY=1. Anyone else could fake them.
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const fromProxy = req => process.env.TRUST_PROXY === '1' || LOOPBACK.has(req.socket.remoteAddress);
+const fwd = (req, name) => fromProxy(req) && req.headers[name] ? String(req.headers[name]).split(',').map(s => s.trim()) : null;
+const isHttps = req => !!req.socket.encrypted || (fwd(req, 'x-forwarded-proto') || [])[0] === 'https';
+const HOST_RE = /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
+const SITE_URL_RE = /^https?:\/\/(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
 const baseUrl = (req, c) => {
-  if (c.site.url && /^https?:\/\//.test(c.site.url)) return c.site.url.replace(/\/+$/, '');
-  const proto = (req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
-  return proto + '://' + (req.headers['x-forwarded-host'] || req.headers.host || 'localhost');
+  const set = String(c.site.url || '').trim().replace(/\/+$/, '');
+  if (SITE_URL_RE.test(set)) return set;
+  // no domain set in admin: fall back to the request's host, but only if it looks like a real host name
+  const host = (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host || '';
+  return (isHttps(req) ? 'https' : 'http') + '://' + (HOST_RE.test(host) ? host.toLowerCase() : 'localhost');
 };
-const ip = req => req.socket.remoteAddress || '';
+// client address for login rate limiting; behind a local proxy, the last X-Forwarded-For entry is the one it added
+const ip = req => { const f = fwd(req, 'x-forwarded-for'); return (f && f[f.length - 1]) || req.socket.remoteAddress || ''; };
 const cookies = req => Object.fromEntries((req.headers.cookie || '').split(';').map(s => s.trim().split('=')).filter(p => p[0]).map(([k, ...v]) => [k, v.join('=')]));
 
 function send(res, code, body, type, extra) {
@@ -104,33 +115,51 @@ function serveStatic(req, res, root, rel, cache) {
   let p; try { p = decodeURIComponent(rel); } catch (e) { return send(res, 400, 'Bad request', 'text/plain'); }
   const file = path.normalize(path.join(root, p));
   if (!file.startsWith(root + path.sep) || p.includes('\0')) return send(res, 403, 'Forbidden', 'text/plain');
+  // only known web file types are served (no .rar/.zip/.psd or other stray files left in public/)
+  if (!MIME[path.extname(file).toLowerCase()] || /[\\/]\./.test(p)) return send(res, 404, 'Not found', 'text/plain');
+  // uploaded files can never run as a page, even if a file is crafted to look like HTML
+  if (p.startsWith('/uploads/')) res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
   serveFile(req, res, file, cache);
 }
 
-const ADMIN_CSP = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; frame-ancestors 'none'; form-action 'self'";
+const ADMIN_CSP = "default-src 'self'; img-src 'self' data: https:; media-src 'self' https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+// public pages: scripts only from this site, no plugins, can't be framed by other sites
+const PUBLIC_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'";
+const BASE_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Content-Security-Policy': PUBLIC_CSP
+};
 
 async function adminApi(req, res, url) {
   const route = url.pathname.slice('/admin/api/'.length);
   const m = req.method;
   if (route === 'login' && m === 'POST') {
-    const f = fails.get(ip(req)) || { n: 0, until: 0 };
+    const who = ip(req);
+    const f = fails.get(who) || { n: 0, until: 0, last: 0 };
     if (f.until > Date.now()) return json(res, 429, { error: 'ลองผิดหลายครั้งเกินไป กรุณารอ 15 นาที' });
     let b; try { b = JSON.parse(await readBody(req, 4096)); } catch (e) { return json(res, 400, { error: 'bad request' }); }
-    if (store.checkLogin(b.user || '', b.password || '')) {
-      fails.delete(ip(req));
+    if (!b || typeof b !== 'object' || typeof b.user !== 'string' || typeof b.password !== 'string') return json(res, 400, { error: 'bad request' });
+    if (await store.checkLogin(b.user, b.password)) {
+      fails.delete(who);
       const token = crypto.randomBytes(32).toString('base64url'), csrf = crypto.randomBytes(24).toString('base64url');
       sessions.set(token, { exp: Date.now() + SESSION_MS, csrf });
-      const secure = (req.headers['x-forwarded-proto'] === 'https' || process.env.COOKIE_SECURE) ? '; Secure' : '';
+      const secure = (isHttps(req) || process.env.COOKIE_SECURE) ? '; Secure' : '';
       return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
     }
-    f.n++; if (f.n >= 5) { f.until = Date.now() + 15 * 60e3; f.n = 0; }
-    fails.set(ip(req), f);
+    f.n++; f.last = Date.now();
+    if (f.n >= 5) { f.until = Date.now() + 15 * 60e3; f.n = 0; }
+    fails.set(who, f);
     return json(res, 401, { error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
   }
 
   const s = session(req);
   if (!s) return json(res, 401, { error: 'unauthorized' });
-  if (m !== 'GET' && req.headers['x-csrf-token'] !== s.csrf) return json(res, 403, { error: 'csrf' });
+  const tok = String(req.headers['x-csrf-token'] || '');
+  if (m !== 'GET' && (tok.length !== s.csrf.length || !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(s.csrf)))) return json(res, 403, { error: 'csrf' });
 
   try {
     if (route === 'me' && m === 'GET') return json(res, 200, { csrf: s.csrf });
@@ -168,11 +197,18 @@ async function adminApi(req, res, url) {
       return json(res, 200, { ok: true });
     }
     if (route === 'password' && m === 'POST') {
-      const b = JSON.parse(await readBody(req, 4096));
+      // wrong "current password" guesses count toward the same lockout as the login form
+      const who = ip(req), f = fails.get(who) || { n: 0, until: 0, last: 0 };
+      if (f.until > Date.now()) return json(res, 429, { error: 'ลองผิดหลายครั้งเกินไป กรุณารอ 15 นาที' });
+      const b = JSON.parse(await readBody(req, 4096)) || {};
       const user = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'admin.json'), 'utf8')).user;
-      if (!store.checkLogin(user, b.current || '')) return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
-      if (String(b.next || '').length < 10) return json(res, 400, { error: 'รหัสผ่านใหม่ต้องยาวอย่างน้อย 10 ตัวอักษร' });
-      store.setPassword(String(b.next));
+      if (!await store.checkLogin(user, String(b.current || ''))) {
+        f.n++; f.last = Date.now(); if (f.n >= 5) { f.until = Date.now() + 15 * 60e3; f.n = 0; } fails.set(who, f);
+        return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
+      }
+      const next = typeof b.next === 'string' ? b.next : '';
+      if (next.length < 10 || next.length > 200) return json(res, 400, { error: 'รหัสผ่านใหม่ต้องยาว 10–200 ตัวอักษร' });
+      store.setPassword(next);
       for (const k of sessions.keys()) if (k !== s.token) sessions.delete(k);
       return json(res, 200, { ok: true });
     }
@@ -184,13 +220,15 @@ async function adminApi(req, res, url) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    for (const [k, v] of Object.entries(BASE_HEADERS)) res.setHeader(k, v);
+    if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     const url = new URL(req.url, 'http://x');
     const p = url.pathname;
 
     // ---------- admin (the only place that can change anything) ----------
     if (p === '/admin' || p.startsWith('/admin/')) {
       const sec = { 'Content-Security-Policy': ADMIN_CSP, 'X-Frame-Options': 'DENY', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store' };
-      if (p.startsWith('/admin/api/')) return adminApi(req, res, url);
+      if (p.startsWith('/admin/api/')) { for (const [k, v] of Object.entries(sec)) res.setHeader(k, v); return await adminApi(req, res, url); }
       if (p === '/admin' || p === '/admin/') return send(res, 200, fs.readFileSync(path.join(ADMIN_DIR, 'index.html')), 'text/html; charset=utf-8', sec);
       if (p === '/admin/admin.js' || p === '/admin/admin.css') return send(res, 200, fs.readFileSync(path.join(ADMIN_DIR, p.slice(7))), MIME[path.extname(p)], sec);
       return send(res, 404, 'Not found', 'text/plain', sec);
@@ -206,7 +244,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/' || p === '/home') return page(render.home(c, base));
     if (['/rewards', '/gameplay', '/drivers', '/news', '/faq'].includes(p)) return page(render[p.slice(1)](c, base));
     if (p.startsWith('/news/')) {
-      const slug = decodeURIComponent(p.slice(6)).replace(/\/$/, '');
+      let slug; try { slug = decodeURIComponent(p.slice(6)).replace(/\/$/, ''); } catch (e) { return page(render.notFound(c, base), 404); }
       const n = c.news.find(x => x.published && x.slug === slug);
       return n ? page(render.article(c, base, n)) : page(render.notFound(c, base), 404);
     }
@@ -225,7 +263,16 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-setInterval(() => { const t = Date.now(); for (const [k, v] of sessions) if (v.exp < t) sessions.delete(k); }, 600e3).unref();
+setInterval(() => {
+  const t = Date.now();
+  for (const [k, v] of sessions) if (v.exp < t) sessions.delete(k);
+  for (const [k, v] of fails) if (v.until < t && v.last < t - 3600e3) fails.delete(k);
+}, 600e3).unref();
+// a stray error must never take the whole site down
+process.on('unhandledRejection', e => console.error('unhandled:', e));
+// drop clients that send headers or bodies too slowly (slowloris-style)
+server.headersTimeout = 20e3;
+server.requestTimeout = 300e3;
 
 const created = store.ensureAdmin();
 server.listen(PORT, () => {

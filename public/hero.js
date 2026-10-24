@@ -20,7 +20,9 @@ const nav=$('#nav');
   const dpr=Math.min(2,devicePixelRatio||1);
   function build(){
     W=box.clientWidth;H=box.clientHeight;
-    cols=W<600?4:W<1000?6:8; rows=Math.max(4,Math.round(cols*H/W*1.05));
+    // not laid out yet (hidden tab, prerender): an empty size would mean endless rows and a frozen page
+    if(W<10||H<10){setTimeout(build,300);return}
+    cols=W<600?4:W<1000?6:8; rows=Math.min(40,Math.max(4,Math.round(cols*H/W*1.05)));
     tw=W/cols;th=H/rows;box.innerHTML='';box.appendChild(v);tiles=[];
     for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
       const h=document.createElement('div');h.className='h';h.style.cssText='left:'+(c*tw)+'px;top:'+(r*th)+'px;width:'+(tw+.5)+'px;height:'+(th+.5)+'px';box.appendChild(h);
