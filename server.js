@@ -152,7 +152,8 @@ const server = http.createServer(async (req, res) => {
     const page = (html, code) => send(res, code || 200, html, 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' });
 
     // ---------- public pages ----------
-    if (p === '/') return page(render.home(c, base));
+    // "/home" is an internal alias of "/" for hosts (e.g. Plesk nginx) that never forward the bare root to Node
+    if (p === '/' || p === '/home') return page(render.home(c, base));
     if (['/rewards', '/gameplay', '/drivers', '/news', '/faq'].includes(p)) return page(render[p.slice(1)](c, base));
     if (p.startsWith('/news/')) {
       const slug = decodeURIComponent(p.slice(6)).replace(/\/$/, '');
