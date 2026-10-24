@@ -144,7 +144,7 @@
       "id": "d1",
       "title": "Street Rookie",
       "desc": "น้องใหม่หัวใจนักแข่ง",
-      "image": "/img/keyart_rc_v1.jpg",
+      "image": "/img/keyart_rc_v1.png",
       "pos": "12% center",
       "badge": "COMING SOON"
     },
@@ -152,7 +152,7 @@
       "id": "d2",
       "title": "Drift King",
       "desc": "เจ้าแห่งโค้งสุดลื่น",
-      "image": "/img/keyart_rc_v1.jpg",
+      "image": "/img/keyart_rc_v1.png",
       "pos": "42% center",
       "badge": "COMING SOON"
     },
@@ -160,7 +160,7 @@
       "id": "d3",
       "title": "Speed Demon",
       "desc": "เร็วแรงทะลุขีดจำกัด",
-      "image": "/img/keyart_rc_v1.jpg",
+      "image": "/img/keyart_rc_v1.png",
       "pos": "72% center",
       "badge": "COMING SOON"
     },
@@ -168,7 +168,7 @@
       "id": "d4",
       "title": "Night Rider",
       "desc": "ราชาแห่งถนนยามค่ำ",
-      "image": "/img/keyart_rc_v1.jpg",
+      "image": "/img/keyart_rc_v1.png",
       "pos": "100% center",
       "badge": "COMING SOON"
     }
@@ -208,7 +208,7 @@
       "date": "2026-10-24",
       "tag": "ANNOUNCEMENT",
       "published": true,
-      "image": "/img/keyart_rc_v1.jpg",
+      "image": "/img/keyart_rc_v1.png",
       "excerpt": "ตำนานสตรีทเรซกลับมาอีกครั้งบนมือถือและคอม",
       "body": "## RAYCITY-M กลับมาแล้ว\nตำนานสตรีทเรซกลับมาอีกครั้ง เล่นได้ทั้งบนมือถือและคอมพิวเตอร์\n\n### ติดตามข่าวสาร\nติดตามประกาศและกิจกรรมได้ทางเพจเฟซบุ๊กอย่างเป็นทางการ",
       "seoTitle": "",

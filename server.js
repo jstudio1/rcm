@@ -12,8 +12,35 @@ const ADMIN_DIR = path.join(__dirname, 'admin');
 const UPLOADS = path.join(PUBLIC, 'uploads');
 fs.mkdirSync(UPLOADS, { recursive: true });
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.mp4': 'video/mp4', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8' };
-const IMG_EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8' };
+// uploadable media: extension, size limit, and a check on the file's first bytes
+const UPLOAD_TYPES = {
+  'image/jpeg': { ext: '.jpg', max: 10e6, sig: b => b[0] === 0xff && b[1] === 0xd8 },
+  'image/png': { ext: '.png', max: 10e6, sig: b => b.slice(0, 4).toString('hex') === '89504e47' },
+  'image/webp': { ext: '.webp', max: 10e6, sig: b => b.slice(0, 4).toString() === 'RIFF' && b.slice(8, 12).toString() === 'WEBP' },
+  'image/gif': { ext: '.gif', max: 10e6, sig: b => b.slice(0, 4).toString() === 'GIF8' },
+  'video/mp4': { ext: '.mp4', max: 60e6, sig: b => b.slice(4, 8).toString() === 'ftyp' },
+  'video/webm': { ext: '.webm', max: 60e6, sig: b => b.slice(0, 4).toString('hex') === '1a45dfa3' }
+};
+const MEDIA_EXT = { '.jpg': 'image', '.jpeg': 'image', '.png': 'image', '.webp': 'image', '.gif': 'image', '.svg': 'image', '.mp4': 'video', '.webm': 'video' };
+const MEDIA_DIRS = [['img', path.join(PUBLIC, 'img')], ['uploads', UPLOADS]];
+
+function listMedia() {
+  const out = [];
+  for (const [prefix, dir] of MEDIA_DIRS) {
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch (e) { continue; }
+    for (const name of names) {
+      const kind = MEDIA_EXT[path.extname(name).toLowerCase()];
+      if (!kind) continue;
+      try {
+        const st = fs.statSync(path.join(dir, name));
+        if (st.isFile()) out.push({ url: '/' + prefix + '/' + name, name, kind, size: st.size, time: st.mtimeMs, deletable: prefix === 'uploads' });
+      } catch (e) {}
+    }
+  }
+  return out.sort((a, b) => b.time - a.time);
+}
 
 const sessions = new Map(); // token -> { exp, csrf }
 const fails = new Map();    // ip -> { n, until }
@@ -37,14 +64,15 @@ function send(res, code, body, type, extra) {
 }
 const json = (res, code, obj, extra) => send(res, code, JSON.stringify(obj), 'application/json; charset=utf-8', Object.assign({ 'Cache-Control': 'no-store' }, extra));
 
-function readBody(req, limit) {
+function readRaw(req, limit) {
   return new Promise((resolve, reject) => {
     let n = 0; const parts = [];
     req.on('data', ch => { n += ch.length; if (n > limit) { reject(Object.assign(new Error('too large'), { code: 413 })); req.destroy(); } else parts.push(ch); });
-    req.on('end', () => resolve(Buffer.concat(parts).toString('utf8')));
+    req.on('end', () => resolve(Buffer.concat(parts)));
     req.on('error', reject);
   });
 }
+const readBody = async (req, limit) => (await readRaw(req, limit)).toString('utf8');
 
 function session(req) {
   const t = cookies(req).sid;
@@ -54,19 +82,29 @@ function session(req) {
   return Object.assign({ token: t }, s);
 }
 
-function serveFile(res, file, cache) {
+// supports byte ranges so videos can seek and play on iPhone/Safari
+function serveFile(req, res, file, cache) {
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) return send(res, 404, 'Not found', 'text/plain');
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': type, 'Content-Length': st.size, 'Cache-Control': cache || 'public, max-age=300', 'X-Content-Type-Options': 'nosniff' });
+    const hd = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': cache || 'public, max-age=300', 'X-Content-Type-Options': 'nosniff', 'Last-Modified': st.mtime.toUTCString() };
+    const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (r && (r[1] || r[2])) {
+      let a = r[1] ? +r[1] : Math.max(0, st.size - +r[2]), b = r[1] && r[2] ? Math.min(+r[2], st.size - 1) : st.size - 1;
+      if (a >= st.size || a > b) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}` }); return res.end(); }
+      res.writeHead(206, Object.assign(hd, { 'Content-Range': `bytes ${a}-${b}/${st.size}`, 'Content-Length': b - a + 1 }));
+      return req.method === 'HEAD' ? res.end() : fs.createReadStream(file, { start: a, end: b }).pipe(res);
+    }
+    res.writeHead(200, Object.assign(hd, { 'Content-Length': st.size }));
+    if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).pipe(res);
   });
 }
-function serveStatic(res, root, rel, cache) {
+function serveStatic(req, res, root, rel, cache) {
   let p; try { p = decodeURIComponent(rel); } catch (e) { return send(res, 400, 'Bad request', 'text/plain'); }
   const file = path.normalize(path.join(root, p));
   if (!file.startsWith(root + path.sep) || p.includes('\0')) return send(res, 403, 'Forbidden', 'text/plain');
-  serveFile(res, file, cache);
+  serveFile(req, res, file, cache);
 }
 
 const ADMIN_CSP = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; frame-ancestors 'none'; form-action 'self'";
@@ -107,15 +145,27 @@ async function adminApi(req, res, url) {
       const saved = store.saveContent(JSON.parse(await readBody(req, 4e6)));
       return json(res, 200, saved);
     }
+    if (route === 'media' && m === 'GET') return json(res, 200, { items: listMedia() });
+    // raw file body; the type comes from Content-Type and must match the file's first bytes
     if (route === 'upload' && m === 'POST') {
-      const b = JSON.parse(await readBody(req, 14e6));
-      const mm = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(b.data || '');
-      if (!mm) return json(res, 400, { error: 'รองรับเฉพาะไฟล์ JPG, PNG, WEBP, GIF' });
-      const buf = Buffer.from(mm[2], 'base64');
-      if (buf.length > 10e6) return json(res, 413, { error: 'ไฟล์ใหญ่เกิน 10MB' });
-      const name = Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex') + IMG_EXT[mm[1]];
+      const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+      const t = UPLOAD_TYPES[type];
+      if (!t) return json(res, 400, { error: 'รองรับเฉพาะรูป JPG, PNG, WEBP, GIF และวิดีโอ MP4, WEBM' });
+      let buf;
+      try { buf = await readRaw(req, t.max); } catch (e) { return json(res, 413, { error: 'ไฟล์ใหญ่เกิน ' + t.max / 1e6 + 'MB' }); }
+      if (buf.length < 12 || !t.sig(buf)) return json(res, 400, { error: 'ไฟล์เสียหายหรือไม่ตรงกับนามสกุล' });
+      const name = Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex') + t.ext;
       fs.writeFileSync(path.join(UPLOADS, name), buf);
       return json(res, 200, { url: '/uploads/' + name });
+    }
+    // only files uploaded through the admin can be deleted; built-in /img files are protected
+    if (route === 'media' && m === 'DELETE') {
+      const name = path.basename(url.searchParams.get('name') || '');
+      if (!name || !MEDIA_EXT[path.extname(name).toLowerCase()]) return json(res, 400, { error: 'ชื่อไฟล์ไม่ถูกต้อง' });
+      const file = path.join(UPLOADS, name);
+      if (!fs.existsSync(file)) return json(res, 404, { error: 'ไม่พบไฟล์' });
+      fs.unlinkSync(file);
+      return json(res, 200, { ok: true });
     }
     if (route === 'password' && m === 'POST') {
       const b = JSON.parse(await readBody(req, 4096));
@@ -166,7 +216,7 @@ const server = http.createServer(async (req, res) => {
     // ---------- static files ----------
     if (/\.[a-z0-9]+$/i.test(p)) {
       const long = p.startsWith('/img/') || p.startsWith('/uploads/');
-      return serveStatic(res, PUBLIC, p, long ? 'public, max-age=86400' : 'no-cache');
+      return serveStatic(req, res, PUBLIC, p, long ? 'public, max-age=86400' : 'no-cache');
     }
     return page(render.notFound(c, base), 404);
   } catch (e) {

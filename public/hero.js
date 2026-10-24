@@ -11,9 +11,11 @@ const nav=$('#nav');
   const POSX=small?.74:.5;
   // background video (720p on phones); the key art is the poster and the fallback
   const v=document.createElement('video');v.className='bgv';v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('muted','');
-  v.preload='auto';v.poster='img/keyart_rc_v1.jpg';v.src=small?'img/rc_burn_v2_720.mp4':'img/rc_burn_v2.mp4';
-  if(!reduce){v.autoplay=true;v.addEventListener('canplay',()=>{v.play().catch(()=>{})},{once:true})}
-  const still=new Image();still.src='img/keyart_rc_v1.jpg';
+  // file paths come from the admin (home > hero background) via data attributes
+  const src=(small?box.dataset.videoSm:box.dataset.video)||box.dataset.video||'',img=box.dataset.image||'';
+  v.preload='auto';if(img)v.poster=img;if(src)v.src=src;
+  if(!reduce&&src){v.autoplay=true;v.addEventListener('canplay',()=>{v.play().catch(()=>{})},{once:true})}
+  const still=new Image();if(img)still.src=img;
   let tiles=[],W=0,H=0,cols=8,rows=6,tw=1,th=1,built=false;
   const dpr=Math.min(2,devicePixelRatio||1);
   function build(){

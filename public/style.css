@@ -448,7 +448,7 @@ body{overflow-x:hidden}
 
 /* tile grid over a looping burnout video (RayCity login style): tiles are see-through glass at rest;
    when the cursor passes, a tile takes a snapshot of the video under it and spins over in 3D */
-.tiles{position:absolute;inset:0;z-index:0;overflow:hidden;background:#04060a url(img/keyart_rc_v1.jpg) center/cover no-repeat}
+.tiles{position:absolute;inset:0;z-index:0;overflow:hidden;background:#04060a center/cover no-repeat}
 .tiles .bgv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .tiles .h{position:absolute;background:#04060a;opacity:0;pointer-events:none}
 .tiles .h.on{opacity:1}
