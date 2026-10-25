@@ -3,6 +3,59 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const nav=$('#nav');
 
+/* Sound effects for the flipping tiles, synthesized with Web Audio (no audio files).
+   Browsers only allow sound after the visitor clicks, taps or presses a key, so the
+   engine starts on the first such gesture. The speaker button turns it on/off and the
+   choice is remembered. Each flip = a short air "whoosh" + a soft "clack" as it lands,
+   panned left/right by where the tile sits, with small random pitch so it never sounds canned. */
+const SFX=(function(){
+  const AC=window.AudioContext||window.webkitAudioContext;
+  let on=true,ctx=null,master=null,noise=null,last=0;
+  try{on=localStorage.getItem('rc-sfx')!=='off'}catch(e){}
+  const btns=$$('.snd');
+  const ready=()=>!!ctx&&ctx.state==='running';
+  const paint=()=>btns.forEach(b=>{b.setAttribute('aria-pressed',on);b.classList.toggle('wait',on&&!ready())});
+  function start(){
+    if(!on||!AC)return;
+    if(!ctx){
+      ctx=new AC();master=ctx.createGain();master.gain.value=.55;master.connect(ctx.destination);
+      const len=Math.floor(ctx.sampleRate*.3),buf=ctx.createBuffer(1,len,ctx.sampleRate),d=buf.getChannelData(0);
+      for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);
+      noise=buf;
+    }
+    if(ctx.state==='suspended')ctx.resume().then(paint,paint);
+    paint();
+  }
+  ['pointerdown','keydown','touchstart'].forEach(ev=>addEventListener(ev,start,{passive:true}));
+  function flip(pan,delayMs){
+    if(!on||!ready())return;
+    const ms=performance.now();if(ms-last<45)return;last=ms; // a sweep of tiles shouldn't turn into noise
+    const t=ctx.currentTime+(delayMs||0)/1000;
+    let out=master;
+    if(ctx.createStereoPanner){const p=ctx.createStereoPanner();p.pan.value=Math.max(-.9,Math.min(.9,pan));p.connect(master);out=p}
+    // whoosh: noise through a band-pass that sweeps up as the slab lifts
+    const n=ctx.createBufferSource(),bp=ctx.createBiquadFilter(),g=ctx.createGain();
+    n.buffer=noise;n.playbackRate.value=.85+Math.random()*.4;
+    bp.type='bandpass';bp.Q.value=1.4;bp.frequency.setValueAtTime(700,t);bp.frequency.exponentialRampToValueAtTime(2400+Math.random()*600,t+.2);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.16,t+.04);g.gain.exponentialRampToValueAtTime(.001,t+.3);
+    n.connect(bp);bp.connect(g);g.connect(out);n.start(t);n.stop(t+.31);
+    // clack: a short pitched thump when the slab settles back
+    const t2=t+.62+Math.random()*.08,o=ctx.createOscillator(),og=ctx.createGain();
+    o.type='triangle';o.frequency.setValueAtTime(170+Math.random()*70,t2);o.frequency.exponentialRampToValueAtTime(65,t2+.09);
+    og.gain.setValueAtTime(0,t2);og.gain.linearRampToValueAtTime(.2,t2+.006);og.gain.exponentialRampToValueAtTime(.001,t2+.13);
+    o.connect(og);og.connect(out);o.start(t2);o.stop(t2+.14);
+  }
+  function toggle(){
+    on=!on;
+    try{localStorage.setItem('rc-sfx',on?'on':'off')}catch(e){}
+    if(on){start();setTimeout(()=>flip(0),60)} // short preview so the visitor hears what they turned on
+    paint();
+  }
+  btns.forEach(b=>b.addEventListener('click',toggle));
+  paint();
+  return {flip};
+})();
+
 /* tile grid over the burnout loop video (RayCity login style) */
 (function(){
   const box=document.getElementById('tiles');if(!box)return;
@@ -54,6 +107,7 @@ const nav=$('#nav');
     const dur=900+Math.random()*140;
     setTimeout(()=>{
       if(!snap(o)){o.busy=false;return}
+      SFX.flip((o.c+.5)/cols*2-1);
       o.t.classList.toggle('x',!horiz);o.t.classList.add('fl');o.h.classList.add('on');
       // a thick slab: lifts toward the viewer, turns a full revolution with a small damped wobble, settles back
       const P='perspective(900px) ';
