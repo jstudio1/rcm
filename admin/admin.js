@@ -285,6 +285,171 @@
     return h('div', { class: 'a-lc' }, h('div', { class: 'ic' }, mark2), h('div', {}, h('div', { class: 'row' }, h('b', {}, name), chip), inp, h('div', { style: 'margin-top:8px' }, open)));
   }
 
+  // ---------- PageSpeed Insights ----------
+  // Runs Google's test on the live site from the server, shows the scores, Core Web Vitals,
+  // real-user data and top fixes, and charts the performance score over time.
+  let psiTimer = null;
+  const sv = (tag, attrs, ...kids) => {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+    for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k));
+    return e;
+  };
+  // Google's own bands: score 90+ good, 50–89 needs work, below 50 poor; metric limits per Core Web Vitals
+  const band = v => (v == null ? 'na' : v >= 90 ? 'good' : v >= 50 ? 'mid' : 'bad');
+  const BAND_TXT = { good: 'ดี', mid: 'ควรปรับปรุง', bad: 'ต้องแก้', na: 'ไม่มีข้อมูล' };
+  const LIM = { fcp: [1800, 3000], lcp: [2500, 4000], tbt: [200, 600], cls: [0.1, 0.25], si: [3400, 5800], inp: [200, 500] };
+  const mBand = (k, v) => (v == null ? 'na' : v <= LIM[k][0] ? 'good' : v <= LIM[k][1] ? 'mid' : 'bad');
+  const FIELD_BAND = { FAST: 'good', AVERAGE: 'mid', SLOW: 'bad' };
+  const fmtV = (k, v) => (v == null ? '—' : k === 'cls' ? v.toFixed(3) : v >= 1000 ? (v / 1000).toFixed(1) + ' s' : Math.round(v) + ' ms');
+  const when2 = iso => new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  const DEV = { mobile: 'มือถือ', desktop: 'คอม' };
+  const MLABEL = {
+    fcp: ['FCP', 'เวลาที่เห็นเนื้อหาแรก'], lcp: ['LCP', 'เวลาที่เห็นเนื้อหาหลัก'], tbt: ['TBT', 'เวลาที่หน้าค้าง'],
+    cls: ['CLS', 'หน้ากระตุกขณะโหลด'], si: ['Speed Index', 'ความเร็วการแสดงผลรวม'], inp: ['INP', 'ความไวเมื่อกด/แตะ']
+  };
+  const status = b => h('span', { class: 'ps-b ' + b }, h('i'), BAND_TXT[b]); // colour + dot + word, never colour alone
+
+  function gauge(v, label) {
+    const b = band(v), r = 34, C = 2 * Math.PI * r;
+    const svg = sv('svg', { viewBox: '0 0 80 80', class: 'ps-ring ' + b, role: 'img', 'aria-label': label + ' ' + (v == null ? '-' : v) },
+      sv('circle', { cx: 40, cy: 40, r, class: 'tr' }),
+      v == null ? null : sv('circle', { cx: 40, cy: 40, r, class: 'ar', 'stroke-dasharray': C, 'stroke-dashoffset': C * (1 - v / 100), transform: 'rotate(-90 40 40)' }),
+      sv('text', { x: 40, y: 47, 'text-anchor': 'middle' }, v == null ? '–' : String(v)));
+    return h('div', { class: 'ps-g' }, svg, h('b', {}, label), status(b));
+  }
+  const tile = (k, v, b) => h('div', { class: 'ps-m' }, h('div', { class: 'lb' }, h('b', {}, MLABEL[k][0]), h('small', {}, MLABEL[k][1])), h('div', { class: 'v' }, fmtV(k, v)), status(b));
+
+  function result(r) {
+    if (!r) return h('div', { class: 'a-empty' }, 'ยังไม่เคยตรวจอุปกรณ์นี้ กดปุ่มด้านบนเพื่อเริ่ม');
+    const fullUrl = 'https://pagespeed.web.dev/analysis?url=' + encodeURIComponent(r.url) + '&form_factor=' + r.strategy;
+    const f = r.field;
+    return h('div', { class: 'ps-res' },
+      h('div', { class: 'ps-meta' }, h('span', {}, 'ตรวจ ', h('b', {}, r.url), ' · ', when2(r.at), r.source === 'auto' ? ' · ตรวจอัตโนมัติ' : ''),
+        h('a', { class: 'ghost sm', href: fullUrl, target: '_blank', rel: 'noopener noreferrer' }, 'เปิดรายงานเต็มบน Google ↗')),
+      r.drop ? h('div', { class: 'a-note' }, '⚠ คะแนนประสิทธิภาพลดลง ' + r.drop + ' คะแนนจากการตรวจครั้งก่อนของหน้านี้') : null,
+      h('div', { class: 'ps-gs' }, gauge(r.scores.perf, 'ประสิทธิภาพ'), gauge(r.scores.a11y, 'การช่วยเหลือพิเศษ'), gauge(r.scores.bp, 'แนวทางปฏิบัติ'), gauge(r.scores.seo, 'SEO')),
+      h('div', { class: 'ps-two' },
+        h('div', {},
+          h('h4', {}, 'ผลทดสอบ (ห้องทดลองของ Google)'),
+          h('div', { class: 'ps-ms' }, ...['fcp', 'lcp', 'tbt', 'cls', 'si'].map(k => tile(k, r.metrics[k] && r.metrics[k].v, mBand(k, r.metrics[k] && r.metrics[k].v))))),
+        r.screenshot ? h('figure', { class: 'ps-shot' }, h('img', { src: r.screenshot, alt: 'ภาพหน้าจอตอนโหลดเสร็จ' }), h('figcaption', {}, 'หน้าจอที่ Google เห็น')) : null),
+      h('h4', {}, 'ข้อมูลผู้ใช้จริง (Chrome, ย้อนหลัง 28 วัน)'),
+      f ? h('div', { class: 'ps-ms' }, ...['lcp', 'inp', 'cls', 'fcp'].filter(k => f[k]).map(k => tile(k, f[k].v, FIELD_BAND[f[k].c] || mBand(k, f[k].v))))
+        : h('div', { class: 'a-note' }, 'ยังไม่มีข้อมูลจากผู้ใช้จริง Google จะแสดงเมื่อมีผู้เข้าชมผ่าน Chrome มากพอ (ปกติสำหรับเว็บใหม่) ระหว่างนี้ใช้ผลทดสอบด้านบนแทน'),
+      f && f.origin ? h('small', { class: 'h' }, 'หน้านี้ยังมีข้อมูลไม่พอ จึงแสดงค่าเฉลี่ยของทั้งเว็บแทน') : null,
+      h('h4', {}, 'สิ่งที่ควรแก้ (เรียงตามผลกระทบ)'),
+      r.opps && r.opps.length ? h('ol', { class: 'ps-opps' }, ...r.opps.map(o => h('li', {}, h('span', {}, o.title, o.display ? h('small', {}, o.display) : null),
+        o.ms >= 50 ? h('em', {}, 'ประหยัด ~' + (o.ms >= 1000 ? (o.ms / 1000).toFixed(1) + ' วิ' : o.ms + ' ms')) : null)))
+        : h('div', { class: 'a-note ok' }, 'ไม่มีรายการที่ต้องแก้ เยี่ยมมาก'));
+  }
+
+  // performance score over time: one line per device, crosshair tooltip on hover, table below
+  function chart(hist) {
+    const W = 720, H = 230, L = 40, R = 86, T = 16, B = 30;
+    const wrap = h('div', { class: 'ps-chart' });
+    const pts = hist.filter(x => x.scores.perf != null).map(x => ({ x, t: Date.parse(x.at), v: x.scores.perf }));
+    if (pts.length < 2) { wrap.append(h('div', { class: 'a-empty' }, 'ตรวจอย่างน้อย 2 ครั้งเพื่อดูกราฟแนวโน้ม')); return wrap; }
+    const t0 = Math.min(...pts.map(p => p.t)), t1 = Math.max(...pts.map(p => p.t)), span = Math.max(1, t1 - t0);
+    const X = t => L + (W - L - R) * (t - t0) / span, Y = v => T + (H - T - B) * (1 - v / 100);
+    const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ps-svg', role: 'img', 'aria-label': 'กราฟคะแนนประสิทธิภาพตามเวลา' });
+    for (const g of [0, 50, 90, 100]) svg.append(sv('line', { x1: L, x2: W - R, y1: Y(g), y2: Y(g), class: g === 50 || g === 90 ? 'th' : 'gr' }), sv('text', { x: L - 8, y: Y(g) + 4, 'text-anchor': 'end', class: 'ax' }, String(g)));
+    const fmtD = t => new Date(t).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+    svg.append(sv('text', { x: L, y: H - 8, class: 'ax' }, fmtD(t0)), sv('text', { x: W - R, y: H - 8, 'text-anchor': 'end', class: 'ax' }, fmtD(t1)));
+    const legend = h('div', { class: 'ps-leg' });
+    for (const dev of ['mobile', 'desktop']) {
+      const s = pts.filter(p => p.x.strategy === dev);
+      legend.append(h('span', { class: 'k ' + dev }, h('i'), DEV[dev]));
+      if (!s.length) continue;
+      if (s.length > 1) svg.append(sv('path', { class: 'ln ' + dev, d: s.map((p, i) => (i ? 'L' : 'M') + X(p.t).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join(' ') }));
+      for (const p of s) svg.append(p.el = sv('circle', { class: 'dt ' + dev, cx: X(p.t), cy: Y(p.v), r: 4 }));
+      const last = s[s.length - 1];
+      svg.append(sv('text', { x: X(last.t) + 10, y: Y(last.v) + 4, class: 'dl' }, DEV[dev] + ' ' + last.v)); // direct label at the latest point
+    }
+    // hover: snap to the nearest test, draw a crosshair and show its numbers
+    const cross = sv('line', { class: 'cx', y1: T, y2: H - B, x1: -10, x2: -10 });
+    const hit = sv('rect', { x: L, y: 0, width: W - L - R, height: H, fill: 'transparent' });
+    svg.append(cross, hit);
+    const tip = h('div', { class: 'ps-tip', hidden: true });
+    let on = null;
+    hit.addEventListener('pointermove', e => {
+      const box = svg.getBoundingClientRect(), mx = (e.clientX - box.left) * W / box.width;
+      const p = pts.reduce((a, q) => (Math.abs(X(q.t) - mx) < Math.abs(X(a.t) - mx) ? q : a));
+      if (on) on.el.classList.remove('on');
+      on = p; p.el.classList.add('on');
+      cross.setAttribute('x1', X(p.t)); cross.setAttribute('x2', X(p.t));
+      const s = p.x.scores;
+      tip.replaceChildren(h('b', {}, when2(p.x.at)), h('div', {}, h('span', { class: 'k ' + p.x.strategy }, h('i'), DEV[p.x.strategy]), ' · ', p.x.path),
+        h('div', {}, 'ประสิทธิภาพ ', h('strong', {}, String(s.perf))), h('div', { class: 'mu' }, `ช่วยเหลือพิเศษ ${s.a11y ?? '–'} · แนวทาง ${s.bp ?? '–'} · SEO ${s.seo ?? '–'}`));
+      tip.hidden = false;
+      const left = X(p.t) / W * box.width;
+      tip.style.left = Math.min(box.width - 190, Math.max(0, left + 12)) + 'px';
+      tip.style.top = Math.max(0, Y(p.v) / H * box.height - 30) + 'px';
+    });
+    hit.addEventListener('pointerleave', () => { tip.hidden = true; cross.setAttribute('x1', -10); cross.setAttribute('x2', -10); if (on) on.el.classList.remove('on'); });
+    wrap.append(legend, h('div', { class: 'ps-plot' }, svg, tip));
+    return wrap;
+  }
+  const histTable = hist => h('div', { class: 'ps-tbl' }, h('table', {},
+    h('thead', {}, h('tr', {}, ...['เวลา', 'อุปกรณ์', 'หน้า', 'ประสิทธิภาพ', 'ช่วยเหลือ', 'แนวทาง', 'SEO', 'LCP', 'CLS', 'แบบ'].map(t => h('th', {}, t)))),
+    h('tbody', {}, ...hist.slice().reverse().slice(0, 25).map(x => h('tr', {},
+      h('td', {}, when2(x.at)), h('td', {}, DEV[x.strategy]), h('td', {}, x.path),
+      ...['perf', 'a11y', 'bp', 'seo'].map(k => h('td', { class: 'n ' + band(x.scores[k]) }, x.scores[k] == null ? '–' : String(x.scores[k]))),
+      h('td', {}, fmtV('lcp', x.metrics.lcp && x.metrics.lcp.v)), h('td', {}, fmtV('cls', x.metrics.cls && x.metrics.cls.v)),
+      h('td', {}, x.source === 'auto' ? 'อัตโนมัติ' : 'กดเอง'))))));
+
+  function pagespeedView() {
+    const host = h('div', {}, h('div', { class: 'a-empty' }, 'กำลังโหลด…'));
+    let S = null, dev = 'mobile', page = '/';
+    const draw = () => {
+      if (cur !== 'pagespeed') return;
+      const run = S.running;
+      const pageSel = h('select', { onchange: e => { page = e.target.value; draw(); } }, ...S.pages.map(([p, l]) => { const o = h('option', { value: p }, l + ' (' + p + ')'); if (p === page) o.selected = true; return o; }));
+      const go = d => async () => {
+        try { await api('pagespeed/run', 'POST', { strategy: d, path: page }); dev = d; await load(); } catch (e) { alert(e.message); }
+      };
+      const btns = ['mobile', 'desktop'].map(d => h('button', { type: 'button', class: d === 'mobile' ? 'btn sm' : 'ghost sm', disabled: !!run || !S.siteUrl, onclick: go(d) }, (d === 'mobile' ? '📱 ' : '💻 ') + 'ตรวจ' + DEV[d]));
+      const top = box('ตรวจความเร็วเว็บ (Google PageSpeed Insights)',
+        !S.siteUrl ? h('div', { class: 'a-note' }, 'ตั้ง "โดเมนหลัก" ในเมนู ข้อมูลเว็บ & SEO หลัก ก่อน Google ตรวจได้เฉพาะเว็บที่ออนไลน์จริง') : null,
+        h('div', { class: 'ps-run' }, h('label', { class: 'a-f' }, h('span', {}, 'หน้าที่จะตรวจ'), pageSel), h('div', { class: 'bt' }, ...btns)),
+        run ? h('div', { class: 'ps-wait' }, h('i', { class: 'sp' }), `กำลังตรวจ${DEV[run.strategy]} หน้า ${run.path} … ${run.elapsed} วินาที (ปกติ 15–40 วินาที)`) : null,
+        S.error ? h('div', { class: 'a-err', style: 'text-align:left' }, S.error.msg) : null,
+        !S.hasKey ? h('small', { class: 'h' }, 'ต้องใส่ Google API key ก่อน (ฟรี): การตรวจแบบไม่มี key ใช้โควตารวมของทุกคนทั่วโลกซึ่งมักเต็ม ใส่ key ได้ที่ "การตั้งค่า" ด้านล่าง') : null);
+      const tabs = {};
+      const seg = h('div', { class: 'a-seg' }, ...['mobile', 'desktop'].map(d => (tabs[d] = h('button', { type: 'button', class: d === dev ? 'on' : '', onclick: () => { dev = d; draw(); } }, DEV[d]))));
+      const latest = S.latest[dev];
+      const hist = S.history.filter(x => x.path === page);
+      const autoChk = h('input', { type: 'checkbox' }); autoChk.checked = !!S.auto.on;
+      const hourSel = h('select', {}, ...Array.from({ length: 24 }, (_, i) => { const o = h('option', { value: i }, String(i).padStart(2, '0') + ':00 น.'); if (i === S.auto.hour) o.selected = true; return o; }));
+      const keyInp = h('input', { type: 'password', autocomplete: 'off', placeholder: S.hasKey ? 'ใส่ key ใหม่เพื่อเปลี่ยน (ตอนนี้: ' + S.keyHint + ')' : 'วาง API key ที่นี่' });
+      const saveSet = async body => { try { const r = await api('pagespeed/settings', 'POST', body); Object.assign(S, r); toast('บันทึกแล้ว ✓'); draw(); } catch (e) { alert(e.message); } };
+      host.replaceChildren(top,
+        box('ผลล่าสุด', seg, latest && latest.path !== page ? h('small', { class: 'h' }, 'ผลล่าสุดของ' + DEV[dev] + 'เป็นของหน้า ' + latest.path) : null, result(latest)),
+        box('แนวโน้มคะแนนประสิทธิภาพ: ' + (S.pages.find(p => p[0] === page) || [page, page])[1], chart(hist), hist.length ? histTable(hist) : null),
+        box('การตั้งค่า',
+          h('div', { class: 'a-f' }, h('span', {}, 'Google API key ' + (S.hasKey ? '(ตั้งค่าแล้ว ' + S.keyHint + ')' : '(ยังไม่ได้ตั้ง)')),
+            h('div', { class: 'ps-key' }, keyInp, h('button', { type: 'button', class: 'btn sm', onclick: () => saveSet({ key: keyInp.value }) }, 'บันทึก key'),
+              S.hasKey ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { if (confirm('ลบ API key?')) saveSet({ key: '' }); } }, 'ลบ key') : null),
+            h('span', { class: 'h' }, 'วิธีขอ key (ฟรี): console.cloud.google.com > APIs & Services > Library > ค้นหา "PageSpeed Insights API" > Enable > Credentials > Create credentials > API key (แนะนำจำกัดให้ใช้ได้เฉพาะ PageSpeed Insights API) · key เก็บบนเซิร์ฟเวอร์เท่านั้น ไม่แสดงในหน้าเว็บ')),
+          h('div', { class: 'a-f' }, h('span', {}, 'ตรวจอัตโนมัติทุกวัน (หน้าแรก มือถือ + คอม)'),
+            h('div', { class: 'ps-key' }, h('label', { class: 'a-chk' }, autoChk, 'เปิด'), h('span', {}, 'หลังเวลา'), hourSel,
+              h('button', { type: 'button', class: 'btn sm', onclick: () => saveSet({ auto: { on: autoChk.checked, hour: hourSel.value } }) }, 'บันทึก')),
+            h('span', { class: 'h' }, 'ผลเก็บในกราฟและตารางด้านบน ถ้าคะแนนลดลง 10 คะแนนขึ้นไปจะมีป้ายเตือน' + (S.lastAuto ? ' · ตรวจอัตโนมัติล่าสุด ' + S.lastAuto : '')))));
+      clearTimeout(psiTimer);
+      if (run) psiTimer = setTimeout(load, 3000);
+    };
+    const load = async () => {
+      try {
+        const prevRun = S && S.running;
+        S = await api('pagespeed');
+        if (prevRun && !S.running) toast(S.error ? 'ตรวจไม่สำเร็จ' : 'ตรวจเสร็จแล้ว ✓');
+        draw();
+      } catch (e) { host.replaceChildren(h('div', { class: 'a-empty' }, 'โหลดไม่สำเร็จ: ' + e.message)); }
+    };
+    load();
+    return host;
+  }
+
   // ---------- sections ----------
   const PN = { rewards: 'Rewards', gameplay: 'Gameplay', drivers: 'Drivers', news: 'News', faq: 'FAQ' };
   const SECTIONS = [
@@ -359,6 +524,8 @@
           linkCard(C.links.social, 'discord', 'Discord', 'DC', 'ปุ่มกด = เร็วๆ นี้'), linkCard(C.links.social, 'youtube', 'YouTube', 'YT', 'ปุ่มกด = เร็วๆ นี้'))] },
     { id: 'media', g: 'ตั้งค่าเว็บ', label: 'คลังรูป & วิดีโอ', desc: 'ไฟล์รูปและวิดีโอทั้งหมดบนเว็บ อัปโหลด ดูตัวอย่าง คัดลอกลิงก์ หรือลบไฟล์ที่อัปโหลดเอง (ไฟล์ระบบใน /img ลบจากที่นี่ไม่ได้)', paths: [],
       view: () => mediaLibrary({ kind: 'all' }) },
+    { id: 'pagespeed', g: 'ตั้งค่าเว็บ', label: 'PageSpeed', desc: 'ตรวจความเร็วและคะแนน SEO ของเว็บจริงด้วย Google PageSpeed Insights ดูแนวโน้มย้อนหลัง และตั้งให้ตรวจอัตโนมัติทุกวัน', paths: [],
+      view: () => pagespeedView() },
     { id: 'history', g: 'ตั้งค่าเว็บ', label: 'ประวัติการแก้ไข', desc: 'ทุกครั้งที่บันทึก ระบบเก็บสำเนาก่อนหน้าไว้ 40 ครั้งล่าสุด โหลดกลับมาแล้วกดบันทึกเพื่อย้อนเวอร์ชัน', paths: [],
       view: () => {
         const host = h('div', { class: 'a-list' }, h('div', { class: 'a-empty' }, 'กำลังโหลด…'));

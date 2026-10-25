@@ -44,3 +44,9 @@ $env:ADMIN_USER="admin"; $env:ADMIN_PASSWORD="รหัสผ่านของ�
 - หลังบ้าน > ข้อมูลเว็บ & SEO หลัก > เครื่องมือ SEO & สถิติ: รหัสยืนยัน Google Search Console / Bing, Google Analytics 4, บัญชี X
 - หลังบ้าน > หน้าแต่ละหน้า: รูปแชร์เฉพาะหน้า และปุ่ม "ซ่อนจาก Google (noindex)"
 - ข่าวและ Drivers มีช่อง alt ของรูป
+
+## PageSpeed (หลังบ้าน > PageSpeed)
+- ตรวจความเร็ว/คะแนนของเว็บจริงด้วย Google PageSpeed Insights ได้ทั้งมือถือและคอม เลือกหน้าได้ เก็บประวัติพร้อมกราฟ และตั้งให้ตรวจอัตโนมัติวันละครั้ง (หน้าแรก มือถือ + คอม)
+- **ต้องใส่ Google API key (ฟรี)** ที่ "การตั้งค่า" ในหน้านั้น: console.cloud.google.com > APIs & Services > Library > "PageSpeed Insights API" > Enable > Credentials > Create credentials > API key
+- ต้องตั้ง "โดเมนหลัก" ก่อน เพราะ Google ตรวจได้เฉพาะเว็บที่ออนไลน์ (ตรวจ localhost ไม่ได้)
+- ข้อมูลและ key เก็บใน `data/pagespeed.json` (ไม่อยู่ใน git, key ไม่ถูกส่งไปที่หน้าเว็บ)

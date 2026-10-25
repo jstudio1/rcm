@@ -2,6 +2,8 @@ data/admin.json
 data/history/
 data/sessions.json
 data/limits.json
+data/pagespeed.json
+data/pagespeed-auto-*.lock
 public/uploads/
 .claude/
 node_modules/

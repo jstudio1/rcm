@@ -5,7 +5,8 @@ const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const store = require('./lib/store');
-const { render } = require('./lib/render');
+const { render, PAGES } = require('./lib/render');
+const psi = require('./lib/pagespeed');
 
 const PORT = +process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -70,6 +71,8 @@ const baseUrl = (req, c) => {
   const host = (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host || '';
   return (isHttps(req) ? 'https' : 'http') + '://' + (HOST_RE.test(host) ? host.toLowerCase() : 'localhost');
 };
+// public address of a page on the live site (PageSpeed needs the real domain, not localhost)
+const siteUrlFor = (p, c) => { const s = String(c.site.url || '').trim().replace(/\/+$/, ''); return SITE_URL_RE.test(s) ? s + p : ''; };
 // client address for login rate limiting; behind a local proxy, the last X-Forwarded-For entry is the one it added
 const ip = req => { const f = fwd(req, 'x-forwarded-for'); return (f && f[f.length - 1]) || peer(req); };
 const cookies = req => Object.fromEntries((req.headers.cookie || '').split(';').map(s => s.trim().split('=')).filter(p => p[0]).map(([k, ...v]) => [k, v.join('=')]));
@@ -259,6 +262,30 @@ async function adminApi(req, res, url) {
       if (!complete) return json(res, 400, { error: 'ข้อมูลไม่ครบ ระบบไม่บันทึกเพื่อป้องกันเนื้อหาหาย' });
       return json(res, 200, store.saveContent(b));
     }
+    // ---- PageSpeed Insights: status/history, start a test, settings ----
+    if (route === 'pagespeed' && m === 'GET') {
+      const c = store.getContent();
+      const pages = [['/', 'หน้าแรก']].concat(PAGES.map(k => ['/' + k, c.pages[k].navLabel || k]))
+        .concat(c.news.filter(n => n.published).map(n => ['/news/' + encodeURIComponent(n.slug), 'ข่าว: ' + n.title]));
+      return json(res, 200, Object.assign(psi.status(), { siteUrl: siteUrlFor('/', c) ? siteUrlFor('', c) : '', pages }));
+    }
+    if (route === 'pagespeed/run' && m === 'POST') {
+      const b = JSON.parse(await readBody(req, 4096)) || {};
+      const c = store.getContent();
+      const strategy = b.strategy === 'desktop' ? 'desktop' : 'mobile';
+      const p = typeof b.path === 'string' ? b.path : '/';
+      const known = ['/'].concat(PAGES.map(k => '/' + k), c.news.filter(n => n.published).map(n => '/news/' + encodeURIComponent(n.slug)));
+      if (!known.includes(p)) return json(res, 400, { error: 'ไม่พบหน้านี้' });
+      const target = siteUrlFor(p, c);
+      if (!target) return json(res, 400, { error: 'ตั้ง "โดเมนหลัก" ในเมนู ข้อมูลเว็บ & SEO หลัก ก่อน (Google ตรวจได้เฉพาะเว็บที่ออนไลน์)' });
+      if (!psi.start(strategy, p, target, 'manual')) return json(res, 409, { error: 'กำลังตรวจอยู่ รอให้เสร็จก่อน' });
+      return json(res, 202, { ok: true });
+    }
+    if (route === 'pagespeed/settings' && m === 'POST') {
+      const b = JSON.parse(await readBody(req, 4096)) || {};
+      try { psi.saveSettings(b); } catch (e) { if (e.user) return json(res, 400, { error: e.message }); throw e; }
+      return json(res, 200, psi.status());
+    }
     if (route === 'media' && m === 'GET') return json(res, 200, { items: listMedia() });
     // raw file body; the type comes from Content-Type and must match the file's first bytes
     if (route === 'upload' && m === 'POST') {
@@ -368,6 +395,8 @@ setInterval(() => {
   try { sessions.prune(); } catch (e) {}
   try { fails.prune(); } catch (e) {}
 }, 600e3).unref();
+// daily PageSpeed auto-check (only does anything when switched on in the admin)
+setInterval(() => { try { psi.autoTick(p => siteUrlFor(p, store.getContent())); } catch (e) { console.error('pagespeed auto:', e.message); } }, 300e3).unref();
 // a stray error must never take the whole site down
 process.on('unhandledRejection', e => console.error('unhandled:', e));
 // drop clients that send headers or bodies too slowly (slowloris-style)
