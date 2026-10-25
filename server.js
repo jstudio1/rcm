@@ -3,6 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const store = require('./lib/store');
 const { render } = require('./lib/render');
 
@@ -12,7 +13,7 @@ const ADMIN_DIR = path.join(__dirname, 'admin');
 const UPLOADS = path.join(PUBLIC, 'uploads');
 fs.mkdirSync(UPLOADS, { recursive: true });
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8', '.woff2': 'font/woff2' };
 // uploadable media: extension, size limit, and a check on the file's first bytes
 const UPLOAD_TYPES = {
   'image/jpeg': { ext: '.jpg', max: 10e6, sig: b => b[0] === 0xff && b[1] === 0xd8 },
@@ -30,9 +31,13 @@ function listMedia() {
   for (const [prefix, dir] of MEDIA_DIRS) {
     let names = [];
     try { names = fs.readdirSync(dir); } catch (e) { continue; }
+    const set = new Set(names.map(n => n.toLowerCase()));
     for (const name of names) {
       const kind = MEDIA_EXT[path.extname(name).toLowerCase()];
       if (!kind) continue;
+      // a .webp made as the fast twin of a .jpg/.png is served automatically: list only the original
+      const stem = name.toLowerCase().replace(/\.webp$/, '');
+      if (stem !== name.toLowerCase() && ['.jpg', '.jpeg', '.png'].some(e => set.has(stem + e))) continue;
       try {
         const st = fs.statSync(path.join(dir, name));
         if (st.isFile()) out.push({ url: '/' + prefix + '/' + name, name, kind, size: st.size, time: st.mtimeMs, deletable: prefix === 'uploads' });
@@ -43,14 +48,17 @@ function listMedia() {
 }
 
 const sessions = store.sessions; // token -> { exp, csrf }, stored in data/sessions.json
-const fails = new Map();    // ip -> { n, until }
+const fails = store.limits; // failed logins per client, shared via data/limits.json
 const SESSION_MS = 8 * 3600e3;
 
 // X-Forwarded-* headers are only believed when they come from a reverse proxy on this machine
 // (e.g. Plesk nginx), or when TRUST_PROXY=1. Anyone else could fake them.
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 // no remote address = connected over a local socket (e.g. Plesk/Passenger), which is also a local proxy
-const fromProxy = req => process.env.TRUST_PROXY === '1' || !req.socket.remoteAddress || LOOPBACK.has(req.socket.remoteAddress);
+// (the peer address is captured when the request arrives: once a client disconnects it reads as empty,
+// which must not be mistaken for a local proxy)
+const peer = req => (req.peer !== undefined ? req.peer : (req.peer = req.socket.remoteAddress || ''));
+const fromProxy = req => { const a = peer(req); return process.env.TRUST_PROXY === '1' || a === '' || LOOPBACK.has(a); };
 const fwd = (req, name) => fromProxy(req) && req.headers[name] ? String(req.headers[name]).split(',').map(s => s.trim()) : null;
 const isHttps = req => !!req.socket.encrypted || (fwd(req, 'x-forwarded-proto') || [])[0] === 'https';
 const HOST_RE = /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
@@ -63,16 +71,33 @@ const baseUrl = (req, c) => {
   return (isHttps(req) ? 'https' : 'http') + '://' + (HOST_RE.test(host) ? host.toLowerCase() : 'localhost');
 };
 // client address for login rate limiting; behind a local proxy, the last X-Forwarded-For entry is the one it added
-const ip = req => { const f = fwd(req, 'x-forwarded-for'); return (f && f[f.length - 1]) || req.socket.remoteAddress || ''; };
+const ip = req => { const f = fwd(req, 'x-forwarded-for'); return (f && f[f.length - 1]) || peer(req); };
 const cookies = req => Object.fromEntries((req.headers.cookie || '').split(';').map(s => s.trim().split('=')).filter(p => p[0]).map(([k, ...v]) => [k, v.join('=')]));
 
+// ---- compression: brotli (or gzip) for text; images and video are already compressed ----
+const COMPRESSIBLE = /^(text\/|application\/(json|xml|javascript)|image\/svg)/;
+const pickEnc = req => { const a = String(req && req.headers['accept-encoding'] || ''); return /\bbr\b/.test(a) ? 'br' : /\bgzip\b/.test(a) ? 'gzip' : null; };
+const squeeze = (buf, enc, q) => enc === 'br'
+  ? zlib.brotliCompressSync(buf, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: q, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: buf.length } })
+  : zlib.gzipSync(buf, { level: Math.min(9, q) });
+
 function send(res, code, body, type, extra) {
-  res.writeHead(code, Object.assign({
-    'Content-Type': type || 'text/html; charset=utf-8',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'strict-origin-when-cross-origin'
-  }, extra || {}));
-  res.end(body);
+  type = type || 'text/html; charset=utf-8';
+  const hd = Object.assign({ 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' }, extra || {});
+  let buf = body == null ? Buffer.alloc(0) : Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+  const enc = COMPRESSIBLE.test(type) && buf.length >= 860 ? pickEnc(res.req) : null;
+  if (enc) { buf = squeeze(buf, enc, 5); hd['Content-Encoding'] = enc; }
+  if (COMPRESSIBLE.test(type)) hd.Vary = 'Accept-Encoding';
+  hd['Content-Length'] = buf.length;
+  res.writeHead(code, hd);
+  res.end(res.req && res.req.method === 'HEAD' ? undefined : buf);
+}
+// HTML pages: an ETag lets returning visitors get a tiny "304 Not Modified" instead of the whole page
+function sendPage(req, res, code, html, extra) {
+  const etag = 'W/"' + crypto.createHash('sha1').update(html).digest('base64url').slice(0, 20) + '"';
+  const hd = Object.assign({ 'Cache-Control': 'no-cache', ETag: etag }, extra || {});
+  if (code === 200 && req.headers['if-none-match'] === etag) { res.writeHead(304, hd); return res.end(); }
+  send(res, code, html, 'text/html; charset=utf-8', hd);
 }
 const json = (res, code, obj, extra) => send(res, code, JSON.stringify(obj), 'application/json; charset=utf-8', Object.assign({ 'Cache-Control': 'no-store' }, extra));
 
@@ -94,12 +119,31 @@ function session(req) {
   return Object.assign({ token: t }, s);
 }
 
-// supports byte ranges so videos can seek and play on iPhone/Safari
-function serveFile(req, res, file, cache) {
+// compressed copies of static text files, rebuilt when the file changes
+const zcache = new Map();
+// supports byte ranges so videos can seek and play on iPhone/Safari; ETag/Last-Modified allow 304 replies
+function serveFile(req, res, file, cache, vary) {
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) return send(res, 404, 'Not found', 'text/plain');
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
-    const hd = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': cache || 'public, max-age=300', 'X-Content-Type-Options': 'nosniff', 'Last-Modified': st.mtime.toUTCString() };
+    const etag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
+    const hd = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': cache || 'public, max-age=300', 'X-Content-Type-Options': 'nosniff', 'Last-Modified': st.mtime.toUTCString(), ETag: etag };
+    if (vary) hd.Vary = vary;
+    const ims = Date.parse(req.headers['if-modified-since'] || '');
+    if (req.headers['if-none-match'] === etag || (!req.headers['if-none-match'] && ims && Math.floor(st.mtimeMs / 1000) <= Math.floor(ims / 1000))) { res.writeHead(304, hd); return res.end(); }
+    // text files (css/js/svg/xml): send a cached brotli/gzip copy
+    const enc = COMPRESSIBLE.test(type) && st.size >= 860 ? pickEnc(req) : null;
+    if (COMPRESSIBLE.test(type)) {
+      hd.Vary = [vary, 'Accept-Encoding'].filter(Boolean).join(', ');
+      delete hd['Accept-Ranges'];
+      if (enc) {
+        const k = file + '|' + enc + '|' + etag;
+        let z = zcache.get(k);
+        if (!z) { z = squeeze(fs.readFileSync(file), enc, 11); if (zcache.size > 200) zcache.clear(); zcache.set(k, z); }
+        res.writeHead(200, Object.assign(hd, { 'Content-Encoding': enc, 'Content-Length': z.length }));
+        return res.end(req.method === 'HEAD' ? undefined : z);
+      }
+    }
     const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (r && (r[1] || r[2])) {
       let a = r[1] ? +r[1] : Math.max(0, st.size - +r[2]), b = r[1] && r[2] ? Math.min(+r[2], st.size - 1) : st.size - 1;
@@ -120,12 +164,47 @@ function serveStatic(req, res, root, rel, cache) {
   if (!MIME[path.extname(file).toLowerCase()] || /[\\/]\./.test(p)) return send(res, 404, 'Not found', 'text/plain');
   // uploaded files can never run as a page, even if a file is crafted to look like HTML
   if (p.startsWith('/uploads/')) res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+  // a .jpg/.png with a .webp twin next to it: browsers that accept WebP get the smaller file
+  if (/\.(jpe?g|png)$/i.test(file)) {
+    const twin = file.replace(/\.(jpe?g|png)$/i, '.webp');
+    if (hasFile(twin) && twinFresh(file, twin)) {
+      // "Vary: Accept" on both answers so shared caches never hand WebP to a browser that can't show it
+      return serveFile(req, res, /image\/webp/.test(req.headers.accept || '') ? twin : file, cache, 'Accept');
+    }
+  }
   serveFile(req, res, file, cache);
 }
+// small existence cache so WebP lookups don't hit the disk on every request
+const fcache = new Map();
+function hasFile(f) {
+  const c = fcache.get(f), now = Date.now();
+  if (c && now - c.t < 30e3) return c.ok;
+  let ok = false; try { ok = fs.statSync(f).isFile(); } catch (e) {}
+  if (fcache.size > 2000) fcache.clear();
+  fcache.set(f, { ok, t: now });
+  return ok;
+}
+// a WebP twin only counts if it isn't older than its original: if someone replaces track.jpg,
+// visitors must get the new picture, not the outdated track.webp (1 minute of slack for copies made together)
+function twinFresh(file, twin) {
+  try { return fs.statSync(twin).mtimeMs >= fs.statSync(file).mtimeMs - 60e3; } catch (e) { return false; }
+}
+// browser cache lifetimes: versioned (?v=) files and uploads never change, built-in images rarely do
+function cacheFor(p, url) {
+  if (url.searchParams.has('v') || p.startsWith('/fonts/') || p.startsWith('/uploads/')) return 'public, max-age=31536000, immutable';
+  if (p.startsWith('/img/')) return 'public, max-age=604800, stale-while-revalidate=86400';
+  if (/\.(css|js)$/.test(p)) return 'no-cache';
+  return 'public, max-age=86400';
+}
 
-const ADMIN_CSP = "default-src 'self'; img-src 'self' data: https:; media-src 'self' https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+const ADMIN_CSP = "default-src 'self'; img-src 'self' data: https:; media-src 'self' https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 // public pages: scripts only from this site, no plugins, can't be framed by other sites
-const PUBLIC_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'";
+const PUBLIC_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'";
+// when a Google Analytics 4 ID is set in the admin, pages may also load gtag and report to Google
+const GA_CSP = PUBLIC_CSP
+  .replace("script-src 'self'", "script-src 'self' https://www.googletagmanager.com")
+  .replace("connect-src 'self'", "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com");
+const GA_RE = /^G-[A-Z0-9]{4,15}$/;
 const BASE_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -172,8 +251,13 @@ async function adminApi(req, res, url) {
       return old ? json(res, 200, old) : json(res, 404, { error: 'not found' });
     }
     if (route === 'content' && m === 'PUT') {
-      const saved = store.saveContent(JSON.parse(await readBody(req, 4e6)));
-      return json(res, 200, saved);
+      const b = JSON.parse(await readBody(req, 4e6));
+      // a save must carry the whole site; anything partial would blank the missing parts, so refuse it
+      const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+      const complete = isObj(b) && ['site', 'links', 'home', 'pages'].every(k => isObj(b[k])) && isObj(b.links.social) && isObj(b.links.download)
+        && ['news', 'gameplay', 'rewards', 'drivers', 'faq'].every(k => Array.isArray(b[k]));
+      if (!complete) return json(res, 400, { error: 'ข้อมูลไม่ครบ ระบบไม่บันทึกเพื่อป้องกันเนื้อหาหาย' });
+      return json(res, 200, store.saveContent(b));
     }
     if (route === 'media' && m === 'GET') return json(res, 200, { items: listMedia() });
     // raw file body; the type comes from Content-Type and must match the file's first bytes
@@ -221,6 +305,7 @@ async function adminApi(req, res, url) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    peer(req); // remember who connected before anything async happens
     for (const [k, v] of Object.entries(BASE_HEADERS)) res.setHeader(k, v);
     if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     const url = new URL(req.url, 'http://x');
@@ -238,7 +323,24 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed', 'text/plain');
 
     const c = store.getContent(), base = baseUrl(req, c);
-    const page = (html, code) => send(res, code || 200, html, 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' });
+    const moved = to => { res.writeHead(301, { Location: to, 'Cache-Control': 'public, max-age=3600' }); res.end(); };
+
+    // ---------- one address per page (avoids duplicate content in Google) ----------
+    // www <-> bare domain and http -> https, only when the admin has set the main domain
+    const canon = SITE_URL_RE.test(String(c.site.url || '').replace(/\/+$/, '')) ? new URL(c.site.url) : null;
+    if (canon) {
+      const host = String((fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
+      const ch = canon.hostname.toLowerCase();
+      const wwwTwin = host === 'www.' + ch || 'www.' + host === ch;
+      const plainHttp = host === ch && canon.protocol === 'https:' && (fwd(req, 'x-forwarded-proto') || [])[0] === 'http';
+      if (wwwTwin || plainHttp) return moved(canon.origin + p + url.search);
+    }
+    if (p === '/index.html') return moved('/' + url.search);
+    // (leading slashes are collapsed too: "//evil.com/" must never become a redirect to another site)
+    if (p.length > 1 && p.endsWith('/')) return moved('/' + p.replace(/^\/+|\/+$/g, '') + url.search);
+
+    const ga = GA_RE.test(c.site.ga4 || '');
+    const page = (html, code) => sendPage(req, res, code || 200, html, ga ? { 'Content-Security-Policy': GA_CSP } : null);
 
     // ---------- public pages ----------
     // "/home" is an internal alias of "/" for hosts (e.g. Plesk nginx) that never forward the bare root to Node
@@ -249,14 +351,11 @@ const server = http.createServer(async (req, res) => {
       const n = c.news.find(x => x.published && x.slug === slug);
       return n ? page(render.article(c, base, n)) : page(render.notFound(c, base), 404);
     }
-    if (p === '/sitemap.xml') return send(res, 200, render.sitemap(c, base), MIME['.xml'], { 'Cache-Control': 'no-cache' });
-    if (p === '/robots.txt') return send(res, 200, render.robots(base), MIME['.txt']);
+    if (p === '/sitemap.xml') return send(res, 200, render.sitemap(c, base, store.savedAt()), MIME['.xml'], { 'Cache-Control': 'no-cache' });
+    if (p === '/robots.txt') return send(res, 200, render.robots(base), MIME['.txt'], { 'Cache-Control': 'public, max-age=3600' });
 
     // ---------- static files ----------
-    if (/\.[a-z0-9]+$/i.test(p)) {
-      const long = p.startsWith('/img/') || p.startsWith('/uploads/');
-      return serveStatic(req, res, PUBLIC, p, long ? 'public, max-age=86400' : 'no-cache');
-    }
+    if (/\.[a-z0-9]+$/i.test(p)) return serveStatic(req, res, PUBLIC, p, cacheFor(p, url));
     return page(render.notFound(c, base), 404);
   } catch (e) {
     console.error(e);
@@ -267,7 +366,7 @@ const server = http.createServer(async (req, res) => {
 setInterval(() => {
   const t = Date.now();
   try { sessions.prune(); } catch (e) {}
-  for (const [k, v] of fails) if (v.until < t && v.last < t - 3600e3) fails.delete(k);
+  try { fails.prune(); } catch (e) {}
 }, 600e3).unref();
 // a stray error must never take the whole site down
 process.on('unhandledRejection', e => console.error('unhandled:', e));

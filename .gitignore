@@ -1,6 +1,7 @@
 data/admin.json
 data/history/
 data/sessions.json
+data/limits.json
 public/uploads/
 .claude/
 node_modules/

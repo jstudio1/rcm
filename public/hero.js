@@ -66,8 +66,16 @@ const SFX=(function(){
   const v=document.createElement('video');v.className='bgv';v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('muted','');
   // file paths come from the admin (home > hero background) via data attributes
   const src=(small?box.dataset.videoSm:box.dataset.video)||box.dataset.video||'',img=box.dataset.image||'';
-  v.preload='auto';if(img)v.poster=img;if(src)v.src=src;
-  if(!reduce&&src){v.autoplay=true;v.addEventListener('canplay',()=>{v.play().catch(()=>{})},{once:true})}
+  if(img)v.poster=img;
+  // the video starts downloading only after the page has finished loading, so it never slows the first paint;
+  // on data-saver or very slow connections it is skipped and the still key art stays
+  const net=navigator.connection||{},lite=net.saveData||/(^|-)(2g|3g)$/.test(net.effectiveType||'');
+  function loadVideo(){
+    if(!src||lite)return;
+    v.preload='auto';v.src=src;
+    if(!reduce){v.autoplay=true;v.addEventListener('canplay',()=>{v.play().catch(()=>{})},{once:true})}
+  }
+  if(document.readyState==='complete')setTimeout(loadVideo,150);else addEventListener('load',()=>setTimeout(loadVideo,150),{once:true});
   const still=new Image();if(img)still.src=img;
   let tiles=[],W=0,H=0,cols=8,rows=6,tw=1,th=1,built=false;
   const dpr=Math.min(2,devicePixelRatio||1);

@@ -160,12 +160,14 @@
     return h('label', { class: 'a-f' }, h('span', { class: 'top' }, h('span', {}, label), cnt), input, o.help ? h('span', { class: 'h' }, o.help) : null);
   }
   function check(obj, key, label) {
-    const i = h('input', { type: 'checkbox' }); i.checked = !!obj[key];
+    // stored values may be booleans or the strings "true"/"false" (text fields on the server)
+    const i = h('input', { type: 'checkbox' }); i.checked = obj[key] === true || obj[key] === 'true' || obj[key] === '1';
     i.addEventListener('change', () => { obj[key] = i.checked; mark(); });
     return h('label', { class: 'a-chk' }, i, label);
   }
   // image or video path with preview, "choose from library" and "upload" buttons
   function imageField(obj, key, label, o) {
+    if (typeof o.ph === 'function') o = Object.assign({}, o, { ph: o.ph() });
     const kind = o.type === 'video' ? 'video' : 'image';
     const inp = h('input', { type: 'text', placeholder: o.ph || '/img/... หรือ https://...' }); inp.value = obj[key] || '';
     const pv = h('div', { class: 'pv' });
@@ -294,7 +296,8 @@
           field(n, 'title', 'หัวข้อข่าว (H1)', { onchange: u }),
           two(check(n, 'published', 'เผยแพร่ (ติ๊ก = แสดงบนเว็บและ sitemap)'), field(n, 'date', 'วันที่', { type: 'date' })),
           two(field(n, 'tag', 'ป้ายหมวด', { help: 'เช่น ANNOUNCEMENT, EVENT' }), field(n, 'slug', 'URL (slug)', { help: 'เว้นว่าง = สร้างจากหัวข้อ → /news/…' })),
-          field(n, 'image', 'รูปหน้าปก', { type: 'image' }),
+          field(n, 'image', 'รูปหน้าปก', { type: 'image', help: 'แนะนำกว้าง 1200px ขึ้นไป (Google ใช้แสดงในผลค้นหาข่าว)' }),
+          field(n, 'imageAlt', 'คำอธิบายรูปหน้าปก (alt)', { ph: () => n.title, help: 'อธิบายว่าในรูปมีอะไร ช่วย SEO และผู้ใช้ที่มองไม่เห็น · เว้นว่าง = ใช้หัวข้อข่าว' }),
           field(n, 'excerpt', 'สรุปสั้น (แสดงในการ์ด)', { type: 'textarea' }),
           bodyEditor(n),
           seoBox(n, 'seoTitle', 'seoDescription', { url: () => '/news/' + (n.slug || '…'), fbT: () => (n.title || '') + ' | ' + C.site.name, fbD: () => n.excerpt })]
@@ -307,7 +310,7 @@
         form: (r, u) => [two(field(r, 'milestone', 'เป้าหมาย (เช่น 100K)', { onchange: u }), field(r, 'status', 'สถานะ', { help: 'เช่น LOCKED / UNLOCKED' })), field(r, 'title', 'ชื่อรางวัล (H3)', { onchange: u }), field(r, 'desc', 'รายละเอียด', { type: 'textarea' })] }) },
     { id: 'drivers', g: 'เนื้อหา', label: 'Drivers', desc: 'การ์ดนักซิ่ง/รถ แต่ละใบมีรูป ป้ายมุม และชื่อ', paths: ['drivers'], url: '/drivers', count: () => C.drivers.length,
       view: () => listEditor(C.drivers, { title: d => d.title, blank: () => ({ title: '', desc: '', image: '', pos: 'center', badge: '' }),
-        form: (d, u) => [field(d, 'title', 'ชื่อ (H3)', { onchange: u }), field(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), field(d, 'image', 'รูปภาพ', { type: 'image' }),
+        form: (d, u) => [field(d, 'title', 'ชื่อ (H3)', { onchange: u }), field(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), field(d, 'image', 'รูปภาพ', { type: 'image' }), field(d, 'alt', 'ข้อความอธิบายรูป (alt)', { ph: () => d.title, help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น · เว้นว่าง = ใช้ชื่อ' }),
           two(field(d, 'pos', 'ตำแหน่งรูป (CSS)', { help: 'เช่น center, 30% center' }), field(d, 'badge', 'ป้ายมุมการ์ด', { help: 'เช่น COMING SOON' }))] }) },
     { id: 'faq', g: 'เนื้อหา', label: 'FAQ', desc: 'คำถามที่พบบ่อย ระบบส่งข้อมูลให้ Google แสดงเป็นคำถาม-คำตอบอัตโนมัติ', paths: ['faq'], url: '/faq', count: () => C.faq.length,
       view: () => listEditor(C.faq, { title: f => f.q, blank: () => ({ q: '', a: '' }), form: (f, u) => [field(f, 'q', 'คำถาม (H3)', { onchange: u }), field(f, 'a', 'คำตอบ', { type: 'textarea' })] }) },
@@ -315,7 +318,7 @@
     { id: 'home', g: 'หน้าเว็บ', label: 'หน้าแรก', desc: 'หัวข้อ H1 H2 H3 ข้อความอธิบาย ปุ่มลงทะเบียน และ SEO ของหน้าแรก', paths: ['home'], url: '/',
       view: () => [
         box('พื้นหลังหน้าแรก (Hero)', note('วิดีโอเล่นวนเป็นพื้นหลัง รูปใช้แสดงระหว่างรอวิดีโอโหลดและเมื่อวิดีโอเล่นไม่ได้ · เว้นว่าง = ใช้ไฟล์เริ่มต้น'),
-          field(C.home, 'heroVideo', 'วิดีโอพื้นหลัง (คอม)', { type: 'video', ph: '/img/rc_burn_v2.mp4', help: 'MP4 (H.264) แนะนำ 1920×1080 ไม่เกิน ~15MB ไม่มีเสียง' }),
+          field(C.home, 'heroVideo', 'วิดีโอพื้นหลัง (คอม)', { type: 'video', ph: '/img/rc_burn_v2_hd.mp4', help: 'MP4 (H.264) แนะนำ 1920×1080 ไม่เกิน ~15MB ไม่มีเสียง' }),
           field(C.home, 'heroVideoMobile', 'วิดีโอพื้นหลัง (มือถือ)', { type: 'video', ph: '/img/rc_burn_v2_m.mp4', help: 'ไฟล์เล็กสำหรับมือถือ แนะนำ 720p ไม่เกิน ~3MB · เว้นว่างและตั้งวิดีโอคอมไว้ = ใช้วิดีโอเดียวกับคอม' }),
           field(C.home, 'heroImage', 'รูปพื้นหลัง / รูปสำรอง', { type: 'image', ph: '/img/keyart_rc_v1_web.jpg', help: 'แนะนำ 1920×1080 ขึ้นไป ควรเป็นภาพเดียวกับเฟรมแรกของวิดีโอ' })),
         box('หัวข้อใหญ่', field(C.home, 'badge', 'ป้ายเล็กด้านบน'), field(C.home, 'h1', 'H1'), two(field(C.home, 'h2', 'H2'), field(C.home, 'h3', 'H3 (ตัวสีแดง)')), field(C.home, 'lead', 'ข้อความอธิบาย', { type: 'textarea' })),
@@ -327,7 +330,10 @@
       view: () => [
         box('หัวข้อหน้า', two(field(C.pages[k], 'navLabel', 'ชื่อในเมนู'), field(C.pages[k], 'eyebrow', 'ข้อความเล็กเหนือหัวข้อ')), field(C.pages[k], 'h1', 'H1'), field(C.pages[k], 'h2', 'H2 (หัวข้อรอง)'), field(C.pages[k], 'intro', 'ย่อหน้าแนะนำ', { type: 'textarea' }),
           k === 'news' ? field(C.pages[k], 'empty', 'ข้อความเมื่อยังไม่มีข่าว') : null),
-        seoBox(C.pages[k], 'seoTitle', 'seoDescription', { url: '/' + k, fbT: () => C.pages[k].h1 + ' | ' + C.site.name, fbD: () => C.site.description })]
+        seoBox(C.pages[k], 'seoTitle', 'seoDescription', { url: '/' + k, fbT: () => C.pages[k].h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
+        box('การแชร์ & การค้นหา',
+          field(C.pages[k], 'ogImage', 'รูปแชร์ของหน้านี้ (Facebook / LINE / X)', { type: 'image', ph: () => C.site.ogImage, help: 'แนะนำ 1200×630 · เว้นว่าง = ใช้รูปแชร์หลักของเว็บ' }),
+          check(C.pages[k], 'noindex', 'ซ่อนหน้านี้จาก Google (noindex) — หน้ายังเปิดได้ แต่จะไม่ขึ้นในผลค้นหาและไม่อยู่ใน sitemap'))]
     })),
 
     { id: 'general', g: 'ตั้งค่าเว็บ', label: 'ข้อมูลเว็บ & SEO หลัก', desc: 'ชื่อเว็บ โดเมน รูปแชร์ และค่า SEO เริ่มต้นของทั้งเว็บ', paths: ['site'], url: '/',
@@ -338,7 +344,12 @@
           field(C.site, 'favicon', 'ไอคอนเว็บ (Favicon)', { type: 'image', ph: '/img/favicon.png', help: 'ไอคอนที่แท็บเบราว์เซอร์/ผลค้นหา Google/หน้าจอมือถือ แนะนำ PNG จัตุรัส 192×192 ขึ้นไป · เว้นว่าง = ใช้ไอคอนเริ่มต้น' }),
           field(C.site, 'ogImage', 'รูปแชร์ (Open Graph)', { type: 'image', help: 'แนะนำ 1200×630' }), field(C.site, 'footer', 'ข้อความท้ายเว็บ (Copyright)')),
         seoBox(C.site, 'defaultTitle', 'description', { open: true, label: 'SEO เริ่มต้น (หน้าแรก)', url: '/' }),
-        box('Keywords', field(C.site, 'keywords', 'คำค้น (คั่นด้วยจุลภาค)'))] },
+        box('เครื่องมือ SEO & สถิติ',
+          note('ใส่แล้วกดบันทึก ระบบใส่โค้ดให้ทุกหน้าอัตโนมัติ ไม่ต้องแก้ไฟล์'),
+          field(C.site, 'googleVerify', 'Google Search Console: รหัสยืนยันเว็บไซต์', { ph: 'เช่น AbCdEf123...', help: 'Search Console > เพิ่มพร็อพเพอร์ตี้ > วิธี "แท็ก HTML" > คัดลอกเฉพาะค่าใน content="..."' }),
+          field(C.site, 'bingVerify', 'Bing Webmaster: รหัสยืนยัน (msvalidate.01)', { ph: 'ไม่บังคับ' }),
+          two(field(C.site, 'ga4', 'Google Analytics 4: Measurement ID', { ph: 'G-XXXXXXXXXX', help: 'ขึ้นต้นด้วย G- · เว้นว่าง = ไม่ติดตามสถิติ' }),
+            field(C.site, 'twitter', 'บัญชี X / Twitter ของเกม', { ph: '@raycitym', help: 'ใช้ในการ์ดแชร์บน X' })))] },
     { id: 'links', g: 'ตั้งค่าเว็บ', label: 'ลิงก์โซเชียล & ดาวน์โหลด', desc: 'ใส่ลิงก์แล้วปุ่มบนหน้าแรกกดไปลิงก์นั้นทันที เว้นว่าง = แสดง "เร็วๆ นี้"', paths: ['links'], url: '/',
       view: () => [
         box('ลิงก์ดาวน์โหลด', note('ใส่ลิงก์แล้วป้าย SOON จะหายไปจากปุ่มนั้น'),
