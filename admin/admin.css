@@ -219,3 +219,13 @@ textarea.big{min-height:300px}
 .ps-run select{width:100%;max-width:100%;min-width:0;text-overflow:ellipsis}
 .ps-run .a-f{min-width:min(240px,100%)}
 .ps-tip[hidden]{display:none}
+.a-f select{background:#121316;border:1px solid var(--ln-2);color:#fff;padding:10px 12px;font:inherit;max-width:100%}
+/* loading-screen design picker */
+.ldr-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.ldr-pick .card{display:grid;gap:8px;align-content:start;padding:14px;background:#1d1f23;border:1px solid var(--ln);cursor:pointer;transition:border-color .2s,background .2s}
+.ldr-pick .card:hover{border-color:var(--ln-2)}
+.ldr-pick .card.on{border-color:var(--red-2);background:rgba(225,6,0,.08);box-shadow:inset 0 0 0 1px var(--red-2)}
+.ldr-pick .card b{display:flex;align-items:center;gap:8px;font-weight:500;color:#fff}
+.ldr-pick .card b em{font-style:normal;font-size:11px;background:var(--red-2);color:#fff;padding:1px 8px;border-radius:999px}
+.ldr-pick .card p{font-size:12.5px;color:var(--mu);line-height:1.5}
+.ldr-pick .card a{justify-self:start}

@@ -509,6 +509,34 @@
           field(C.site, 'favicon', 'ไอคอนเว็บ (Favicon)', { type: 'image', ph: '/img/favicon.png', help: 'ไอคอนที่แท็บเบราว์เซอร์/ผลค้นหา Google/หน้าจอมือถือ แนะนำ PNG จัตุรัส 192×192 ขึ้นไป · เว้นว่าง = ใช้ไอคอนเริ่มต้น' }),
           field(C.site, 'ogImage', 'รูปแชร์ (Open Graph)', { type: 'image', help: 'แนะนำ 1200×630' }), field(C.site, 'footer', 'ข้อความท้ายเว็บ (Copyright)')),
         seoBox(C.site, 'defaultTitle', 'description', { open: true, label: 'SEO เริ่มต้น (หน้าแรก)', url: '/' }),
+        box('หน้า Loading (ก่อนเข้าเว็บ)',
+          check(C.site, 'loader', 'เปิดใช้หน้า Loading'),
+          // design picker: one card per design, each with its own preview (works even before saving / while switched off)
+          h('div', { class: 'a-f' }, h('span', {}, 'รูปแบบ'), (() => {
+            const DESIGNS = [
+              ['launcher', 'Launcher ในเกม', 'ภาพหลักแบบเบลอ + แถบล่างแบบ launcher: LOADING พร้อมคำแนะนำ → READY → ปุ่ม START GAME แล้วภาพชัดขึ้นเข้าเว็บ'],
+              ['tacho', 'เกจวัดรอบ', 'แผงหน้าปัดคาร์บอน เข็มวัดรอบไต่ไปโซนแดง ไฟ shift light 10 ดวง เกียร์ N→6 แล้วเกจพุ่งเข้าหาจอ'],
+              ['headlights', 'Cinematic ไฟหน้ารถ', 'จอดำ ไฟหน้ากะพริบ แสงไฟท้ายลากยาว โลโก้ค่อยๆ สว่างพร้อมแสงกวาด แล้วแฟลชเข้าเว็บ'],
+              ['neon', 'ถนนนีออน', 'พระอาทิตย์ตกแบบ synthwave ตึกเมือง ถนนตารางนีออนพุ่งเข้าหา โลโก้เรืองแสง แล้วพุ่งเข้าเส้นขอบฟ้า']
+            ];
+            const cur = () => (DESIGNS.some(d => d[0] === C.site.loaderStyle) ? C.site.loaderStyle : 'launcher');
+            const wrap = h('div', { class: 'ldr-pick', role: 'radiogroup' });
+            const draw = () => wrap.replaceChildren(...DESIGNS.map(([id, name, desc]) => h('div', { class: 'card' + (cur() === id ? ' on' : ''), role: 'radio', 'aria-checked': cur() === id ? 'true' : 'false', tabindex: 0,
+              onclick: e => { if (e.target.closest('a')) return; C.site.loaderStyle = id; mark(); draw(); },
+              onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); C.site.loaderStyle = id; mark(); draw(); } } },
+              h('b', {}, name, cur() === id ? h('em', {}, 'ใช้อยู่') : null), h('p', {}, desc),
+              h('a', { class: 'ghost sm', href: '/?loader=preview&style=' + id, target: '_blank', rel: 'noopener' }, 'ดูตัวอย่าง ↗'))));
+            draw();
+            return wrap;
+          })(), h('span', { class: 'h' }, 'คลิกการ์ดเพื่อเลือก แล้วกด "บันทึกส่วนนี้" · ปุ่มดูตัวอย่างเปิดได้ทันทีโดยไม่ต้องบันทึก')),
+          check(C.site, 'loaderOnce', 'แสดงเฉพาะหน้าแรกที่เปิดในการเข้าชมแต่ละครั้ง (แนะนำ: เปิดหน้าอื่นต่อจะไม่ขึ้นซ้ำ)'),
+          h('label', { class: 'a-f' }, h('span', {}, 'แสดงที่หน้าไหน'), (() => {
+            const sel = h('select', { onchange: e => { C.site.loaderScope = e.target.value; mark(); } },
+              h('option', { value: 'home' }, 'เฉพาะหน้าแรก'), h('option', { value: 'all' }, 'ทุกหน้า'));
+            sel.value = C.site.loaderScope === 'all' ? 'all' : 'home';
+            return sel;
+          })(), h('span', { class: 'h' }, 'หมายเหตุ: หน้า Loading ทำให้คะแนน PageSpeed ลดลงเล็กน้อย เพราะเนื้อหาจริงแสดงช้าลง ~1 วินาที')),
+          note('แสดงอย่างน้อยราว 2 วินาที และไม่เกิน 4 วินาที แม้เน็ตช้า · ผู้ใช้ที่ตั้งค่าลดการเคลื่อนไหวจะเห็นแบบสั้นและเรียบ')),
         box('เครื่องมือ SEO & สถิติ',
           note('ใส่แล้วกดบันทึก ระบบใส่โค้ดให้ทุกหน้าอัตโนมัติ ไม่ต้องแก้ไฟล์'),
           field(C.site, 'googleVerify', 'Google Search Console: รหัสยืนยันเว็บไซต์', { ph: 'เช่น AbCdEf123...', help: 'Search Console > เพิ่มพร็อพเพอร์ตี้ > วิธี "แท็ก HTML" > คัดลอกเฉพาะค่าใน content="..."' }),

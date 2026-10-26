@@ -95,7 +95,8 @@ const SFX=(function(){
       box.appendChild(t);tiles.push({t,h,cv,e:t.lastChild,c,r,busy:false});
     }
     for(let r=1;r<rows;r++)for(let c=1;c<cols;c++){const d=document.createElement('span');d.className='dot';d.style.left=(c*tw)+'px';d.style.top=(r*th)+'px';box.appendChild(d)}
-    if(!built&&!reduce)setTimeout(intro,400);
+    // tiles wave in when the page is revealed: right away, or after the loading screen opens
+    if(!built&&!reduce){if(document.documentElement.classList.contains('ldr-on'))document.addEventListener('rc-loaded',()=>setTimeout(intro,250),{once:true});else setTimeout(intro,400)}
     built=true;
   }
   // copy the part of the current video frame (or the still) that sits under this tile

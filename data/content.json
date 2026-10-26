@@ -6,11 +6,15 @@
     "description": "RAYCITY-M ตำนานสตรีทเรซกลับมาอีกครั้ง เล่นได้ทั้งบนมือถือและคอม พบกันเร็วๆ นี้",
     "keywords": "RAYCITY-M, เกมแข่งรถ, สตรีทเรซ, เกมมือถือ, เกมพีซี",
     "ogImage": "/img/hero_race_v2_poster.jpg",
-    "footer": "© 2026 RAYCITY-M. All rights reserved."
+    "footer": "© 2026 RAYCITY-M. All rights reserved.",
+    "loader": "true",
+    "loaderOnce": "true",
+    "loaderScope": "home",
+    "loaderStyle": "launcher"
   },
   "links": {
     "social": {
-      "facebook": "https://www.facebook.com/raycityxth/",
+      "facebook": "",
       "tiktok": "",
       "discord": "",
       "youtube": ""

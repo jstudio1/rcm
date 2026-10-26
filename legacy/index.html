@@ -157,7 +157,7 @@ const burger=$('#burger');
 burger.addEventListener('click',()=>{const o=nav.classList.toggle('open');burger.setAttribute('aria-expanded',o);document.body.style.overflow=o?'hidden':''});
 /* everything stays on this page; a short note says it is coming soon */
 /* official channels: put the real links here. Empty = shows "coming soon" */
-const SOCIAL={facebook:'https://www.facebook.com/raycityxth/',tiktok:'',discord:'',youtube:''};
+const SOCIAL={facebook:'',tiktok:'',discord:'',youtube:''};
 $$('[data-social]').forEach(a=>{const u=SOCIAL[a.dataset.social];if(u){a.href=u}else{a.removeAttribute('target');a.setAttribute('data-stay','');a.dataset.msg='';a.title=a.title+' · Coming soon'}});
 const t=$('#toast');let tm;
 $$('[data-stay]').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();

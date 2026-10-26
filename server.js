@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const store = require('./lib/store');
-const { render, PAGES } = require('./lib/render');
+const { render, PAGES, LOADER_STYLES } = require('./lib/render');
 const psi = require('./lib/pagespeed');
 
 const PORT = +process.env.PORT || 3000;
@@ -371,7 +371,11 @@ const server = http.createServer(async (req, res) => {
 
     // ---------- public pages ----------
     // "/home" is an internal alias of "/" for hosts (e.g. Plesk nginx) that never forward the bare root to Node
-    if (p === '/' || p === '/home') return page(render.home(c, base));
+    // ?loader=preview[&style=tacho] shows a loading-screen design even while it's switched off (admin preview buttons)
+    if (p === '/' || p === '/home') {
+      const pv = url.searchParams.get('loader') === 'preview' ? (LOADER_STYLES.includes(url.searchParams.get('style')) ? url.searchParams.get('style') : (c.site.loaderStyle || 'launcher')) : null;
+      return page(render.home(c, base, { loaderPreview: pv }));
+    }
     if (['/rewards', '/gameplay', '/drivers', '/news', '/faq'].includes(p)) return page(render[p.slice(1)](c, base));
     if (p.startsWith('/news/')) {
       let slug; try { slug = decodeURIComponent(p.slice(6)).replace(/\/$/, ''); } catch (e) { return page(render.notFound(c, base), 404); }
