@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "description": "RAYCITY-M website with SEO server rendering and an admin back office (no dependencies)",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18" }
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }

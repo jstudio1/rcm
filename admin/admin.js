@@ -5,12 +5,13 @@
   let navBtns = {}, barEls = {};
 
   // ---------- tiny helpers ----------
+  const safeLink = value => { const u = String(value || '').trim(); return !/[\\\x00-\x20\x7f]/.test(u) && /^(https?:\/\/[^/]|\/(?!\/)|#|mailto:)/i.test(u) ? u : '#'; };
   const h = (tag, attrs, ...kids) => {
     const e = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
       if (k === 'class') e.className = v;
       else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-      else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+      else if (v !== false && v != null) e.setAttribute(k, k === 'href' ? safeLink(v) : v === true ? '' : v);
     }
     for (const kid of kids.flat()) if (kid != null && kid !== false) e.append(kid.nodeType ? kid : document.createTextNode(kid));
     return e;
@@ -279,7 +280,7 @@
     const chip = h('span', { class: 'a-chip' });
     const open = h('a', { target: '_blank', rel: 'noopener noreferrer', href: '#' }, 'ทดสอบเปิดลิงก์ ↗');
     const inp = h('input', { type: 'url', placeholder: 'https://...' }); inp.value = obj[key] || '';
-    const upd = () => { const on = !!inp.value.trim(); chip.textContent = on ? 'ใส่ลิงก์แล้ว' : 'ยังว่าง · ' + hint; chip.className = 'a-chip' + (on ? ' on' : ''); open.style.display = on ? '' : 'none'; open.href = inp.value || '#'; };
+    const upd = () => { const on = !!inp.value.trim(); chip.textContent = on ? 'ใส่ลิงก์แล้ว' : 'ยังว่าง · ' + hint; chip.className = 'a-chip' + (on ? ' on' : ''); open.style.display = on ? '' : 'none'; open.href = safeLink(inp.value); };
     inp.addEventListener('input', () => { obj[key] = inp.value; upd(); mark(); });
     upd();
     return h('div', { class: 'a-lc' }, h('div', { class: 'ic' }, mark2), h('div', {}, h('div', { class: 'row' }, h('b', {}, name), chip), inp, h('div', { style: 'margin-top:8px' }, open)));
@@ -450,6 +451,194 @@
     return host;
   }
 
+  // ---------- visitor statistics ----------
+  const TH_M = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const fmtDay = (d, short) => { const [y, m, dd] = d.split('-').map(Number); return dd + ' ' + TH_M[m - 1] + (short ? '' : ' ' + (y + 543)); };
+  const fmtTime = t => new Date(t).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const nf = n => Number(n || 0).toLocaleString('en-US');
+  const bkkToday = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 86400e3).toISOString().slice(0, 10);
+  const DEV_NAME = { android: 'Android', ios: 'iOS (iPhone/iPad)', desktop: 'คอมพิวเตอร์', other: 'อื่นๆ' };
+  const DEV_SHORT = { android: 'Android', ios: 'iOS', desktop: 'คอม', other: 'อื่นๆ' };
+  const svgEl = (tag, attrs, ...kids) => {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+    for (const kid of kids) if (kid != null) e.append(kid.nodeType ? kid : document.createTextNode(kid));
+    return e;
+  };
+  const niceMax = v => { if (v <= 4) return 4; const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
+
+  // multi-series line/area chart with a hover tooltip
+  function lineChart(labels, series, o) {
+    o = o || {};
+    const W = 900, H = 290, L = 52, R = 14, T = 14, B = 30, iw = W - L - R, ih = H - T - B;
+    const max = niceMax(Math.max(1, ...series.flatMap(s => s.values)));
+    const n = labels.length, X = i => L + (n === 1 ? iw / 2 : (iw * i) / (n - 1)), Y = v => T + ih - (ih * v) / max;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+    for (let k = 0; k <= 4; k++) {
+      const v = (max * k) / 4, y = Y(v);
+      svg.append(svgEl('line', { class: 'grid', x1: L, x2: W - R, y1: y, y2: y }), svgEl('text', { x: L - 8, y: y + 4, 'text-anchor': 'end' }, nf(Math.round(v * 10) / 10)));
+    }
+    const step = Math.max(1, Math.ceil(n / 8));
+    labels.forEach((lb, i) => { if ((i % step === 0 && (n - 1 - i >= Math.ceil(step * 0.6) || i === n - 1)) || i === n - 1) svg.append(svgEl('text', { x: X(i), y: H - 8, 'text-anchor': i === 0 && n > 1 ? 'start' : i === n - 1 && n > 1 ? 'end' : 'middle' }, lb)); });
+    series.forEach((s, si) => {
+      const pts = s.values.map((v, i) => X(i) + ',' + Y(v)).join(' ');
+      if (s.area && n > 1) svg.append(svgEl('polygon', { points: `${X(0)},${T + ih} ${pts} ${X(n - 1)},${T + ih}`, fill: s.color, 'fill-opacity': '.14' }));
+      const part = o.partialLast && n > 2 && !s.dash;
+      const solid = part ? s.values.slice(0, n - 1).map((v, i) => X(i) + ',' + Y(v)).join(' ') : pts;
+      svg.append(svgEl('polyline', { points: solid, fill: 'none', stroke: s.color, 'stroke-width': s.dash ? 1.6 : 2.4, 'stroke-linejoin': 'round', 'stroke-dasharray': s.dash ? '5 4' : '' }));
+      if (part) svg.append(svgEl('polyline', { points: X(n - 2) + ',' + Y(s.values[n - 2]) + ' ' + X(n - 1) + ',' + Y(s.values[n - 1]), fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-dasharray': '4 4', opacity: '.7' }));
+      if (n <= 45) s.values.forEach((v, i) => svg.append(svgEl('circle', { cx: X(i), cy: Y(v), r: s.dash ? 0 : 3, fill: s.color })));
+    });
+    const hl = svgEl('line', { x1: 0, x2: 0, y1: T, y2: T + ih, stroke: 'rgba(255,255,255,.35)', 'stroke-width': 1, style: 'display:none' });
+    const cap = svgEl('rect', { x: L, y: T, width: iw, height: ih, fill: 'transparent' });
+    svg.append(hl, cap);
+    const tip = h('div', { class: 'an-tip', style: 'display:none' });
+    const box2 = h('div', { class: 'an-chart' }, svg, tip);
+    const move = e => {
+      const r = svg.getBoundingClientRect(), x = ((e.clientX - r.left) / r.width) * W;
+      const i = Math.max(0, Math.min(n - 1, Math.round(n === 1 ? 0 : ((x - L) / iw) * (n - 1))));
+      hl.setAttribute('x1', X(i)); hl.setAttribute('x2', X(i)); hl.style.display = '';
+      tip.replaceChildren(h('b', {}, (o.tipLabels || labels)[i]), ...series.flatMap(s => [h('br'), h('i', { style: 'background:' + s.color }), s.name + ': ', h('b', {}, nf(s.values[i]))]));
+      tip.style.display = ''; tip.style.left = Math.max(70, Math.min(r.width - 70, (X(i) / W) * r.width)) + 'px'; tip.style.top = (Math.min(...series.map(s => Y(s.values[i]))) / H) * r.height + 'px';
+    };
+    cap.addEventListener('mousemove', move); cap.addEventListener('touchstart', e => move(e.touches[0]), { passive: true }); cap.addEventListener('touchmove', e => move(e.touches[0]), { passive: true });
+    cap.addEventListener('mouseleave', () => { hl.style.display = 'none'; tip.style.display = 'none'; });
+    return box2;
+  }
+
+  function barRows(items, total, o) {
+    o = o || {};
+    if (!items.length) return h('div', { class: 'a-empty' }, 'ยังไม่มีข้อมูล');
+    const max = Math.max(1, ...items.map(i => i.value));
+    return h('div', { class: 'an-list' }, ...items.map(it => h('div', { class: 'an-row' + (o.alt ? ' alt' : '') },
+      h('div', { class: 't' }, h('span', { title: it.label }, it.label), h('span', {}, h('b', {}, nf(it.value)), h('em', {}, it.sub || (total ? Math.round((it.value / total) * 1000) / 10 + '%' : '')))),
+      h('div', { class: 'tr' }, h('i', { style: 'width:' + Math.max(1.5, (it.value / max) * 100) + '%' })))));
+  }
+
+  function analyticsView() {
+    const host = h('div', {}, h('div', { class: 'a-empty' }, 'กำลังโหลด…'));
+    const today0 = bkkToday();
+    let preset = 'today', from = today0, to = today0, mode = 'daily', R = null, ipQ = '', ipOnly = '', showBots = false, ipShow = 20;
+    let rows = [], rowsTotal = 0, rowsLoading = false;
+    const range = p => {
+      const t = bkkToday();
+      if (p === 'today') return [t, t];
+      if (p === 'yesterday') { const y = addDays(t, -1); return [y, y]; }
+      const n = Number(p); return [addDays(t, -(n - 1)), t];
+    };
+    const growth = (a, b) => {
+      if (!b && !a) return h('span', { class: 'an-chip' }, '–');
+      if (!b) return h('span', { class: 'an-chip up' }, '▲ ใหม่');
+      const p = Math.round(((a - b) / b) * 1000) / 10;
+      return h('span', { class: 'an-chip ' + (p > 0 ? 'up' : p < 0 ? 'down' : '') }, (p > 0 ? '▲ ' : p < 0 ? '▼ ' : '') + Math.abs(p) + '%');
+    };
+    const load = async () => {
+      try { R = await api('analytics?from=' + from + '&to=' + to); rows = []; rowsTotal = 0; await loadRows(true); draw(); }
+      catch (e) { host.replaceChildren(h('div', { class: 'a-empty' }, 'โหลดไม่สำเร็จ: ' + e.message)); }
+    };
+    const loadRows = async reset => {
+      if (rowsLoading) return; rowsLoading = true;
+      try {
+        const off = reset ? 0 : rows.length;
+        const d = await api('analytics/visits?from=' + from + '&to=' + to + '&limit=25&offset=' + off + (ipOnly ? '&ip=' + encodeURIComponent(ipOnly) : '') + (showBots ? '&bots=1' : ''));
+        rows = reset ? d.rows : rows.concat(d.rows); rowsTotal = d.total;
+      } finally { rowsLoading = false; }
+    };
+    const pick = async (p, f, t) => { preset = p; from = f; to = t; ipOnly = ''; ipShow = 20; await load(); };
+    const draw = () => {
+      if (cur !== 'stats' || !R) return;
+      const T = R.totals, P = R.prev, single = R.days === 1;
+      const label = single ? fmtDay(R.from) : fmtDay(R.from) + ' – ' + fmtDay(R.to) + ' (' + R.days + ' วัน)';
+      const prevLabel = P.from === P.to ? fmtDay(P.from) : fmtDay(P.from, true) + ' – ' + fmtDay(P.to, true);
+      // ---- range picker
+      const presets = [['today', 'วันนี้'], ['yesterday', 'เมื่อวาน'], ['7', '7 วัน'], ['15', '15 วัน'], ['30', '30 วัน']];
+      const seg = h('div', { class: 'a-seg' }, ...presets.map(([k, l]) => h('button', { type: 'button', class: preset === k ? 'on' : '', onclick: () => { const [f, t] = range(k); pick(k, f, t); } }, l)));
+      const fi = h('input', { type: 'date', value: from, max: R.today }), ti = h('input', { type: 'date', value: to, max: R.today });
+      const go = h('button', { type: 'button', class: 'btn sm', onclick: () => { if (!fi.value || !ti.value) return; let f = fi.value, t = ti.value; if (f > t) [f, t] = [t, f]; if (Date.parse(t) - Date.parse(f) > 365 * 86400e3) return alert('เลือกช่วงได้ไม่เกิน 366 วัน'); pick('custom', f, t); } }, 'ดูข้อมูล');
+      const picker = box(null, h('div', { class: 'an-bar' }, seg, h('span', { class: 'an-rng' }, 'หรือเลือกเอง'), fi, h('span', { class: 'an-rng' }, 'ถึง'), ti, go,
+        h('button', { type: 'button', class: 'ghost sm', onclick: load }, '↻ รีเฟรช')),
+        h('div', { class: 'an-rng' }, 'กำลังดู: ', h('b', { style: 'color:#fff;font-weight:500' }, label), ' · เวลาประเทศไทย (UTC+7) · เทียบกับ ' + prevLabel));
+      // ---- KPIs
+      const kpi = (title, val, sub, cls) => h('div', { class: 'an-kpi ' + (cls || '') }, h('small', {}, title), h('b', {}, nf(val)), sub);
+      const kpis = h('div', { class: 'an-kpis' },
+        kpi('เข้าชมจริง (Page views)', T.views, h('div', { class: 'sub' }, growth(T.views, P.views), ' หน้าที่คนจริงเปิดดู'), 'red'),
+        kpi('ผู้เข้าชมไม่ซ้ำ (Unique)', T.visitors, h('div', { class: 'sub' }, growth(T.visitors, P.visitors), ' นับ 1 คนต่ออุปกรณ์/เบราว์เซอร์'), 'red'),
+        kpi('Traffic ทั้งหมด', T.traffic, h('div', { class: 'sub' }, growth(T.traffic, P.traffic), ' รวมบอท/ระบบ ' + nf(T.bots))),
+        kpi('IP ไม่ซ้ำ', T.ips, h('div', { class: 'sub' }, growth(T.ips, P.ips), ' เฉพาะผู้เข้าชมจริง')));
+      const kpis2 = h('div', { class: 'an-kpis' },
+        kpi('ผู้เข้าชมใหม่', T.newVisitors, h('div', { class: 'sub' }, 'ครั้งแรกที่เปิดเว็บ')),
+        kpi('ผู้เข้าชมกลับมา', T.returningVisitors, h('div', { class: 'sub' }, 'เคยเข้ามาก่อนแล้ว')),
+        kpi('เฉลี่ยต่อคน', T.visitors ? Math.round((T.views / T.visitors) * 10) / 10 : 0, h('div', { class: 'sub' }, 'หน้า / ผู้เข้าชม 1 คน')),
+        kpi('บอท / ระบบ', T.bots, h('div', { class: 'sub' }, 'ไม่นับเป็นผู้เข้าชมจริง')));
+      // ---- growth chart
+      let chart;
+      if (single) {
+        const labs = R.hourly.map(x => String(x.hour).padStart(2, '0') + ':00');
+        chart = lineChart(labs, [{ name: 'เข้าชมจริง', color: '#ff2a2a', area: true, values: R.hourly.map(x => x.views) }, { name: 'ผู้เข้าชมไม่ซ้ำ', color: '#ffffff', values: R.hourly.map(x => x.visitors) }], { tipLabels: labs.map(l => fmtDay(R.from, true) + ' ' + l) });
+      } else {
+        const cum = mode === 'cum', S = R.series;
+        const labs = S.map(x => fmtDay(x.day, true));
+        chart = lineChart(labs, cum
+          ? [{ name: 'เข้าชมจริง (สะสม)', color: '#ff2a2a', area: true, values: S.map(x => x.cumViews) }, { name: 'ผู้เข้าชมไม่ซ้ำ (สะสม)', color: '#ffffff', values: S.map(x => x.cumVisitors) }]
+          : [{ name: 'เข้าชมจริง', color: '#ff2a2a', area: true, values: S.map(x => x.views) }, { name: 'ผู้เข้าชมไม่ซ้ำ', color: '#ffffff', values: S.map(x => x.visitors) }, { name: 'Traffic รวมบอท', color: '#7d8590', dash: true, values: S.map(x => x.traffic) }],
+          { partialLast: R.to === R.today, tipLabels: S.map(x => fmtDay(x.day) + (x.day === R.today ? ' (วันนี้ ยังไม่จบวัน)' : '')) });
+      }
+      const modeSeg = single ? null : h('div', { class: 'a-seg' }, ...[['daily', 'รายวัน'], ['cum', 'สะสม (การเติบโต)']].map(([k, l]) => h('button', { type: 'button', class: mode === k ? 'on' : '', onclick: () => { mode = k; draw(); } }, l)));
+      const legend = h('div', { class: 'an-leg' }, h('span', { style: '--c:#ff2a2a' }, 'เข้าชมจริง'), h('span', { style: '--c:#fff' }, 'ผู้เข้าชมไม่ซ้ำ'), !single && mode === 'daily' ? h('span', { style: '--c:#7d8590' }, 'Traffic รวมบอท') : null);
+      const growthBox = box(single ? 'ผู้เข้าชมรายชั่วโมง' : 'กราฟการเติบโต', h('div', { class: 'an-bar', style: 'justify-content:space-between' }, legend, modeSeg), chart);
+      // ---- devices, os, browser
+      const devTotal = R.devices.reduce((n, d) => n + d.visitors, 0);
+      const devBox = box('อุปกรณ์ที่ใช้เข้าชม (นับตามผู้เข้าชมไม่ซ้ำ)',
+        barRows(R.devices.map(d => ({ label: DEV_NAME[d.key], value: d.visitors, sub: Math.round(devTotal ? (d.visitors / devTotal) * 1000 : 0) / 10 + '% · ' + nf(d.views) + ' views' })), devTotal),
+        h('small', { class: 'h' }, 'iPad ที่เปิดโหมด "ดูเว็บแบบคอม" อาจถูกนับเป็นคอมพิวเตอร์ (เบราว์เซอร์ไม่บอกว่าเป็น iPad)'));
+      const osTotal = R.os.reduce((n, x) => n + x[1], 0), brTotal = R.browsers.reduce((n, x) => n + x[1], 0);
+      const two = h('div', { class: 'an-2' }, box('ระบบปฏิบัติการ', barRows(R.os.map(([k, v]) => ({ label: k, value: v })), osTotal, { alt: true })), box('เบราว์เซอร์ / แอปที่เปิด', barRows(R.browsers.map(([k, v]) => ({ label: k, value: v })), brTotal, { alt: true })));
+      const srcTotal = R.sources.reduce((n, x) => n + x[1], 0);
+      const two2 = h('div', { class: 'an-2' }, box('มาจากไหน (แหล่งที่มา)', barRows(R.sources.map(([k, v]) => ({ label: k, value: v })), srcTotal)), box('หน้ายอดนิยม', barRows(R.pages.map(([k, v]) => ({ label: k, value: v })), T.views, { alt: true })));
+      const hoursMax = Math.max(...R.hours), peak = R.hours.indexOf(hoursMax);
+      const hourBox = box('ช่วงเวลาที่คนเข้ามากที่สุด' + (hoursMax ? ' (พีค ' + String(peak).padStart(2, '0') + ':00 น.)' : ''), lineChart(R.hours.map((_, i) => String(i).padStart(2, '0')), [{ name: 'เข้าชมจริง', color: '#ff2a2a', area: true, values: R.hours }], { tipLabels: R.hours.map((_, i) => 'เวลา ' + String(i).padStart(2, '0') + ':00 น.') }));
+      // ---- IP table
+      const q = h('input', { type: 'search', placeholder: 'ค้นหา IP…', value: ipQ });
+      const tb = h('tbody');
+      const moreIp = h('div', { style: 'text-align:center' });
+      const fillIps = () => {
+        const list = R.ips.filter(x => !ipQ || x.ip.includes(ipQ));
+        moreIp.replaceChildren(...(list.length > ipShow ? [h('button', { type: 'button', class: 'ghost sm', onclick: () => { ipShow += 20; fillIps(); } }, 'แสดงเพิ่ม (' + ipShow + ' / ' + list.length + ')')] : []));
+        tb.replaceChildren(...list.slice(0, ipShow).map(x => h('tr', {},
+          h('td', { class: 'ip' }, x.ip), h('td', {}, h('span', { class: 'an-dev ' + x.device }, DEV_SHORT[x.device] || x.device)),
+          h('td', { class: 'n' }, nf(x.views)), h('td', { class: 'n' }, nf(x.visitors)), h('td', {}, fmtTime(x.first)), h('td', {}, fmtTime(x.last)), h('td', { class: 'p', title: x.last_page }, x.last_page),
+          h('td', {}, h('button', { type: 'button', class: 'ghost sm', onclick: async () => { ipOnly = x.ip; await loadRows(true); draw(); document.getElementById('an-visits').scrollIntoView({ behavior: 'smooth' }); } }, 'ดูประวัติ')))));
+        if (!tb.children.length) tb.append(h('tr', {}, h('td', { colspan: 8, style: 'text-align:center;color:var(--mu);padding:24px' }, 'ไม่พบข้อมูล')));
+      };
+      q.addEventListener('input', () => { ipQ = q.value.trim(); fillIps(); });
+      fillIps();
+      const bad = R.ips.length && R.ips.filter(x => ['127.0.0.1', '::1', 'unknown'].includes(x.ip)).reduce((n, x) => n + x.views, 0) > T.views * 0.5;
+      const ipBox = box('ผู้เข้าชมแยกตาม IP (สูงสุด 200 อันดับแรก)',
+        bad ? note('IP ส่วนใหญ่เป็น 127.0.0.1 / unknown แปลว่าระบบยังอ่าน IP จริงของผู้เข้าชมไม่ได้เพราะอยู่หลัง proxy ของโฮสต์ (เช่น Plesk) ให้เพิ่มตัวแปร TRUST_PROXY = 1 ใน Custom environment variables แล้ว Restart App') : null,
+        h('div', { class: 'an-filter' }, q, h('small', { class: 'h' }, 'ผู้เข้าชม = จำนวนอุปกรณ์/เบราว์เซอร์ที่ต่างกันจาก IP นั้น (หลายคนอาจใช้ Wi-Fi เดียวกัน)')),
+        h('div', { class: 'an-wrap' }, h('table', { class: 'an-tbl' }, h('thead', {}, h('tr', {}, ...['IP', 'อุปกรณ์', 'เข้าชม', 'ผู้เข้าชม', 'ครั้งแรก', 'ล่าสุด', 'หน้าล่าสุด', ''].map((t, i) => h('th', { class: i === 2 || i === 3 ? 'n' : '' }, t)))), tb)), moreIp);
+      // ---- visit log
+      const botChk = h('input', { type: 'checkbox' }); botChk.checked = showBots;
+      botChk.addEventListener('change', async () => { showBots = botChk.checked; await loadRows(true); draw(); });
+      const vrows = rows.map(r => h('tr', {},
+        h('td', {}, fmtTime(r.t)), h('td', { class: 'ip' }, r.ip), h('td', {}, r.bot ? h('span', { class: 'an-chip' }, 'บอท: ' + r.bot_name) : h('span', { class: 'an-dev ' + r.device }, DEV_SHORT[r.device] || r.device)),
+        h('td', {}, r.os + ' · ' + r.browser), h('td', { class: 'p', title: r.path }, r.path), h('td', {}, r.source), h('td', {}, r.isNew ? h('span', { class: 'an-chip up' }, 'ใหม่') : '')));
+      const more = rows.length < rowsTotal ? h('div', { style: 'text-align:center' }, h('button', { type: 'button', class: 'ghost sm', onclick: async () => { await loadRows(false); draw(); } }, 'โหลดเพิ่ม (' + nf(rows.length) + ' / ' + nf(rowsTotal) + ')')) : null;
+      const logBox = box('รายการเข้าชมล่าสุด', h('div', { id: 'an-visits', class: 'an-filter' },
+        ipOnly ? h('span', { class: 'an-chip up' }, 'IP: ' + ipOnly) : null,
+        ipOnly ? h('button', { type: 'button', class: 'ghost sm', onclick: async () => { ipOnly = ''; await loadRows(true); draw(); } }, 'ล้างตัวกรอง') : null,
+        h('label', { class: 'a-chk' }, botChk, 'แสดงบอท/ระบบด้วย')),
+        h('div', { class: 'an-wrap' }, h('table', { class: 'an-tbl' }, h('thead', {}, h('tr', {}, ...['เวลา', 'IP', 'อุปกรณ์', 'ระบบ · เบราว์เซอร์', 'หน้า', 'มาจาก', ''].map(t => h('th', {}, t)))),
+          h('tbody', {}, ...(vrows.length ? vrows : [h('tr', {}, h('td', { colspan: 7, style: 'text-align:center;color:var(--mu);padding:24px' }, 'ยังไม่มีการเข้าชมในช่วงนี้'))])))), more);
+      const bots = R.botNames.length ? box('บอท / ระบบที่เข้ามา (ไม่นับเป็นผู้เข้าชมจริง)', barRows(R.botNames.map(([k, v]) => ({ label: k, value: v })), T.bots, { alt: true })) : null;
+      host.replaceChildren(...[picker, kpis, h('div', { style: 'height:12px' }), kpis2, h('div', { style: 'height:18px' }), growthBox, devBox, two, two2, hourBox, ipBox, logBox, bots,
+        (R.to === R.today && !single ? h('small', { class: 'h' }, 'เส้นประช่วงท้ายของกราฟคือ "วันนี้" ซึ่งยังไม่จบวัน ตัวเลขจึงต่ำกว่าวันอื่นเป็นเรื่องปกติ') : null), h('small', { class: 'h' }, 'ข้อมูลเก็บ ' + R.keepDays + ' วันล่าสุด · เข้าชมจริง = คนที่เปิดหน้าเว็บ (ตัดบอทและตัวตรวจระบบออก) · ไม่ซ้ำ = นับด้วยคุกกี้ที่ไม่ระบุตัวตน (vid)')].filter(Boolean));
+    };
+    load();
+    return host;
+  }
+
   // ---------- sections ----------
   const PN = { rewards: 'Rewards', gameplay: 'Gameplay', drivers: 'Drivers', news: 'News', faq: 'FAQ' };
   const SECTIONS = [
@@ -501,6 +690,8 @@
           check(C.pages[k], 'noindex', 'ซ่อนหน้านี้จาก Google (noindex) — หน้ายังเปิดได้ แต่จะไม่ขึ้นในผลค้นหาและไม่อยู่ใน sitemap'))]
     })),
 
+    { id: 'stats', g: 'รายงาน', label: 'สถิติผู้เข้าชม', desc: 'ดูจำนวนผู้เข้าชมจริง ผู้เข้าชมไม่ซ้ำ IP อุปกรณ์ Android / iOS / คอม และกราฟการเติบโต เลือกดูย้อนหลังได้ทุกช่วงวัน', paths: [],
+      view: () => analyticsView() },
     { id: 'general', g: 'ตั้งค่าเว็บ', label: 'ข้อมูลเว็บ & SEO หลัก', desc: 'ชื่อเว็บ โดเมน รูปแชร์ และค่า SEO เริ่มต้นของทั้งเว็บ', paths: ['site'], url: '/',
       view: () => [
         box('ข้อมูลเว็บไซต์', field(C.site, 'name', 'ชื่อเว็บไซต์', { help: 'แสดงที่โลโก้ ฟุตเตอร์ และต่อท้าย title' }),
@@ -626,21 +817,29 @@
     if (bar) { setStatus(dirty.has(cur) ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ไม่มีการเปลี่ยนแปลง', dirty.has(cur) ? 'warn' : ''); refreshChrome(); }
   }
 
+  let saving = false;
   async function save(ids) {
+    if (saving) return;
     ids = ids.filter(id => sec(id).paths.length);
     if (!ids.length) return;
+    saving = true;
     try {
       const body = clone(saved);
+      const submitted = clone(C);
       for (const id of ids) for (const p of sec(id).paths) setPath(body, p, clone(getPath(C, p)));
       const res = await api('content', 'PUT', body);
       saved = res;
-      for (const id of ids) { for (const p of sec(id).paths) setPath(C, p, clone(getPath(res, p))); dirty.delete(id); }
+      for (const id of ids) {
+        if (sec(id).paths.every(p => JSON.stringify(getPath(C, p)) === JSON.stringify(getPath(submitted, p)))) {
+          for (const p of sec(id).paths) setPath(C, p, clone(getPath(res, p))); dirty.delete(id);
+        }
+      }
       toast('บันทึกแล้ว ✓');
       render(); setStatus('บันทึกแล้ว ✓ ' + new Date().toLocaleTimeString('th-TH'), 'ok');
     } catch (e) {
       if (e.status === 401) return loginScreen('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
       setStatus('บันทึกไม่สำเร็จ: ' + e.message, 'err');
-    }
+    } finally { saving = false; }
   }
   addEventListener('beforeunload', e => { if (dirty.size) { e.preventDefault(); e.returnValue = ''; } });
   addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's' && C) { e.preventDefault(); save([cur]); } });

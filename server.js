@@ -4,9 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
+const { pipeline } = require('stream');
+const locked = require('./lib/lock');
 const store = require('./lib/store');
 const { render, PAGES, LOADER_STYLES } = require('./lib/render');
 const psi = require('./lib/pagespeed');
+const analytics = require('./lib/analytics');
 
 const PORT = +process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -18,9 +21,9 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=u
 // uploadable media: extension, size limit, and a check on the file's first bytes
 const UPLOAD_TYPES = {
   'image/jpeg': { ext: '.jpg', max: 10e6, sig: b => b[0] === 0xff && b[1] === 0xd8 },
-  'image/png': { ext: '.png', max: 10e6, sig: b => b.slice(0, 4).toString('hex') === '89504e47' },
+  'image/png': { ext: '.png', max: 10e6, sig: b => b.length >= 24 && b.slice(0, 8).toString('hex') === '89504e470d0a1a0a' && b.readUInt32BE(16) > 0 && b.readUInt32BE(20) > 0 },
   'image/webp': { ext: '.webp', max: 10e6, sig: b => b.slice(0, 4).toString() === 'RIFF' && b.slice(8, 12).toString() === 'WEBP' },
-  'image/gif': { ext: '.gif', max: 10e6, sig: b => b.slice(0, 4).toString() === 'GIF8' },
+  'image/gif': { ext: '.gif', max: 10e6, sig: b => ['GIF87a', 'GIF89a'].includes(b.slice(0, 6).toString()) && b.readUInt16LE(6) > 0 && b.readUInt16LE(8) > 0 },
   'video/mp4': { ext: '.mp4', max: 60e6, sig: b => b.slice(4, 8).toString() === 'ftyp' },
   'video/webm': { ext: '.webm', max: 60e6, sig: b => b.slice(0, 4).toString('hex') === '1a45dfa3' }
 };
@@ -59,7 +62,8 @@ const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 // (the peer address is captured when the request arrives: once a client disconnects it reads as empty,
 // which must not be mistaken for a local proxy)
 const peer = req => (req.peer !== undefined ? req.peer : (req.peer = req.socket.remoteAddress || ''));
-const fromProxy = req => { const a = peer(req); return process.env.TRUST_PROXY === '1' || a === '' || LOOPBACK.has(a); };
+const trustedPeers = new Set((process.env.TRUST_PROXY_IPS || '').split(',').map(s => s.trim()).filter(Boolean));
+const fromProxy = req => { const a = peer(req); return process.env.TRUST_PROXY === '1' && (a === '' || LOOPBACK.has(a) || trustedPeers.has(a)); };
 const fwd = (req, name) => fromProxy(req) && req.headers[name] ? String(req.headers[name]).split(',').map(s => s.trim()) : null;
 const isHttps = req => !!req.socket.encrypted || (fwd(req, 'x-forwarded-proto') || [])[0] === 'https';
 const HOST_RE = /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
@@ -104,13 +108,17 @@ function sendPage(req, res, code, html, extra) {
 }
 const json = (res, code, obj, extra) => send(res, code, JSON.stringify(obj), 'application/json; charset=utf-8', Object.assign({ 'Cache-Control': 'no-store' }, extra));
 
+let bufferedRequests = 0;
 function readRaw(req, limit) {
+  if (bufferedRequests >= 4) return Promise.reject(Object.assign(new Error('Busy'), { code: 503 }));
+  bufferedRequests++;
   return new Promise((resolve, reject) => {
     let n = 0; const parts = [];
     req.on('data', ch => { n += ch.length; if (n > limit) { reject(Object.assign(new Error('too large'), { code: 413 })); req.destroy(); } else parts.push(ch); });
     req.on('end', () => resolve(Buffer.concat(parts)));
     req.on('error', reject);
-  });
+    req.on('aborted', () => reject(new Error('Request aborted')));
+  }).finally(() => { bufferedRequests--; });
 }
 const readBody = async (req, limit) => (await readRaw(req, limit)).toString('utf8');
 
@@ -125,8 +133,10 @@ function session(req) {
 // compressed copies of static text files, rebuilt when the file changes
 const zcache = new Map();
 // supports byte ranges so videos can seek and play on iPhone/Safari; ETag/Last-Modified allow 304 replies
+function pipeFile(file, res, options) { pipeline(fs.createReadStream(file, options), res, () => {}); }
 function serveFile(req, res, file, cache, vary) {
   fs.stat(file, (err, st) => {
+    try {
     if (err || !st.isFile()) return send(res, 404, 'Not found', 'text/plain');
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
     const etag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
@@ -142,7 +152,7 @@ function serveFile(req, res, file, cache, vary) {
       if (enc) {
         const k = file + '|' + enc + '|' + etag;
         let z = zcache.get(k);
-        if (!z) { z = squeeze(fs.readFileSync(file), enc, 11); if (zcache.size > 200) zcache.clear(); zcache.set(k, z); }
+        if (!z) { z = squeeze(fs.readFileSync(file), enc, 5); if (zcache.size > 200) zcache.clear(); zcache.set(k, z); }
         res.writeHead(200, Object.assign(hd, { 'Content-Encoding': enc, 'Content-Length': z.length }));
         return res.end(req.method === 'HEAD' ? undefined : z);
       }
@@ -152,21 +162,27 @@ function serveFile(req, res, file, cache, vary) {
       let a = r[1] ? +r[1] : Math.max(0, st.size - +r[2]), b = r[1] && r[2] ? Math.min(+r[2], st.size - 1) : st.size - 1;
       if (a >= st.size || a > b) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}` }); return res.end(); }
       res.writeHead(206, Object.assign(hd, { 'Content-Range': `bytes ${a}-${b}/${st.size}`, 'Content-Length': b - a + 1 }));
-      return req.method === 'HEAD' ? res.end() : fs.createReadStream(file, { start: a, end: b }).pipe(res);
+      return req.method === 'HEAD' ? res.end() : pipeFile(file, res, { start: a, end: b });
     }
     res.writeHead(200, Object.assign(hd, { 'Content-Length': st.size }));
     if (req.method === 'HEAD') return res.end();
-    fs.createReadStream(file).pipe(res);
+    pipeFile(file, res);
+    } catch (e) { if (!res.headersSent) send(res, 500, 'File unavailable', 'text/plain'); else res.destroy(); }
   });
 }
 function serveStatic(req, res, root, rel, cache) {
   let p; try { p = decodeURIComponent(rel); } catch (e) { return send(res, 400, 'Bad request', 'text/plain'); }
-  const file = path.normalize(path.join(root, p));
+  if (/[\\:\x00-\x1f]/.test(p)) return send(res, 403, 'Forbidden', 'text/plain');
+  let file = path.normalize(path.join(root, p));
   if (!file.startsWith(root + path.sep) || p.includes('\0')) return send(res, 403, 'Forbidden', 'text/plain');
+  try { file = fs.realpathSync(file); const realRoot = fs.realpathSync(root); if (!file.startsWith(realRoot + path.sep)) return send(res, 403, 'Forbidden', 'text/plain'); } catch (e) { return send(res, 404, 'Not found', 'text/plain'); }
+  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
+  const staticExt = path.extname(file).toLowerCase();
+  if (/^\/(?:img|uploads)\//i.test(p) && !MEDIA_EXT[staticExt] && staticExt !== '.ico') return send(res, 404, 'Not found', 'text/plain');
   // only known web file types are served (no .rar/.zip/.psd or other stray files left in public/)
   if (!MIME[path.extname(file).toLowerCase()] || /[\\/]\./.test(p)) return send(res, 404, 'Not found', 'text/plain');
   // uploaded files can never run as a page, even if a file is crafted to look like HTML
-  if (p.startsWith('/uploads/')) res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+  if (p.replace(/\\/g, '/').toLowerCase().startsWith('/uploads/')) res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
   // a .jpg/.png with a .webp twin next to it: browsers that accept WebP get the smaller file
   if (/\.(jpe?g|png)$/i.test(file)) {
     const twin = file.replace(/\.(jpe?g|png)$/i, '.webp');
@@ -180,6 +196,7 @@ function serveStatic(req, res, root, rel, cache) {
 // small existence cache so WebP lookups don't hit the disk on every request
 const fcache = new Map();
 function hasFile(f) {
+  try { if (!fs.realpathSync(f).startsWith(fs.realpathSync(PUBLIC) + path.sep)) return false; } catch (e) { return false; }
   const c = fcache.get(f), now = Date.now();
   if (c && now - c.t < 30e3) return c.ok;
   let ok = false; try { ok = fs.statSync(f).isFile(); } catch (e) {}
@@ -220,34 +237,33 @@ const BASE_HEADERS = {
 async function adminApi(req, res, url) {
   const route = url.pathname.slice('/admin/api/'.length);
   const m = req.method;
+  if (['POST', 'PUT'].includes(m) && route !== 'upload' && String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase() !== 'application/json') return json(res, 415, { error: 'Expected application/json' });
   if (route === 'login' && m === 'POST') {
     const who = ip(req);
-    const f = fails.get(who) || { n: 0, until: 0, last: 0 };
-    if (f.until > Date.now()) return json(res, 429, { error: 'ลองผิดหลายครั้งเกินไป กรุณารอ 15 นาที' });
+    
     let b; try { b = JSON.parse(await readBody(req, 4096)); } catch (e) { return json(res, 400, { error: 'bad request' }); }
     if (!b || typeof b !== 'object' || typeof b.user !== 'string' || typeof b.password !== 'string') return json(res, 400, { error: 'bad request' });
-    if (await store.checkLogin(b.user, b.password)) {
-      fails.delete(who);
+    if (b.user.length > 200 || b.password.length > 1024) return json(res, 400, { error: 'bad request' });
+    if (!fails.reserve(who)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
+    const version = store.authVersion();
+    if (await store.checkLogin(b.user, b.password) && version === store.authVersion()) {
       const token = crypto.randomBytes(32).toString('base64url'), csrf = crypto.randomBytes(24).toString('base64url');
-      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf });
-      const secure = (isHttps(req) || process.env.COOKIE_SECURE) ? '; Secure' : '';
+      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf, version });
+      const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
       return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
     }
-    f.n++; f.last = Date.now();
-    if (f.n >= 5) { f.until = Date.now() + 15 * 60e3; f.n = 0; }
-    fails.set(who, f);
     return json(res, 401, { error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
   }
 
   const s = session(req);
   if (!s) return json(res, 401, { error: 'unauthorized' });
   const tok = String(req.headers['x-csrf-token'] || '');
-  if (m !== 'GET' && (tok.length !== s.csrf.length || !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(s.csrf)))) return json(res, 403, { error: 'csrf' });
+  if (m !== 'GET' && (!/^[A-Za-z0-9_-]{32}$/.test(tok) || tok.length !== s.csrf.length || !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(s.csrf)))) return json(res, 403, { error: 'csrf' });
 
   try {
     if (route === 'me' && m === 'GET') return json(res, 200, { csrf: s.csrf });
     if (route === 'logout' && m === 'POST') { sessions.delete(s.token); return json(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0' }); }
-    if (route === 'content' && m === 'GET') return json(res, 200, store.getContent());
+    if (route === 'content' && m === 'GET') return json(res, 200, store.snapshot());
     if (route === 'history' && m === 'GET') return json(res, 200, { items: store.listHistory() });
     if (route.startsWith('history/') && m === 'GET') {
       const old = store.readHistory(decodeURIComponent(route.slice(8)));
@@ -260,7 +276,21 @@ async function adminApi(req, res, url) {
       const complete = isObj(b) && ['site', 'links', 'home', 'pages'].every(k => isObj(b[k])) && isObj(b.links.social) && isObj(b.links.download)
         && ['news', 'gameplay', 'rewards', 'drivers', 'faq'].every(k => Array.isArray(b[k]));
       if (!complete) return json(res, 400, { error: 'ข้อมูลไม่ครบ ระบบไม่บันทึกเพื่อป้องกันเนื้อหาหาย' });
-      return json(res, 200, store.saveContent(b));
+      if (!session(req)) return json(res, 401, { error: 'unauthorized' });
+      const saved = store.saveContent(b);
+      return json(res, 200, saved);
+    }
+    // ---- visitor statistics (read only) ----
+    if (route === 'analytics' && m === 'GET') {
+      const today = analytics.dayOf(Date.now()), q = url.searchParams;
+      const to = q.get('to') || today, from = q.get('from') || to;
+      if (to > today) return json(res, 400, { error: 'ไม่สามารถดูวันที่ในอนาคต' });
+      return json(res, 200, Object.assign(analytics.report(from, to), { today, keepDays: analytics.KEEP_DAYS }));
+    }
+    if (route === 'analytics/visits' && m === 'GET') {
+      const today = analytics.dayOf(Date.now()), q = url.searchParams;
+      const to = q.get('to') || today, from = q.get('from') || to;
+      return json(res, 200, analytics.visits(from, to, { ip: String(q.get('ip') || '').slice(0, 64), limit: q.get('limit'), offset: q.get('offset'), bots: q.get('bots') === '1' }));
     }
     // ---- PageSpeed Insights: status/history, start a test, settings ----
     if (route === 'pagespeed' && m === 'GET') {
@@ -293,10 +323,18 @@ async function adminApi(req, res, url) {
       const t = UPLOAD_TYPES[type];
       if (!t) return json(res, 400, { error: 'รองรับเฉพาะรูป JPG, PNG, WEBP, GIF และวิดีโอ MP4, WEBM' });
       let buf;
-      try { buf = await readRaw(req, t.max); } catch (e) { return json(res, 413, { error: 'ไฟล์ใหญ่เกิน ' + t.max / 1e6 + 'MB' }); }
+      try { buf = await readRaw(req, t.max); } catch (e) { return json(res, e.code === 503 ? 503 : 413, { error: e.code === 503 ? 'Upload busy; retry later' : 'ไฟล์ใหญ่เกิน ' + t.max / 1e6 + 'MB' }); }
       if (buf.length < 12 || !t.sig(buf)) return json(res, 400, { error: 'ไฟล์เสียหายหรือไม่ตรงกับนามสกุล' });
       const name = Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex') + t.ext;
-      fs.writeFileSync(path.join(UPLOADS, name), buf);
+      if (!session(req)) return json(res, 401, { error: 'unauthorized' });
+      const quotaError = locked(path.join(__dirname, 'data', 'uploads-quota'), () => {
+      const maxStorage = Number(process.env.UPLOAD_QUOTA_BYTES) || 1024 * 1024 * 1024;
+      const used = fs.readdirSync(UPLOADS).reduce((n, f) => { const st = fs.lstatSync(path.join(UPLOADS, f)); return n + (st.isFile() ? st.size : 0); }, 0);
+      if (used + buf.length > maxStorage) return true;
+      fs.writeFileSync(path.join(UPLOADS, name), buf, { flag: 'wx', mode: 0o600 });
+      return false;
+      });
+      if (quotaError) return json(res, 413, { error: 'Upload storage quota exceeded' });
       return json(res, 200, { url: '/uploads/' + name });
     }
     // only files uploaded through the admin can be deleted; built-in /img files are protected
@@ -310,24 +348,43 @@ async function adminApi(req, res, url) {
     }
     if (route === 'password' && m === 'POST') {
       // wrong "current password" guesses count toward the same lockout as the login form
-      const who = ip(req), f = fails.get(who) || { n: 0, until: 0, last: 0 };
-      if (f.until > Date.now()) return json(res, 429, { error: 'ลองผิดหลายครั้งเกินไป กรุณารอ 15 นาที' });
+      const who = ip(req);
       const b = JSON.parse(await readBody(req, 4096)) || {};
       const user = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'admin.json'), 'utf8')).user;
+      if (!fails.reserve(who)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
       if (!await store.checkLogin(user, String(b.current || ''))) {
-        f.n++; f.last = Date.now(); if (f.n >= 5) { f.until = Date.now() + 15 * 60e3; f.n = 0; } fails.set(who, f);
         return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
       }
       const next = typeof b.next === 'string' ? b.next : '';
       if (next.length < 10 || next.length > 200) return json(res, 400, { error: 'รหัสผ่านใหม่ต้องยาว 10–200 ตัวอักษร' });
-      store.setPassword(next);
-      sessions.keepOnly(s.token);
-      return json(res, 200, { ok: true });
+      store.setPassword(next, s.version);
+      const token = crypto.randomBytes(32).toString('base64url');
+      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion() });
+      sessions.keepOnly(token);
+      const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
+      return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
     }
   } catch (e) {
-    return json(res, e.code === 413 ? 413 : 400, { error: e.code === 413 ? 'ข้อมูลใหญ่เกินไป' : 'ข้อมูลไม่ถูกต้อง' });
+    return json(res, [409, 413, 503].includes(e.code) ? e.code : 400, { error: e.code === 409 ? 'ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่ก่อนบันทึก' : e.code === 503 ? 'ระบบกำลังบันทึก กรุณาลองใหม่' : e.code === 413 ? 'ข้อมูลใหญ่เกินไป' : 'ข้อมูลไม่ถูกต้อง' });
   }
   return json(res, 404, { error: 'not found' });
+}
+
+// ---- visitor statistics: one anonymous first-party cookie (vid) tells returning visitors apart ----
+function track(req, extra, p, url) {
+  if (req.method !== 'GET') return;
+  if (/prefetch|prerender/i.test(String(req.headers['sec-purpose'] || req.headers.purpose || ''))) return;
+  const ua = String(req.headers['user-agent'] || '');
+  let vid = '', isNew = false;
+  if (!analytics.parseUA(ua).bot) {
+    const ck = cookies(req).vid;
+    vid = /^[0-9a-f]{24}$/.test(ck || '') ? ck : '';
+    if (!vid) {
+      vid = crypto.randomBytes(12).toString('hex'); isNew = true;
+      extra['Set-Cookie'] = `vid=${vid}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Lax${isHttps(req) || process.env.COOKIE_SECURE === '1' ? '; Secure' : ''}`;
+    }
+  }
+  analytics.record({ t: Date.now(), ip: ip(req), path: p, vid, isNew, ua, ref: req.headers.referer, host: (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host, utm: url.searchParams.get('utm_source') });
 }
 
 const server = http.createServer(async (req, res) => {
@@ -335,7 +392,17 @@ const server = http.createServer(async (req, res) => {
     peer(req); // remember who connected before anything async happens
     for (const [k, v] of Object.entries(BASE_HEADERS)) res.setHeader(k, v);
     if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+    if (!req.url.startsWith('/') || req.url.startsWith('//') || /[\\\x00-\x20]/.test(req.url)) return send(res, 400, 'Bad request', 'text/plain');
     const url = new URL(req.url, 'http://x');
+    if (url.pathname.startsWith('/admin/api/') && !['GET', 'HEAD'].includes(req.method)) {
+      const origin = req.headers.origin;
+      const expected = (isHttps(req) ? 'https' : 'http') + '://' + ((fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host);
+      if (req.headers['sec-fetch-site'] === 'cross-site' || (origin && origin !== expected)) return json(res, 403, { error: 'origin' });
+    }
+    const configured = String(store.getContent().site.url || '').trim().replace(/\/+$/, '');
+    if (SITE_URL_RE.test(configured || '') && new URL(configured).protocol === 'https:' && !isHttps(req)) {
+      res.writeHead(308, { Location: new URL(configured).origin + url.pathname + url.search }); return res.end();
+    }
     const p = url.pathname;
 
     // ---------- admin (the only place that can change anything) ----------
@@ -367,7 +434,11 @@ const server = http.createServer(async (req, res) => {
     if (p.length > 1 && p.endsWith('/')) return moved('/' + p.replace(/^\/+|\/+$/g, '') + url.search);
 
     const ga = GA_RE.test(c.site.ga4 || '');
-    const page = (html, code) => sendPage(req, res, code || 200, html, ga ? { 'Content-Security-Policy': GA_CSP } : null);
+    const page = (html, code) => {
+      const extra = ga ? { 'Content-Security-Policy': GA_CSP } : {};
+      if (!code || code === 200) { try { track(req, extra, p, url); } catch (e) { console.error('track:', e.message); } }
+      return sendPage(req, res, code || 200, html, extra);
+    };
 
     // ---------- public pages ----------
     // "/home" is an internal alias of "/" for hosts (e.g. Plesk nginx) that never forward the bare root to Node
@@ -390,7 +461,8 @@ const server = http.createServer(async (req, res) => {
     return page(render.notFound(c, base), 404);
   } catch (e) {
     console.error(e);
-    if (!res.headersSent) send(res, 500, 'Server error', 'text/plain');
+    if (!res.headersSent) send(res, e.code === 503 ? 503 : 500, e.code === 503 ? 'Storage busy; retry later' : 'Server error', 'text/plain');
+    else res.destroy();
   }
 });
 
@@ -404,6 +476,9 @@ setInterval(() => { try { psi.autoTick(p => siteUrlFor(p, store.getContent())); 
 // a stray error must never take the whole site down
 process.on('unhandledRejection', e => console.error('unhandled:', e));
 // drop clients that send headers or bodies too slowly (slowloris-style)
+server.maxHeadersCount = 100;
+server.maxRequestsPerSocket = 1000;
+server.setTimeout(30e3, socket => socket.destroy());
 server.headersTimeout = 20e3;
 server.requestTimeout = 300e3;
 

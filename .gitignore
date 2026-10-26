@@ -13,3 +13,9 @@ node_modules/
 *.7z
 *.psd
 .env
+
+# Transient storage locks and atomic write files
+data/*.json.lock
+data/*.tmp
+data/uploads-quota.lock
+data/visits/
