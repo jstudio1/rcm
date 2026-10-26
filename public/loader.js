@@ -20,7 +20,7 @@
   try { if (!preview && el.getAttribute('data-once') === '1' && sessionStorage.getItem(KEY)) { el.parentNode.removeChild(el); return; } } catch (e) {}
 
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var MIN = reduce ? 300 : +(el.getAttribute('data-min') || 1600), DWELL = reduce ? 200 : 900, MAX = 4200, t0 = Date.now();
+  var MIN = reduce ? 300 : +(el.getAttribute('data-min') || 1600), DWELL = reduce ? 200 : 900, MAX = +(el.getAttribute('data-max') || 4200), t0 = Date.now();
   root.classList.add('ldr-on');
 
   var $ = function (s) { return el.querySelector(s); }, $$ = function (s) { return el.querySelectorAll(s); };

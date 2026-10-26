@@ -845,3 +845,266 @@ html{scrollbar-gutter:stable}
   .s-tuktuk.open{animation:none;opacity:0;transition:opacity .3s}
   .s-tuktuk.open .tt-cut,.s-tuktuk.open .tt-seam,.s-tuktuk.open .tt-photo{animation:none}
 }
+
+/* ---------- 6. Tuk-tuk "light spill" (same photo): pitch black at first, only the headlights ignite,
+   then the light spreads outward from them (two radial mask circles that grow with --p) until the whole
+   car is lit. Leaves by going dark: the car fades out, the lights burn a moment longer, then everything
+   goes black and the site fades in. ---------- */
+.s-tukglow{background:#000}
+.tg-amb{position:absolute;inset:-4%;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;filter:blur(18px) brightness(.5);
+  opacity:calc(var(--p) * .3);will-change:opacity;transform:translateZ(0)}
+.s-tukglow.ready .tg-amb{opacity:.5;transition:opacity .6s ease}
+.tg-photo{position:absolute;left:50%;top:50%;width:max(100vw,calc(100vh * 1672 / 941));aspect-ratio:1672/941;transform:translate(-50%,-50%);
+  -webkit-mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%);mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%)}
+@media (max-aspect-ratio:1/1){
+  .tg-photo{width:170vw;top:45%;-webkit-mask:linear-gradient(transparent,#000 16%,#000 84%,transparent);mask:linear-gradient(transparent,#000 16%,#000 84%,transparent)}
+}
+/* the lit car: visible only inside two circles centred on the headlights, growing with progress */
+.tg-lit{position:absolute;inset:0;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;will-change:opacity;
+  opacity:clamp(0,calc((var(--p) - .08) * 1.3),1);
+  -webkit-mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .1) * 1.25),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .1) * 1.25),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .1) * 1.25),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .1) * 1.25),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%);
+  mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .1) * 1.25),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .1) * 1.25),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .1) * 1.25),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .1) * 1.25),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%)}
+/* the headlights, much brighter than the photo: a white-hot core, a wide warm bloom, an anamorphic streak */
+.tg-lamps{position:absolute;inset:0;pointer-events:none;will-change:opacity;animation:tgCrank .17s ease-in-out infinite alternate}
+@keyframes tgCrank{to{opacity:.55}}
+.s-tukglow.ready .tg-lamps{animation:none;opacity:1}
+.tg-core,.tg-bloom{position:absolute;top:49.1%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);will-change:opacity,transform}
+.tg-core{width:5%;background:radial-gradient(circle,#fff 0,#fff 32%,rgba(255,250,235,.9) 46%,rgba(255,230,190,0) 70%);opacity:clamp(0,calc((var(--p) - .03) * 8),1)}
+.tg-bloom{width:34%;background:radial-gradient(circle,rgba(255,250,238,.95) 0,rgba(255,220,165,.6) 10%,rgba(255,190,110,.24) 28%,rgba(255,170,90,0) 62%);
+  opacity:calc(clamp(0,calc((var(--p) - .06) * 3),1) * .9);transition:transform .5s ease,opacity .4s}
+.tg-core.l,.tg-bloom.l{left:40.8%}.tg-core.r,.tg-bloom.r{left:59.1%}
+.tg-streak{position:absolute;left:0;right:0;top:49.1%;height:3px;margin-top:-1.5px;will-change:opacity,transform;
+  background:linear-gradient(90deg,transparent 4%,rgba(255,190,110,.45) 24%,#fff 40%,#fff 60%,rgba(255,190,110,.45) 76%,transparent 96%);
+  opacity:calc(clamp(0,calc((var(--p) - .3) * 2),1) * .7);transform:scaleX(.5);transition:transform .5s ease,opacity .4s}
+.tg-streak::after{content:"";position:absolute;left:15%;right:15%;top:50%;height:4vw;transform:translateY(-50%);
+  background:radial-gradient(50% 50% at 50% 50%,rgba(255,215,160,.28),rgba(255,215,160,0))}
+.s-tukglow.ready .tg-bloom{opacity:1;transform:translate(-50%,-50%) scale(1.3)}
+.s-tukglow.ready .tg-core{transform:translate(-50%,-50%) scale(1.15);transition:transform .4s ease}
+.s-tukglow.ready .tg-streak{opacity:1;transform:scaleX(1)}
+.tg-hud{position:absolute;left:0;right:0;bottom:clamp(24px,6vh,56px);display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .25s}
+.tg-st{font-family:var(--f-disp);font-weight:700;font-size:14px;letter-spacing:.42em;color:#9ea3ab;text-shadow:0 2px 10px #000}
+.s-tukglow.ready .tg-st{color:#ffc66e;text-shadow:0 0 12px rgba(255,180,90,.6)}
+.tg-bar{position:relative;width:min(240px,60vw);height:2px;background:rgba(255,255,255,.14)}
+.tg-bar .ldr-fill{position:absolute;inset:0;background:linear-gradient(90deg,#b3121a,#ffc66e);transform-origin:left;transform:scaleX(0)}
+.tg-pct{font-family:var(--f-disp);font-weight:600;font-size:12px;letter-spacing:.14em;color:#c9cdd3;font-variant-numeric:tabular-nums;text-shadow:0 2px 8px #000}
+/* leaving (~0.95s): car fades into the dark, the lights flare and then switch off, black fades to the site */
+.s-tukglow.open{transition:opacity .4s .55s ease}
+.s-tukglow.open .tg-lit,.s-tukglow.open .tg-amb{opacity:0;transition:opacity .4s ease}
+.s-tukglow.open .tg-bloom{transform:translate(-50%,-50%) scale(1.6)}
+.s-tukglow.open .tg-lamps{animation:tgOff .55s ease forwards}
+@keyframes tgOff{0%,60%{opacity:1}100%{opacity:0}}
+.s-tukglow.open .tg-hud{opacity:0}
+@media (prefers-reduced-motion:reduce){
+  .tg-lamps{animation:none}
+  .s-tukglow.open{transition:opacity .3s}
+}
+
+/* ---------- 7. Tuk-tuk "slow light spill" (same photo, ~4.5s): about 1s of pure black, the headlights
+   burn alone in the dark for a while, then their light spreads over the car. Ends bright: the lit car
+   cross-fades straight into the site (no fade to black). ---------- */
+.s-tuklong{background:#000;animation:ldrSafe .4s 8s forwards} /* longer design: later fail-safe */
+.tl-amb{position:absolute;inset:-4%;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;filter:blur(18px) brightness(.5);
+  opacity:calc(clamp(0,calc((var(--p) - .6) * 2.5),1) * .3);will-change:opacity;transform:translateZ(0)}
+.s-tuklong.ready .tl-amb{opacity:.5;transition:opacity .6s ease}
+.tl-photo{position:absolute;left:50%;top:50%;width:max(100vw,calc(100vh * 1672 / 941));aspect-ratio:1672/941;transform:translate(-50%,-50%);
+  -webkit-mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%);mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%)}
+@media (max-aspect-ratio:1/1){
+  .tl-photo{width:170vw;top:45%;-webkit-mask:linear-gradient(transparent,#000 16%,#000 84%,transparent);mask:linear-gradient(transparent,#000 16%,#000 84%,transparent)}
+}
+/* the lit car: two circles centred on the headlights that only start growing in the second half */
+.tl-lit{position:absolute;inset:0;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;will-change:opacity;
+  opacity:clamp(0,calc((var(--p) - .5) * 2.5),1);
+  -webkit-mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .55) * 2.22),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .55) * 2.22),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .55) * 2.22),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .55) * 2.22),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%);
+  mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .55) * 2.22),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .55) * 2.22),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .55) * 2.22),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .55) * 2.22),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%)}
+.tl-lamps{position:absolute;inset:0;pointer-events:none;will-change:opacity;animation:tlCrank .17s ease-in-out infinite alternate}
+@keyframes tlCrank{to{opacity:.55}}
+.s-tuklong.ready .tl-lamps{animation:none;opacity:1}
+.tl-core,.tl-bloom{position:absolute;top:49.1%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);will-change:opacity,transform}
+.tl-core{width:5%;background:radial-gradient(circle,#fff 0,#fff 32%,rgba(255,250,235,.9) 46%,rgba(255,230,190,0) 70%);opacity:clamp(0,calc((var(--p) - .22) * 10),1)}
+.tl-bloom{width:34%;background:radial-gradient(circle,rgba(255,250,238,.95) 0,rgba(255,220,165,.6) 10%,rgba(255,190,110,.24) 28%,rgba(255,170,90,0) 62%);
+  opacity:calc(clamp(0,calc((var(--p) - .26) * 3),1) * .9);transition:transform .6s ease,opacity .4s}
+.tl-core.l,.tl-bloom.l{left:40.8%}.tl-core.r,.tl-bloom.r{left:59.1%}
+.tl-streak{position:absolute;left:0;right:0;top:49.1%;height:3px;margin-top:-1.5px;will-change:opacity,transform;
+  background:linear-gradient(90deg,transparent 4%,rgba(255,190,110,.45) 24%,#fff 40%,#fff 60%,rgba(255,190,110,.45) 76%,transparent 96%);
+  opacity:calc(clamp(0,calc((var(--p) - .7) * 3),1) * .7);transform:scaleX(.5);transition:transform .6s ease,opacity .4s}
+.tl-streak::after{content:"";position:absolute;left:15%;right:15%;top:50%;height:4vw;transform:translateY(-50%);
+  background:radial-gradient(50% 50% at 50% 50%,rgba(255,215,160,.28),rgba(255,215,160,0))}
+.s-tuklong.ready .tl-bloom{opacity:1;transform:translate(-50%,-50%) scale(1.3)}
+.s-tuklong.ready .tl-core{transform:translate(-50%,-50%) scale(1.15);transition:transform .4s ease}
+.s-tuklong.ready .tl-streak{opacity:1;transform:scaleX(1)}
+.tl-hud{position:absolute;left:0;right:0;bottom:clamp(24px,6vh,56px);display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .25s}
+.tl-st{font-family:var(--f-disp);font-weight:700;font-size:14px;letter-spacing:.42em;color:#9ea3ab;text-shadow:0 2px 10px #000}
+.s-tuklong.ready .tl-st{color:#ffc66e;text-shadow:0 0 12px rgba(255,180,90,.6)}
+.tl-bar{position:relative;width:min(240px,60vw);height:2px;background:rgba(255,255,255,.14)}
+.tl-bar .ldr-fill{position:absolute;inset:0;background:linear-gradient(90deg,#b3121a,#ffc66e);transform-origin:left;transform:scaleX(0)}
+.tl-pct{font-family:var(--f-disp);font-weight:600;font-size:12px;letter-spacing:.14em;color:#c9cdd3;font-variant-numeric:tabular-nums;text-shadow:0 2px 8px #000}
+/* leaving: stays lit, the headlights flare a little more, and the bright scene cross-fades into the site
+   (the short delay keeps the loader opaque while the scrollbar comes back, so that shift isn't seen) */
+.s-tuklong.open{transition:opacity .65s .15s ease}
+.s-tuklong.open .tl-bloom{transform:translate(-50%,-50%) scale(1.7)}
+.s-tuklong.open .tl-streak{transform:scaleX(1.15)}
+.s-tuklong.open .tl-hud{opacity:0}
+@media (prefers-reduced-motion:reduce){
+  .tl-lamps{animation:none}
+  .s-tuklong.open{transition:opacity .3s}
+}
+
+/* ---------- 8. Tuk-tuk "extra-slow light spill" (same photo, ~6s): about 1.5s of pure black, the headlights
+   burn alone in the dark until ~4s, then their light spreads over the car. Ends bright: the lit car
+   cross-fades straight into the site (no fade to black). ---------- */
+.s-tukxl{background:#000;animation:ldrSafe .4s 10.5s forwards} /* longer design: later fail-safe */
+.tx-amb{position:absolute;inset:-4%;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;filter:blur(18px) brightness(.5);
+  opacity:calc(clamp(0,calc((var(--p) - .7) * 3.3),1) * .3);will-change:opacity;transform:translateZ(0)}
+.s-tukxl.ready .tx-amb{opacity:.5;transition:opacity .6s ease}
+.tx-photo{position:absolute;left:50%;top:50%;width:max(100vw,calc(100vh * 1672 / 941));aspect-ratio:1672/941;transform:translate(-50%,-50%);
+  -webkit-mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%);mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%)}
+@media (max-aspect-ratio:1/1){
+  .tx-photo{width:170vw;top:45%;-webkit-mask:linear-gradient(transparent,#000 16%,#000 84%,transparent);mask:linear-gradient(transparent,#000 16%,#000 84%,transparent)}
+}
+/* the lit car: two circles centred on the headlights that only start growing in the second half */
+.tx-lit{position:absolute;inset:0;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;will-change:opacity;
+  opacity:clamp(0,calc((var(--p) - .62) * 2.6),1);
+  -webkit-mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .66) * 2.94),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .66) * 2.94),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .66) * 2.94),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .66) * 2.94),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%);
+  mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .66) * 2.94),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .66) * 2.94),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .66) * 2.94),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .66) * 2.94),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%)}
+.tx-lamps{position:absolute;inset:0;pointer-events:none;will-change:opacity;animation:txCrank .17s ease-in-out infinite alternate}
+@keyframes txCrank{to{opacity:.55}}
+.s-tukxl.ready .tx-lamps{animation:none;opacity:1}
+.tx-core,.tx-bloom{position:absolute;top:49.1%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);will-change:opacity,transform}
+.tx-core{width:5%;background:radial-gradient(circle,#fff 0,#fff 32%,rgba(255,250,235,.9) 46%,rgba(255,230,190,0) 70%);opacity:clamp(0,calc((var(--p) - .25) * 12),1)}
+.tx-bloom{width:34%;background:radial-gradient(circle,rgba(255,250,238,.95) 0,rgba(255,220,165,.6) 10%,rgba(255,190,110,.24) 28%,rgba(255,170,90,0) 62%);
+  opacity:calc(clamp(0,calc((var(--p) - .28) * 3),1) * .9);transition:transform .6s ease,opacity .4s}
+.tx-core.l,.tx-bloom.l{left:40.8%}.tx-core.r,.tx-bloom.r{left:59.1%}
+.tx-streak{position:absolute;left:0;right:0;top:49.1%;height:3px;margin-top:-1.5px;will-change:opacity,transform;
+  background:linear-gradient(90deg,transparent 4%,rgba(255,190,110,.45) 24%,#fff 40%,#fff 60%,rgba(255,190,110,.45) 76%,transparent 96%);
+  opacity:calc(clamp(0,calc((var(--p) - .78) * 4.5),1) * .7);transform:scaleX(.5);transition:transform .6s ease,opacity .4s}
+.tx-streak::after{content:"";position:absolute;left:15%;right:15%;top:50%;height:4vw;transform:translateY(-50%);
+  background:radial-gradient(50% 50% at 50% 50%,rgba(255,215,160,.28),rgba(255,215,160,0))}
+.s-tukxl.ready .tx-bloom{opacity:1;transform:translate(-50%,-50%) scale(1.3)}
+.s-tukxl.ready .tx-core{transform:translate(-50%,-50%) scale(1.15);transition:transform .4s ease}
+.s-tukxl.ready .tx-streak{opacity:1;transform:scaleX(1)}
+.tx-hud{position:absolute;left:0;right:0;bottom:clamp(24px,6vh,56px);display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .25s}
+.tx-st{font-family:var(--f-disp);font-weight:700;font-size:14px;letter-spacing:.42em;color:#9ea3ab;text-shadow:0 2px 10px #000}
+.s-tukxl.ready .tx-st{color:#ffc66e;text-shadow:0 0 12px rgba(255,180,90,.6)}
+.tx-bar{position:relative;width:min(240px,60vw);height:2px;background:rgba(255,255,255,.14)}
+.tx-bar .ldr-fill{position:absolute;inset:0;background:linear-gradient(90deg,#b3121a,#ffc66e);transform-origin:left;transform:scaleX(0)}
+.tx-pct{font-family:var(--f-disp);font-weight:600;font-size:12px;letter-spacing:.14em;color:#c9cdd3;font-variant-numeric:tabular-nums;text-shadow:0 2px 8px #000}
+/* leaving: stays lit, the headlights flare a little more, and the bright scene cross-fades into the site
+   (the short delay keeps the loader opaque while the scrollbar comes back, so that shift isn't seen) */
+.s-tukxl.open{transition:opacity .65s .15s ease}
+.s-tukxl.open .tx-bloom{transform:translate(-50%,-50%) scale(1.7)}
+.s-tukxl.open .tx-streak{transform:scaleX(1.15)}
+.s-tukxl.open .tx-hud{opacity:0}
+@media (prefers-reduced-motion:reduce){
+  .tx-lamps{animation:none}
+  .s-tukxl.open{transition:opacity .3s}
+}
+
+/* ---------- 9. Tuk-tuk "medium dark, slow spill" (same photo, ~5s): under a second of pure black, the
+   headlights burn alone in the dark until ~2.3s, then their light spreads slowly over the car (~2.7s).
+   Ends bright: the lit car cross-fades straight into the site (no fade to black). ---------- */
+.s-tukmid{background:#000;animation:ldrSafe .4s 9s forwards} /* longer design: later fail-safe */
+.ty-amb{position:absolute;inset:-4%;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;filter:blur(18px) brightness(.5);
+  opacity:calc(clamp(0,calc((var(--p) - .55) * 2.2),1) * .3);will-change:opacity;transform:translateZ(0)}
+.s-tukmid.ready .ty-amb{opacity:.5;transition:opacity .6s ease}
+.ty-photo{position:absolute;left:50%;top:50%;width:max(100vw,calc(100vh * 1672 / 941));aspect-ratio:1672/941;transform:translate(-50%,-50%);
+  -webkit-mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%);mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%)}
+@media (max-aspect-ratio:1/1){
+  .ty-photo{width:170vw;top:45%;-webkit-mask:linear-gradient(transparent,#000 16%,#000 84%,transparent);mask:linear-gradient(transparent,#000 16%,#000 84%,transparent)}
+}
+/* the lit car: two circles centred on the headlights that only start growing in the second half */
+.ty-lit{position:absolute;inset:0;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;will-change:opacity;
+  opacity:clamp(0,calc((var(--p) - .42) * 2.2),1);
+  -webkit-mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .46) * 1.85),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .46) * 1.85),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .46) * 1.85),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .46) * 1.85),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%);
+  mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .46) * 1.85),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .46) * 1.85),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .46) * 1.85),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .46) * 1.85),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%)}
+.ty-lamps{position:absolute;inset:0;pointer-events:none;will-change:opacity;animation:tyCrank .17s ease-in-out infinite alternate}
+@keyframes tyCrank{to{opacity:.55}}
+.s-tukmid.ready .ty-lamps{animation:none;opacity:1}
+.ty-core,.ty-bloom{position:absolute;top:49.1%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);will-change:opacity,transform}
+.ty-core{width:5%;background:radial-gradient(circle,#fff 0,#fff 32%,rgba(255,250,235,.9) 46%,rgba(255,230,190,0) 70%);opacity:clamp(0,calc((var(--p) - .16) * 12),1)}
+.ty-bloom{width:34%;background:radial-gradient(circle,rgba(255,250,238,.95) 0,rgba(255,220,165,.6) 10%,rgba(255,190,110,.24) 28%,rgba(255,170,90,0) 62%);
+  opacity:calc(clamp(0,calc((var(--p) - .19) * 3),1) * .9);transition:transform .6s ease,opacity .4s}
+.ty-core.l,.ty-bloom.l{left:40.8%}.ty-core.r,.ty-bloom.r{left:59.1%}
+.ty-streak{position:absolute;left:0;right:0;top:49.1%;height:3px;margin-top:-1.5px;will-change:opacity,transform;
+  background:linear-gradient(90deg,transparent 4%,rgba(255,190,110,.45) 24%,#fff 40%,#fff 60%,rgba(255,190,110,.45) 76%,transparent 96%);
+  opacity:calc(clamp(0,calc((var(--p) - .65) * 2.9),1) * .7);transform:scaleX(.5);transition:transform .6s ease,opacity .4s}
+.ty-streak::after{content:"";position:absolute;left:15%;right:15%;top:50%;height:4vw;transform:translateY(-50%);
+  background:radial-gradient(50% 50% at 50% 50%,rgba(255,215,160,.28),rgba(255,215,160,0))}
+.s-tukmid.ready .ty-bloom{opacity:1;transform:translate(-50%,-50%) scale(1.3)}
+.s-tukmid.ready .ty-core{transform:translate(-50%,-50%) scale(1.15);transition:transform .4s ease}
+.s-tukmid.ready .ty-streak{opacity:1;transform:scaleX(1)}
+.ty-hud{position:absolute;left:0;right:0;bottom:clamp(24px,6vh,56px);display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .25s}
+.ty-st{font-family:var(--f-disp);font-weight:700;font-size:14px;letter-spacing:.42em;color:#9ea3ab;text-shadow:0 2px 10px #000}
+.s-tukmid.ready .ty-st{color:#ffc66e;text-shadow:0 0 12px rgba(255,180,90,.6)}
+.ty-bar{position:relative;width:min(240px,60vw);height:2px;background:rgba(255,255,255,.14)}
+.ty-bar .ldr-fill{position:absolute;inset:0;background:linear-gradient(90deg,#b3121a,#ffc66e);transform-origin:left;transform:scaleX(0)}
+.ty-pct{font-family:var(--f-disp);font-weight:600;font-size:12px;letter-spacing:.14em;color:#c9cdd3;font-variant-numeric:tabular-nums;text-shadow:0 2px 8px #000}
+/* leaving: stays lit, the headlights flare a little more, and the bright scene cross-fades into the site
+   (the short delay keeps the loader opaque while the scrollbar comes back, so that shift isn't seen) */
+.s-tukmid.open{transition:opacity .65s .15s ease}
+.s-tukmid.open .ty-bloom{transform:translate(-50%,-50%) scale(1.7)}
+.s-tukmid.open .ty-streak{transform:scaleX(1.15)}
+.s-tukmid.open .ty-hud{opacity:0}
+@media (prefers-reduced-motion:reduce){
+  .ty-lamps{animation:none}
+  .s-tukmid.open{transition:opacity .3s}
+}
+
+/* ---------- 10. Tuk-tuk "short dark, slow spill" (same photo, ~4s): a brief moment of pure black, the
+   headlights burn alone in the dark until ~1.3s, then their light spreads slowly over the car (~2.7s).
+   Ends bright: the lit car cross-fades straight into the site (no fade to black). ---------- */
+.s-tukfast{background:#000;animation:ldrSafe .4s 8s forwards} /* longer design: later fail-safe */
+.tz-amb{position:absolute;inset:-4%;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;filter:blur(18px) brightness(.5);
+  opacity:calc(clamp(0,calc((var(--p) - .45) * 1.8),1) * .3);will-change:opacity;transform:translateZ(0)}
+.s-tukfast.ready .tz-amb{opacity:.5;transition:opacity .6s ease}
+.tz-photo{position:absolute;left:50%;top:50%;width:max(100vw,calc(100vh * 1672 / 941));aspect-ratio:1672/941;transform:translate(-50%,-50%);
+  -webkit-mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%);mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%)}
+@media (max-aspect-ratio:1/1){
+  .tz-photo{width:170vw;top:45%;-webkit-mask:linear-gradient(transparent,#000 16%,#000 84%,transparent);mask:linear-gradient(transparent,#000 16%,#000 84%,transparent)}
+}
+/* the lit car: two circles centred on the headlights that only start growing in the second half */
+.tz-lit{position:absolute;inset:0;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;will-change:opacity;
+  opacity:clamp(0,calc((var(--p) - .29) * 1.9),1);
+  -webkit-mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .325) * 1.48),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .325) * 1.48),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .325) * 1.48),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .325) * 1.48),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%);
+  mask:radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .325) * 1.48),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .325) * 1.48),1) * 187%) at 40.8% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%),
+    radial-gradient(calc(1.5% + clamp(0,calc((var(--p) - .325) * 1.48),1) * 105%) calc(2.7% + clamp(0,calc((var(--p) - .325) * 1.48),1) * 187%) at 59.1% 49.1%,#000 0,#000 30%,rgba(0,0,0,.45) 65%,transparent 100%)}
+.tz-lamps{position:absolute;inset:0;pointer-events:none;will-change:opacity;animation:tzCrank .17s ease-in-out infinite alternate}
+@keyframes tzCrank{to{opacity:.55}}
+.s-tukfast.ready .tz-lamps{animation:none;opacity:1}
+.tz-core,.tz-bloom{position:absolute;top:49.1%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);will-change:opacity,transform}
+.tz-core{width:5%;background:radial-gradient(circle,#fff 0,#fff 32%,rgba(255,250,235,.9) 46%,rgba(255,230,190,0) 70%);opacity:clamp(0,calc((var(--p) - .07) * 12),1)}
+.tz-bloom{width:34%;background:radial-gradient(circle,rgba(255,250,238,.95) 0,rgba(255,220,165,.6) 10%,rgba(255,190,110,.24) 28%,rgba(255,170,90,0) 62%);
+  opacity:calc(clamp(0,calc((var(--p) - .1) * 3),1) * .9);transition:transform .6s ease,opacity .4s}
+.tz-core.l,.tz-bloom.l{left:40.8%}.tz-core.r,.tz-bloom.r{left:59.1%}
+.tz-streak{position:absolute;left:0;right:0;top:49.1%;height:3px;margin-top:-1.5px;will-change:opacity,transform;
+  background:linear-gradient(90deg,transparent 4%,rgba(255,190,110,.45) 24%,#fff 40%,#fff 60%,rgba(255,190,110,.45) 76%,transparent 96%);
+  opacity:calc(clamp(0,calc((var(--p) - .6) * 2.5),1) * .7);transform:scaleX(.5);transition:transform .6s ease,opacity .4s}
+.tz-streak::after{content:"";position:absolute;left:15%;right:15%;top:50%;height:4vw;transform:translateY(-50%);
+  background:radial-gradient(50% 50% at 50% 50%,rgba(255,215,160,.28),rgba(255,215,160,0))}
+.s-tukfast.ready .tz-bloom{opacity:1;transform:translate(-50%,-50%) scale(1.3)}
+.s-tukfast.ready .tz-core{transform:translate(-50%,-50%) scale(1.15);transition:transform .4s ease}
+.s-tukfast.ready .tz-streak{opacity:1;transform:scaleX(1)}
+.tz-hud{position:absolute;left:0;right:0;bottom:clamp(24px,6vh,56px);display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .25s}
+.tz-st{font-family:var(--f-disp);font-weight:700;font-size:14px;letter-spacing:.42em;color:#9ea3ab;text-shadow:0 2px 10px #000}
+.s-tukfast.ready .tz-st{color:#ffc66e;text-shadow:0 0 12px rgba(255,180,90,.6)}
+.tz-bar{position:relative;width:min(240px,60vw);height:2px;background:rgba(255,255,255,.14)}
+.tz-bar .ldr-fill{position:absolute;inset:0;background:linear-gradient(90deg,#b3121a,#ffc66e);transform-origin:left;transform:scaleX(0)}
+.tz-pct{font-family:var(--f-disp);font-weight:600;font-size:12px;letter-spacing:.14em;color:#c9cdd3;font-variant-numeric:tabular-nums;text-shadow:0 2px 8px #000}
+/* leaving: stays lit, the headlights flare a little more, and the bright scene cross-fades into the site
+   (the short delay keeps the loader opaque while the scrollbar comes back, so that shift isn't seen) */
+.s-tukfast.open{transition:opacity .65s .15s ease}
+.s-tukfast.open .tz-bloom{transform:translate(-50%,-50%) scale(1.7)}
+.s-tukfast.open .tz-streak{transform:scaleX(1.15)}
+.s-tukfast.open .tz-hud{opacity:0}
+@media (prefers-reduced-motion:reduce){
+  .tz-lamps{animation:none}
+  .s-tukfast.open{transition:opacity .3s}
+}
