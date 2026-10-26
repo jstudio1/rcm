@@ -70,3 +70,8 @@ $env:ADMIN_USER="admin"; $env:ADMIN_PASSWORD="รหัสผ่านของ�
 - ต้องตั้ง `TRUST_PROXY=1` บนโฮสต์ที่อยู่หลัง proxy (เช่น Plesk) ไม่เช่นนั้นจะเห็น IP เป็น 127.0.0.1 ทุกคน
 - เก็บข้อมูล 400 วัน (ปรับด้วย `ANALYTICS_DAYS`, ขั้นต่ำ 30) แล้วลบไฟล์เก่าอัตโนมัติ · โฟลเดอร์ `data/visits/` ไม่ถูกส่งขึ้น GitHub
 - IP และคุกกี้ถือเป็นข้อมูลส่วนบุคคลตาม PDPA ควรมีประกาศนโยบายความเป็นส่วนตัวบนเว็บไซต์
+
+## โฮสต์หลัง proxy (Plesk / nginx) และการ redirect HTTPS
+- แอปจะ redirect ไป `https://` ก็ต่อเมื่อ **แน่ใจว่าผู้เข้าชมเข้ามาด้วย http** เท่านั้น (proxy ที่เชื่อถือส่ง `X-Forwarded-Proto: http` หรือเป็นการเชื่อมต่อตรงจากภายนอกที่ไม่มี TLS) ถ้า proxy ไม่ส่งข้อมูลนี้ แอปจะไม่ redirect เพื่อไม่ให้เกิดลูป `ERR_TOO_MANY_REDIRECTS`
+- เพื่อให้บังคับ HTTPS และอ่าน IP จริงได้ ให้ตั้ง `TRUST_PROXY=1` และให้ proxy ส่ง `X-Forwarded-Proto` (Plesk: Apache & nginx Settings → Additional nginx directives → `passenger_set_header X-Forwarded-Proto $scheme;`) และตั้ง `COOKIE_SECURE=1`
+- การตรวจ Origin ของหลังบ้านเทียบ host เสมอ และเทียบ scheme เฉพาะเมื่อรู้แน่ จึงเข้าหลังบ้านผ่าน proxy ได้ปกติ

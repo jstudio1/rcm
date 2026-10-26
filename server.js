@@ -66,6 +66,17 @@ const trustedPeers = new Set((process.env.TRUST_PROXY_IPS || '').split(',').map(
 const fromProxy = req => { const a = peer(req); return process.env.TRUST_PROXY === '1' && (a === '' || LOOPBACK.has(a) || trustedPeers.has(a)); };
 const fwd = (req, name) => fromProxy(req) && req.headers[name] ? String(req.headers[name]).split(',').map(s => s.trim()) : null;
 const isHttps = req => !!req.socket.encrypted || (fwd(req, 'x-forwarded-proto') || [])[0] === 'https';
+// 'https' / 'http' only when we are SURE how the visitor connected; null when a proxy on this machine (Plesk nginx,
+// Passenger) may be hiding it. Redirects only ever act on a sure 'http', so a host that forgets to forward the
+// scheme can never cause a redirect loop.
+const knownProto = req => {
+  if (req.socket.encrypted) return 'https';
+  const p = (fwd(req, 'x-forwarded-proto') || [])[0];
+  if (p) return p === 'https' ? 'https' : 'http';
+  if (fromProxy(req)) return null;
+  const a = peer(req);
+  return (a === '' || LOOPBACK.has(a)) ? null : 'http'; // a direct remote connection that is not TLS is plain http
+};
 const HOST_RE = /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
 const SITE_URL_RE = /^https?:\/\/(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
 const baseUrl = (req, c) => {
@@ -396,11 +407,13 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     if (url.pathname.startsWith('/admin/api/') && !['GET', 'HEAD'].includes(req.method)) {
       const origin = req.headers.origin;
-      const expected = (isHttps(req) ? 'https' : 'http') + '://' + ((fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host);
-      if (req.headers['sec-fetch-site'] === 'cross-site' || (origin && origin !== expected)) return json(res, 403, { error: 'origin' });
+      const wantHost = (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host, kp = knownProto(req);
+      let sameOrigin = !origin;
+      if (origin) { try { const o = new URL(origin); sameOrigin = o.host === wantHost && (!kp || o.protocol === kp + ':'); } catch (e) { sameOrigin = false; } }
+      if (req.headers['sec-fetch-site'] === 'cross-site' || !sameOrigin) return json(res, 403, { error: 'origin' });
     }
     const configured = String(store.getContent().site.url || '').trim().replace(/\/+$/, '');
-    if (SITE_URL_RE.test(configured || '') && new URL(configured).protocol === 'https:' && !isHttps(req)) {
+    if (SITE_URL_RE.test(configured || '') && new URL(configured).protocol === 'https:' && knownProto(req) === 'http') {
       res.writeHead(308, { Location: new URL(configured).origin + url.pathname + url.search }); return res.end();
     }
     const p = url.pathname;

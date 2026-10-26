@@ -29,7 +29,15 @@ await t.test('parallel guesses cannot undercount, forged forwarding ignored',asy
 await t.test('password change revokes old sessions',async()=>{fs.writeFileSync(path.join(tmp,'data/limits.json'),'{}');const second=await request('/admin/api/login','POST',{user:'admin',password:'Security-test-password-123'});const old=second.headers.get('set-cookie').split(';')[0];const before=cookie;const changed=await request('/admin/api/password','POST',{current:'Security-test-password-123',next:'Changed-password-456'},auth());assert.equal(changed.status,200);cookie=changed.headers.get('set-cookie').split(';')[0];assert.notEqual(cookie,before);assert.equal((await request('/admin/api/me','GET',null,{Cookie:before})).status,401);assert.equal((await request('/admin/api/me','GET',null,{Cookie:old})).status,401);assert.equal((await request('/admin/api/me','GET',null,auth())).status,200);});
 await t.test('corrupt throttle storage fails closed',async()=>{const f=path.join(tmp,'data/limits.json'),before=fs.readFileSync(f);fs.writeFileSync(f,'broken');assert.equal((await request('/admin/api/login','POST',{user:'admin',password:'wrong'})).status,500);fs.writeFileSync(f,before);});
 await t.test('logout revokes token',async()=>{assert.equal((await request('/admin/api/logout','POST',{},auth())).status,200);assert.equal((await request('/admin/api/me','GET',null,auth())).status,401);});
-await t.test('HTTPS enforced for admin with trailing-slash canonical URL',async()=>{const f=path.join(tmp,'data/content.json'),c=JSON.parse(fs.readFileSync(f));c.site.url='https://example.com/';fs.writeFileSync(f,JSON.stringify(c));await new Promise(r=>setTimeout(r,1050));const r=await request('/admin');assert.equal(r.status,308);assert.equal(r.headers.get('location'),'https://example.com/admin');});
+await t.test('HTTPS redirect acts only on a certain http, never loops behind a local proxy',async()=>{const f=path.join(tmp,'data/content.json'),c=JSON.parse(fs.readFileSync(f));c.site.url='https://example.com/';fs.writeFileSync(f,JSON.stringify(c));await new Promise(r=>setTimeout(r,1050));
+// TRUST_PROXY=0 and a loopback peer = a proxy on this machine may be hiding https: unknown, so no redirect (no loop)
+assert.equal((await request('/admin')).status,200);assert.equal((await request('/')).status,200);
+// forwarded headers from an untrusted setup are ignored
+assert.equal((await request('/',"GET",null,{'X-Forwarded-Proto':'http'})).status,200);
+// a direct non-loopback connection without TLS is plain http: redirect to the configured https address
+const lan=Object.values(os.networkInterfaces()).flat().find(i=>i&&i.family==='IPv4'&&!i.internal);
+if(lan){const r=await fetch('http://'+lan.address+':'+port+'/admin',{redirect:'manual'});assert.equal(r.status,308);assert.equal(r.headers.get('location'),'https://example.com/admin');}
+});
 await t.test('XSS payloads escaped in rendered output',()=>{const {render,safeUrl}=require(path.join(tmp,'lib/render'));for(const u of ['javascript:alert(1)','data:text/html,a','//evil.example','/\\evil.example'])assert.equal(safeUrl(u),'');content.site.name='<script>alert(1)</script>';assert.ok(!render.home(content,base).includes('<script>alert(1)</script>'));});
 });
 
