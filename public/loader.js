@@ -78,7 +78,10 @@
     done = true;
     try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
     el.classList.add('open');
-    root.classList.remove('ldr-on');
+    // the scrollbar comes back when scrolling unlocks; a design that covers the screen while leaving
+    // (tuk-tuk flash) sets data-unlock so that small sideways shift happens out of sight
+    var unlock = +(el.getAttribute('data-unlock') || 0);
+    if (unlock) setTimeout(function () { root.classList.remove('ldr-on'); }, unlock); else root.classList.remove('ldr-on');
     try { document.dispatchEvent(new CustomEvent('rc-loaded')); } catch (e) {}
     setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 1000);
   }

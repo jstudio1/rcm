@@ -760,3 +760,88 @@ html.ldr-on .hero .ln span,html.ldr-on .fade-up{animation-play-state:paused} /* 
 /* neon: status, bar and % sit on the road, below the horizon */
 .nn-hud{position:absolute;left:0;right:0;bottom:clamp(40px,12vh,110px);display:flex;flex-direction:column;align-items:center;gap:12px;transition:opacity .4s}
 .s-neon.open .nn-hud{opacity:0}
+
+
+/* ---------- 5. Tuk-tuk (photo, landscape 1672x941): dark scene, faint spotlight, the photo's own lamps
+   light up as the engine cranks, then a black cinematic cut: bars close over the car, a gold hairline
+   flashes, and the bars open onto the site. Opacity/transform only, so phones stay smooth. ---------- */
+html{scrollbar-gutter:stable}
+.s-tuktuk{background:#000}
+.tt-pre{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+/* blurred copy behind the photo: the photo's edges melt into it (soft, slightly blurred border) */
+.tt-amb{position:absolute;inset:-4%;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;filter:blur(18px) brightness(.6);
+  opacity:calc(.18 + var(--p) * .3);will-change:opacity;transform:translateZ(0)}
+.s-tuktuk.ready .tt-amb{opacity:.95;transition:opacity .6s ease}
+/* the photo covers the screen on landscape; on portrait it's a wide band with the car big in the middle */
+.tt-photo{position:absolute;left:50%;top:50%;width:max(100vw,calc(100vh * 1672 / 941));aspect-ratio:1672/941;transform:translate(-50%,-50%);will-change:transform;
+  -webkit-mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%);mask:radial-gradient(ellipse 75% 75% at 50% 48%,#000 60%,transparent 100%)}
+@media (max-aspect-ratio:1/1){
+  .s-tuktuk.ready .tt-amb{opacity:.55}
+  .tt-photo{width:170vw;top:45%;-webkit-mask:linear-gradient(transparent,#000 16%,#000 84%,transparent);mask:linear-gradient(transparent,#000 16%,#000 84%,transparent)}
+}
+.tt-layer{position:absolute;inset:0;background:url(/img/loader_tuktuk_v2.jpg) center/cover no-repeat;will-change:opacity}
+.tt-base{filter:brightness(.12) saturate(.6)}
+/* spotlight from above: the roof and the THAILAND sign show faintly first */
+.tt-spot{filter:brightness(.55);opacity:0;-webkit-mask:radial-gradient(22% 40% at 50% 28%,#000 25%,transparent 100%);mask:radial-gradient(22% 40% at 50% 28%,#000 25%,transparent 100%);animation:ttSpotOn 1.2s .15s ease-out forwards}
+@keyframes ttSpotOn{0%{opacity:0}30%{opacity:.7}38%{opacity:.2}55%,100%{opacity:1}}
+/* roof sign + centre emblem light up first */
+.tt-lamps{-webkit-mask:radial-gradient(7% 6% at 50.2% 16.6%,#000 55%,transparent 100%),radial-gradient(3.2% 5.6% at 50.1% 49.2%,#000 55%,transparent 100%);
+  mask:radial-gradient(7% 6% at 50.2% 16.6%,#000 55%,transparent 100%),radial-gradient(3.2% 5.6% at 50.1% 49.2%,#000 55%,transparent 100%);
+  opacity:clamp(0,calc((var(--p) - .15) * 2.4),1)}
+/* engine catches: the whole car lights up */
+.tt-full{opacity:calc(clamp(0,calc((var(--p) - .75) * 4),1) * .25);transition:opacity .6s ease}
+.s-tuktuk.ready .tt-full{opacity:.92}
+/* headlights: own layer + glows in one wrapper that flickers (opacity) while cranking */
+.tt-crank{position:absolute;inset:0;will-change:opacity;animation:ttCrank .19s ease-in-out infinite alternate}
+@keyframes ttCrank{to{opacity:.38}}
+.s-tuktuk.ready .tt-crank{animation:none;opacity:1}
+.tt-heads{-webkit-mask:radial-gradient(3.4% 6% at 40.8% 49.1%,#000 50%,transparent 100%),radial-gradient(3.4% 6% at 59.1% 49.1%,#000 50%,transparent 100%);
+  mask:radial-gradient(3.4% 6% at 40.8% 49.1%,#000 50%,transparent 100%),radial-gradient(3.4% 6% at 59.1% 49.1%,#000 50%,transparent 100%);
+  opacity:clamp(0,calc((var(--p) - .42) * 1.8),1)}
+.tt-glow{position:absolute;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;will-change:opacity}
+.tt-glow.hl{width:11%;background:radial-gradient(circle,rgba(255,246,228,.95) 0,rgba(255,200,130,.45) 18%,rgba(255,170,80,.1) 40%,rgba(255,170,80,0) 65%);opacity:clamp(0,calc((var(--p) - .45) * 1.9),1)}
+.tt-glow.hl.l{left:40.8%;top:49.1%}.tt-glow.hl.r{left:59.1%;top:49.1%}
+.tt-glow.gd{left:50.1%;top:49.2%;width:7%;background:radial-gradient(circle,rgba(255,226,180,.6) 0,rgba(255,170,70,.2) 30%,rgba(255,160,60,0) 65%);opacity:clamp(0,calc((var(--p) - .25) * 2),1)}
+.tt-glow.sg{left:50.2%;top:16.6%;width:14%;background:radial-gradient(circle,rgba(255,230,170,.5) 0,rgba(255,190,90,.18) 30%,rgba(255,180,80,0) 65%);opacity:clamp(0,calc((var(--p) - .15) * 2),1)}
+.s-tuktuk.ready .tt-glow{opacity:1}
+.s-tuktuk.ready .tt-glow.hl{transform:translate(-50%,-50%) scale(1.25);transition:transform .4s ease}
+.s-tuktuk.ready .tt-photo{animation:ttIdle .08s linear infinite alternate} /* idle rumble */
+@keyframes ttIdle{to{transform:translate(calc(-50% + .5px),calc(-50% + .7px))}}
+/* anamorphic flare through the headlights */
+.tt-flare{position:absolute;left:8%;right:8%;top:49.1%;height:2px;margin-top:-1px;pointer-events:none;will-change:opacity,transform;
+  background:linear-gradient(90deg,transparent,rgba(255,170,80,.4) 30%,#fff3dc 50%,rgba(255,170,80,.4) 70%,transparent);
+  opacity:calc(clamp(0,calc((var(--p) - .6) * 2.5),1) * .5);transform:scaleX(.4);transition:transform .5s ease,opacity .4s}
+.s-tuktuk.ready .tt-flare{opacity:.9;transform:scaleX(1)}
+.tt-haze{position:absolute;left:-10%;right:-10%;bottom:0;height:45%;pointer-events:none;will-change:transform;
+  background:radial-gradient(40% 50% at 25% 80%,rgba(200,200,215,.06),transparent 70%),radial-gradient(40% 50% at 75% 75%,rgba(200,200,215,.05),transparent 70%);animation:ttHaze 8s ease-in-out infinite alternate}
+@keyframes ttHaze{to{transform:translateX(5%)}}
+/* status line over the wet-floor reflection */
+.tt-hud{position:absolute;left:0;right:0;bottom:clamp(24px,6vh,56px);display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .25s}
+.tt-st{font-family:var(--f-disp);font-weight:700;font-size:14px;letter-spacing:.42em;color:#9ea3ab;text-shadow:0 2px 10px #000}
+.s-tuktuk.ready .tt-st{color:#ffc66e;text-shadow:0 0 12px rgba(255,180,90,.6)}
+.tt-bar{position:relative;width:min(240px,60vw);height:2px;background:rgba(255,255,255,.14)}
+.tt-bar .ldr-fill{position:absolute;inset:0;background:linear-gradient(90deg,#b3121a,#ffc66e);transform-origin:left;transform:scaleX(0)}
+.tt-pct{font-family:var(--f-disp);font-weight:600;font-size:12px;letter-spacing:.14em;color:#c9cdd3;font-variant-numeric:tabular-nums;text-shadow:0 2px 8px #000}
+/* the cut (~0.95s): black bars close over the car as it pushes in, a gold hairline flashes on the seam,
+   the scene is dropped behind the bars, then the bars open from the centre onto the site */
+.tt-cut{position:absolute;left:0;right:0;height:50.5%;background:#000;transform:scaleY(0);pointer-events:none;will-change:transform}
+.tt-cut.t{top:0;transform-origin:50% 0}.tt-cut.b{bottom:0;transform-origin:50% 100%}
+.tt-seam{position:absolute;left:0;right:0;top:50%;height:1px;margin-top:-.5px;pointer-events:none;opacity:0;transform:scaleX(0);will-change:transform,opacity;
+  background:linear-gradient(90deg,transparent,rgba(201,160,90,.7) 25%,#ffe2a8 50%,rgba(201,160,90,.7) 75%,transparent);box-shadow:0 0 12px rgba(255,200,120,.55)}
+.s-tuktuk.open{opacity:1;transition:none;animation:ttClear .01s .43s forwards}
+@keyframes ttClear{to{background-color:transparent}}
+.s-tuktuk.open .tt-cut{animation:ttCut .95s cubic-bezier(.7,0,.3,1) forwards}
+@keyframes ttCut{0%{transform:scaleY(0)}44%,52%{transform:scaleY(1)}100%{transform:scaleY(0)}}
+.s-tuktuk.open .tt-seam{animation:ttSeam .95s ease forwards}
+@keyframes ttSeam{0%,36%{opacity:0;transform:scaleX(0)}46%{opacity:1;transform:scaleX(.55)}62%{opacity:1;transform:scaleX(1)}85%,100%{opacity:0;transform:scaleX(1)}}
+.s-tuktuk.open .tt-photo{animation:ttPush .44s cubic-bezier(.5,0,.75,0) forwards,ttGone .01s .43s forwards}
+@keyframes ttPush{to{transform:translate(-50%,-50%) scale(1.07)}}
+.s-tuktuk.open .tt-amb,.s-tuktuk.open .tt-haze{animation:ttGone .01s .43s forwards}
+@keyframes ttGone{to{opacity:0;visibility:hidden}}
+.s-tuktuk.open .tt-hud{opacity:0}
+@media (prefers-reduced-motion:reduce){
+  .tt-spot{animation:none;opacity:1}
+  .tt-haze,.tt-crank,.s-tuktuk.ready .tt-photo{animation:none}
+  .s-tuktuk.open{animation:none;opacity:0;transition:opacity .3s}
+  .s-tuktuk.open .tt-cut,.s-tuktuk.open .tt-seam,.s-tuktuk.open .tt-photo{animation:none}
+}
