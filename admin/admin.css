@@ -130,6 +130,7 @@ textarea.big{min-height:300px}
 .a-lc .row b{font-weight:500}
 .a-chip{font-family:var(--f-disp);font-weight:700;font-size:12px;letter-spacing:.12em;padding:2px 9px;background:rgba(255,255,255,.1);color:var(--mu)}
 .a-chip.on{background:rgba(74,222,128,.16);color:var(--ok)}
+.a-chip.bad{background:rgba(255,107,107,.16);color:#ff7b74}
 .a-lc a{font-size:13px;color:var(--mu);text-decoration:underline}
 
 .a-hist{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--ln);background:#1a1c20}

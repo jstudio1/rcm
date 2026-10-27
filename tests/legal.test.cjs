@@ -123,7 +123,7 @@ test('privacy, terms and support', async t => {
     const home = (await get('/')).html;
     assert.match(home, /<div class="legal-links"><a href="\/privacy">นโยบายความเป็นส่วนตัว<\/a><a href="\/terms">ข้อตกลงการใช้บริการ<\/a><a href="\/support">/);
     const en = (await get('/en/terms')).html;
-    assert.match(en, /<a href="\/en\/privacy">Privacy Policy<\/a><a href="\/en\/terms">Terms of Service<\/a><a href="\/support">Support<\/a>/);
+    assert.match(en, /<a href="\/en\/privacy">Privacy Policy<\/a><a href="\/en\/terms">Terms of Service<\/a><a href="\/en\/support">Support<\/a>/);
     assert.match(en, /Cookie settings<\/button>/);
     const sm = await (await fetch(base + '/sitemap.xml')).text();
     for (const u of ['/privacy', '/en/privacy', '/terms', '/en/terms', '/support']) assert.ok(sm.includes(u + '</loc>'), u);
@@ -156,6 +156,79 @@ test('privacy, terms and support', async t => {
     const c2 = (await api('content')).json;
     assert.deepEqual(c2.supportFaq, []); assert.equal(c2.legal.minAge, '16');
     assert.equal((await api('content', 'PUT', { site: {}, pages: {} })).status, 400, 'partial saves are refused');
+  });
+
+  await t.test('English support and FAQ pages, switch + hreflang + sitemap', async () => {
+    const th = (await get('/support')).html, en = await get('/en/support');
+    assert.equal(en.status, 200);
+    assert.match(en.html, /<html lang="en"/);
+    assert.match(visible(en.html), /Support and contact/);
+    assert.equal(DRAFT.test(visible(en.html)), false, 'no placeholders on the English support page');
+    assert.match(en.html, /hreflang="th"/); assert.match(th, /href="\/en\/support"/);
+    assert.match(th, /<link rel="alternate" hreflang="en" href="[^"]+\/en\/support">/);
+    const fe = await get('/en/faq'); assert.equal(fe.status, 200);
+    assert.match(fe.html, /<html lang="en"/); assert.match(visible(fe.html), /What is RAYCITY-M\?/); assert.match(fe.html, /"@type":"FAQPage"/);
+    assert.match((await get('/faq')).html, /href="\/en\/faq"/);
+    const sm = await (await fetch(base + '/sitemap.xml')).text();
+    assert.ok(sm.includes('/en/support</loc>') && sm.includes('/en/faq</loc>'));
+    const orig = (await api('content')).json;
+    await edit(c => { c.faq.forEach(f => { f.qEn = ''; f.aEn = ''; }); });
+    assert.equal((await get('/en/faq')).status, 404, 'no English FAQ items = no English FAQ page');
+    await edit(c => { c.faq = orig.faq; c.pages.support.bodyEn = ''; });
+    assert.equal((await get('/en/support')).status, 404, 'no English body = no English support page');
+    await edit(c => { c.pages.support.bodyEn = orig.pages.support.bodyEn; });
+    assert.equal((await get('/en/support')).status, 200);
+  });
+
+  await t.test('links to the deletion and odds pages exist only once those pages do', async () => {
+    const del = html => /href="\/delete-account"/.test(html), odds = html => /href="\/odds"/.test(html);
+    for (const p of ['/', '/privacy', '/terms', '/support', '/faq']) { const h = (await get(p)).html; assert.equal(del(h) || odds(h), false, p + ' links to a page that does not exist'); }
+    assert.equal((await (await fetch(base + '/sitemap.xml')).text()).includes('/delete-account'), false);
+    await edit(c => {
+      Object.assign(c.pages.delete, { h1: 'ลบบัญชีและข้อมูล', body: '## ขั้นตอน\nส่งคำขอ', h1En: 'Delete your account', bodyEn: '' });
+      Object.assign(c.pages.odds, { h1: 'อัตรากล่องสุ่ม', body: '## กล่อง A\nรายการ', h1En: 'Loot box odds', bodyEn: '## Box A\nitems' });
+    });
+    const pages = {};
+    for (const p of ['/', '/privacy', '/terms', '/support', '/faq']) pages[p] = (await get(p)).html;
+    for (const p of ['/privacy', '/terms', '/support', '/faq']) assert.match(pages[p], /<nav class="legal-rel"/, p + ' related links');
+    for (const p of Object.keys(pages)) assert.ok(del(pages[p]) && odds(pages[p]), p + ' links to both new pages');
+    assert.equal(/<nav class="legal-rel"[\s\S]*?<\/nav>/.exec(pages['/privacy'])[0].includes('href="/privacy"'), false, 'a page does not link to itself');
+    const sm = await (await fetch(base + '/sitemap.xml')).text();
+    assert.ok(sm.includes('/delete-account</loc>') && sm.includes('/odds</loc>') && sm.includes('/en/odds</loc>'));
+    assert.equal(sm.includes('/en/delete-account'), false, 'no English deletion page, no English URL');
+    const dp = await get('/delete-account'), op = await get('/en/odds');
+    assert.equal(dp.status, 200); assert.match(visible(dp.html), /ลบบัญชีและข้อมูล/); assert.equal((await get('/en/delete-account')).status, 404);
+    assert.equal(op.status, 200); assert.match(op.html, /<html lang="en"/); assert.match(op.html, /<link rel="alternate" hreflang="th" href="[^"]+\/odds">/);
+    const en = (await get('/en/privacy')).html;
+    assert.match(en, /href="\/delete-account"/, 'English page links to the Thai page when there is no English one');
+    assert.match(en, /href="\/en\/odds"/, 'and to the English one when there is');
+    await edit(c => { c.pages.delete.noindex = 'true'; });
+    assert.equal(del((await get('/privacy')).html), false, 'a page hidden from Google is not linked');
+    await edit(c => { for (const k of ['delete', 'odds']) Object.assign(c.pages[k], { noindex: '', h1: '', body: '', bodyEn: '' }); });
+    for (const p of ['/', '/privacy', '/terms', '/support']) { const h = (await get(p)).html; assert.equal(del(h) || odds(h), false, p + ' after removing them'); }
+    assert.equal((await get('/delete-account')).status, 404); assert.equal((await get('/odds')).status, 404);
+  });
+
+  await t.test('store-URL panel: admin only, lists every page, refuses without https, cannot be aimed at internal hosts', async () => {
+    assert.equal((await fetch(base + '/admin/api/urls')).status, 401);
+    assert.equal((await fetch(base + '/admin/api/urls/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 401);
+    const u = (await api('urls')).json;
+    assert.deepEqual(u.items.map(i => i.key), ['privacy', 'terms', 'support', 'faq', 'delete', 'odds']);
+    assert.equal(u.items.find(i => i.key === 'privacy').exists, true); assert.equal(u.items.find(i => i.key === 'delete').exists, false);
+    assert.equal(u.items.find(i => i.key === 'privacy').en, true);
+    assert.equal((await api('urls/check', 'POST', {})).status, 400, 'needs an https domain first');
+    await edit(c => { c.site.url = 'https://127.0.0.1'; });
+    const r = await api('urls/check', 'POST', {});
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    assert.ok(r.json.results.length >= 4);
+    assert.equal(r.json.results.every(x => x.error === 'blocked address'), true, JSON.stringify(r.json.results[0]));
+    assert.equal((await api('urls/check', 'POST', {})).status, 429, 'cooldown between runs');
+    await edit(c => { c.site.url = ''; });
+    const lc = require(path.join(tmp, 'lib/linkcheck'));
+    for (const ip of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '::1', 'fe80::1', 'fd00::1', '::ffff:127.0.0.1', '224.0.0.1']) assert.equal(lc.isPrivate(ip), true, ip);
+    for (const ip of ['8.8.8.8', '1.1.1.1', '172.32.0.1', '2606:4700:4700::1111']) assert.equal(lc.isPrivate(ip), false, ip);
+    for (const bad of ['http://example.com/', 'https://example.com:8443/', 'https://user:pw@example.com/', 'https://localhost/', 'https://foo.localhost/', 'https://[::1]/', 'https://169.254.169.254/latest', 'ftp://example.com', 'javascript:alert(1)', 'not a url']) assert.throws(() => lc.validate(bad), bad);
+    assert.doesNotThrow(() => lc.validate('https://example.com/privacy'));
   });
 
   await t.test('a site saved before these pages existed gets the defaults, not blanks', async () => {

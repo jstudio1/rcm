@@ -10,6 +10,10 @@ const store = require('./lib/store');
 const { render, PAGES, LOADER_STYLES } = require('./lib/render');
 const psi = require('./lib/pagespeed');
 const analytics = require('./lib/analytics');
+const linkcheck = require('./lib/linkcheck');
+const totp = require('./lib/totp');
+let linkCheckBusy = false, linkCheckLast = 0;
+const pending2fa = new Map(); // session token -> { secret, exp }: a two-step key that is shown but not yet confirmed
 
 const PORT = +process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -54,6 +58,7 @@ function listMedia() {
 const sessions = store.sessions; // token -> { exp, csrf }, stored in data/sessions.json
 const fails = store.limits; // failed logins per client, shared via data/limits.json
 const SESSION_MS = 8 * 3600e3;
+const IDLE_MS = (Number(process.env.SESSION_IDLE_MIN) || 120) * 60e3;
 
 // X-Forwarded-* headers are only believed when they come from a reverse proxy on this machine
 // (e.g. Plesk nginx), or when TRUST_PROXY=1. Anyone else could fake them.
@@ -104,7 +109,13 @@ function send(res, code, body, type, extra) {
   const hd = Object.assign({ 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' }, extra || {});
   let buf = body == null ? Buffer.alloc(0) : Buffer.isBuffer(body) ? body : Buffer.from(String(body));
   const enc = COMPRESSIBLE.test(type) && buf.length >= 860 ? pickEnc(res.req) : null;
-  if (enc) { buf = squeeze(buf, enc, 5); hd['Content-Encoding'] = enc; }
+  if (enc) {
+    // compressing is the most expensive thing a request can make the server do: identical pages are compressed once
+    const key = buf.length < 400e3 ? enc + '|' + crypto.createHash('sha1').update(buf).digest('base64url') : '';
+    let z = key && zcache.get(key);
+    if (!z) { z = squeeze(buf, enc, 5); if (key) { if (zcache.size > 200) zcache.clear(); zcache.set(key, z); } }
+    buf = z; hd['Content-Encoding'] = enc;
+  }
   if (COMPRESSIBLE.test(type)) hd.Vary = 'Accept-Encoding';
   hd['Content-Length'] = buf.length;
   res.writeHead(code, hd);
@@ -119,17 +130,23 @@ function sendPage(req, res, code, html, extra) {
 }
 const json = (res, code, obj, extra) => send(res, code, JSON.stringify(obj), 'application/json; charset=utf-8', Object.assign({ 'Cache-Control': 'no-store' }, extra));
 
-let bufferedRequests = 0;
+// Bodies are held in memory, so how many are read at once is capped. Small ones (login, settings) have their own
+// pool and a short deadline, so a few connections that drip bytes slowly can neither fill the pool that big saves
+// and uploads use nor keep a login slot busy for minutes.
+const pools = { small: 0, big: 0 };
 function readRaw(req, limit) {
-  if (bufferedRequests >= 4) return Promise.reject(Object.assign(new Error('Busy'), { code: 503 }));
-  bufferedRequests++;
+  const kind = limit <= 1e5 ? 'small' : 'big';
+  if (pools[kind] >= (kind === 'small' ? 32 : 4)) return Promise.reject(Object.assign(new Error('Busy'), { code: 503 }));
+  pools[kind]++;
+  let timer;
   return new Promise((resolve, reject) => {
     let n = 0; const parts = [];
+    timer = setTimeout(() => { reject(Object.assign(new Error('too slow'), { code: 408 })); req.destroy(); }, kind === 'small' ? 10e3 : 120e3);
     req.on('data', ch => { n += ch.length; if (n > limit) { reject(Object.assign(new Error('too large'), { code: 413 })); req.destroy(); } else parts.push(ch); });
     req.on('end', () => resolve(Buffer.concat(parts)));
     req.on('error', reject);
     req.on('aborted', () => reject(new Error('Request aborted')));
-  }).finally(() => { bufferedRequests--; });
+  }).finally(() => { clearTimeout(timer); pools[kind]--; });
 }
 const readBody = async (req, limit) => (await readRaw(req, limit)).toString('utf8');
 
@@ -137,7 +154,11 @@ function session(req) {
   const t = cookies(req).sid;
   const s = t && sessions.get(t);
   if (!s) return null;
-  if (s.exp < Date.now()) { sessions.delete(t); return null; }
+  const now = Date.now();
+  if (s.exp < now) { sessions.delete(t); return null; }
+  // a session that has been left alone for a while ends (a stolen, forgotten tab can't be used later)
+  if (s.seen && now - s.seen > IDLE_MS) { sessions.delete(t); return null; }
+  if (!s.seen || now - s.seen > 300e3) { try { sessions.set(t, Object.assign({}, s, { seen: now })); } catch (e) {} }
   return Object.assign({ token: t }, s);
 }
 
@@ -242,6 +263,7 @@ const BASE_HEADERS = {
   'X-Frame-Options': 'SAMEORIGIN',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
   'Cross-Origin-Opener-Policy': 'same-origin',
+  'X-Permitted-Cross-Domain-Policies': 'none',
   'Content-Security-Policy': PUBLIC_CSP
 };
 
@@ -257,9 +279,13 @@ async function adminApi(req, res, url) {
     if (b.user.length > 200 || b.password.length > 1024) return json(res, 400, { error: 'bad request' });
     if (!fails.reserve(who)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
     const version = store.authVersion();
-    if (await store.checkLogin(b.user, b.password) && version === store.authVersion()) {
+    // with two-step login on, the code is always part of the answer: a wrong password and a wrong code look the same
+    const passOk = await store.checkLogin(b.user, b.password);
+    const codeOk = !store.totpEnabled() || (typeof b.code === 'string' && store.totpCheck(b.code));
+    if (passOk && codeOk && version === store.authVersion()) {
+      fails.refund(who);
       const token = crypto.randomBytes(32).toString('base64url'), csrf = crypto.randomBytes(24).toString('base64url');
-      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf, version });
+      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf, version, seen: Date.now() });
       const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
       return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
     }
@@ -302,6 +328,24 @@ async function adminApi(req, res, url) {
       const today = analytics.dayOf(Date.now()), q = url.searchParams;
       const to = q.get('to') || today, from = q.get('from') || to;
       return json(res, 200, analytics.visits(from, to, { ip: String(q.get('ip') || '').slice(0, 64), limit: q.get('limit'), offset: q.get('offset'), bots: q.get('bots') === '1' }));
+    }
+    // ---- store URLs: the final addresses to type into App Store Connect / Play Console, and a check that they open ----
+    if (route === 'urls' && m === 'GET') {
+      const c = store.getContent(), base = String(c.site.url || '').trim().replace(/\/+$/, '');
+      return json(res, 200, { base: SITE_URL_RE.test(base) ? base : '', items: render.LEGAL_ORDER.map(k => ({ key: k, label: render.legalLabel(c, k, false) || k, path: render.LEGAL_PATH[k], exists: render.pageExists(c, k), en: render.hasEnglish(c, k) })) });
+    }
+    if (route === 'urls/check' && m === 'POST') {
+      const c = store.getContent(), base = String(c.site.url || '').trim().replace(/\/+$/, '');
+      if (!/^https:\/\//i.test(base) || !SITE_URL_RE.test(base)) return json(res, 400, { error: 'ตั้ง "โดเมนหลัก" เป็น https://... ในเมนู ข้อมูลเว็บ & SEO หลัก ก่อน' });
+      if (linkCheckBusy || Date.now() - linkCheckLast < 10e3) return json(res, 429, { error: 'กำลังตรวจอยู่ หรือเพิ่งตรวจไป รอสักครู่' });
+      linkCheckBusy = true;
+      try {
+        const urls = [];
+        for (const k of render.LEGAL_ORDER) if (render.pageExists(c, k)) { urls.push([k, 'th', base + render.LEGAL_PATH[k]]); if (render.hasEnglish(c, k)) urls.push([k, 'en', base + '/en' + render.LEGAL_PATH[k]]); }
+        const results = [];
+        for (const [key, lang, u] of urls) results.push(Object.assign({ key, lang }, await linkcheck.check(u)));
+        return json(res, 200, { results });
+      } finally { linkCheckBusy = false; linkCheckLast = Date.now(); }
     }
     // ---- PageSpeed Insights: status/history, start a test, settings ----
     if (route === 'pagespeed' && m === 'GET') {
@@ -370,10 +414,45 @@ async function adminApi(req, res, url) {
       if (next.length < 10 || next.length > 200) return json(res, 400, { error: 'รหัสผ่านใหม่ต้องยาว 10–200 ตัวอักษร' });
       store.setPassword(next, s.version);
       const token = crypto.randomBytes(32).toString('base64url');
-      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion() });
+      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion(), seen: Date.now() });
       sessions.keepOnly(token);
       const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
       return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
+    }
+    // ---- two-step login (authenticator app): status, start, confirm, switch off ----
+    // Changing it signs every other session out, so the browser doing it gets a fresh session straight away.
+    if (route === '2fa' && m === 'GET') return json(res, 200, { enabled: store.totpEnabled() });
+    if (route.startsWith('2fa/') && m === 'POST') {
+      const who = ip(req);
+      const b = JSON.parse(await readBody(req, 4096)) || {};
+      const fresh = () => {
+        const token = crypto.randomBytes(32).toString('base64url');
+        sessions.set(token, { exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion(), seen: Date.now() });
+        sessions.keepOnly(token);
+        const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
+        return { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` };
+      };
+      if (!fails.reserve(who)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
+      if (route === '2fa/begin') {
+        if (store.totpEnabled()) return json(res, 400, { error: 'เปิดใช้อยู่แล้ว' });
+        if (!await store.checkLogin(store.adminName(), String(b.current || ''))) return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
+        const secret = totp.newSecret();
+        pending2fa.set(s.token, { secret, exp: Date.now() + 10 * 60e3 });
+        return json(res, 200, { secret, uri: totp.uri(secret, store.adminName(), 'RAYCITY-M') });
+      }
+      if (route === '2fa/enable') {
+        const p = pending2fa.get(s.token);
+        if (!p || p.exp < Date.now()) return json(res, 400, { error: 'หมดเวลา เริ่มตั้งค่าใหม่อีกครั้ง' });
+        if (!store.totpEnable(p.secret, String(b.code || ''), s.version)) return json(res, 400, { error: 'รหัสไม่ถูกต้อง ตรวจว่านาฬิกาเครื่องตรงและลองรหัสใหม่' });
+        pending2fa.delete(s.token); fails.refund(who);
+        return json(res, 200, { ok: true }, fresh());
+      }
+      if (route === '2fa/disable') {
+        if (!await store.checkLogin(store.adminName(), String(b.current || ''))) return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
+        if (!store.totpCheck(String(b.code || ''))) return json(res, 400, { error: 'รหัสไม่ถูกต้อง' });
+        store.totpDisable(s.version); fails.refund(who);
+        return json(res, 200, { ok: true }, fresh());
+      }
     }
   } catch (e) {
     return json(res, [409, 413, 503].includes(e.code) ? e.code : 400, { error: e.code === 409 ? 'ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่ก่อนบันทึก' : e.code === 503 ? 'ระบบกำลังบันทึก กรุณาลองใหม่' : e.code === 413 ? 'ข้อมูลใหญ่เกินไป' : 'ข้อมูลไม่ถูกต้อง' });
@@ -418,6 +497,19 @@ function track(req, extra, p, url, c) {
   analytics.record({ t: Date.now(), ip: ip(req), path: p, vid, isNew, anon, ua, ref: req.headers.referer, host: (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host, utm: url.searchParams.get('utm_source') });
 }
 
+// One address cannot flood the site: a generous per-minute cap on requests (a page and all its files is about 30).
+// Local proxies without a forwarded address are not limited, or everyone behind them would share one allowance.
+const RATE_PER_MIN = Number(process.env.RATE_LIMIT_PER_MIN) || 900;
+const rate = new Map();
+function tooMany(req) {
+  const who = ip(req);
+  if (!who || LOOPBACK.has(who)) return false;
+  const now = Date.now();
+  let r = rate.get(who);
+  if (!r || now - r.t >= 60e3) { if (rate.size > 50000) rate.clear(); r = { t: now, n: 0 }; rate.set(who, r); }
+  return ++r.n > RATE_PER_MIN;
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     peer(req); // remember who connected before anything async happens
@@ -425,6 +517,7 @@ const server = http.createServer(async (req, res) => {
     if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     if (!req.url.startsWith('/') || req.url.startsWith('//') || /[\\\x00-\x20]/.test(req.url)) return send(res, 400, 'Bad request', 'text/plain');
     const url = new URL(req.url, 'http://x');
+    if (tooMany(req)) return send(res, 429, 'Too many requests', 'text/plain', { 'Retry-After': '60' });
     if (url.pathname.startsWith('/admin/api/') && !['GET', 'HEAD'].includes(req.method)) {
       const origin = req.headers.origin;
       const wantHost = (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host, kp = knownProto(req);
@@ -440,7 +533,7 @@ const server = http.createServer(async (req, res) => {
 
     // ---------- admin (the only place that can change anything) ----------
     if (p === '/admin' || p.startsWith('/admin/')) {
-      const sec = { 'Content-Security-Policy': ADMIN_CSP, 'X-Frame-Options': 'DENY', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store' };
+      const sec = { 'Content-Security-Policy': ADMIN_CSP, 'X-Frame-Options': 'DENY', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store', 'Cross-Origin-Resource-Policy': 'same-origin' };
       if (p.startsWith('/admin/api/')) { for (const [k, v] of Object.entries(sec)) res.setHeader(k, v); return await adminApi(req, res, url); }
       if (p === '/admin' || p === '/admin/') return send(res, 200, fs.readFileSync(path.join(ADMIN_DIR, 'index.html')), 'text/html; charset=utf-8', sec);
       if (p === '/admin/admin.js' || p === '/admin/admin.css') return send(res, 200, fs.readFileSync(path.join(ADMIN_DIR, p.slice(7))), MIME[path.extname(p)], sec);
@@ -482,9 +575,15 @@ const server = http.createServer(async (req, res) => {
     }
     if (['/rewards', '/gameplay', '/drivers', '/news', '/faq', '/privacy', '/terms', '/support'].includes(p)) return page(render[p.slice(1)](c, base));
     // English versions of the legal pages (same content, lang="en", linked with hreflang)
-    if (p === '/en/privacy' || p === '/en/terms') {
-      const key = p.slice(4), pg = c.pages[key];
-      return pg && pg.bodyEn && pg.bodyEn.trim() ? page(render[key + 'En'](c, base)) : page(render.notFound(c, base), 404);
+    if (p === '/en/privacy' || p === '/en/terms' || p === '/en/support' || p === '/en/faq' || p === '/en/delete-account' || p === '/en/odds') {
+      const key = p === '/en/delete-account' ? 'delete' : p.slice(4);
+      return render.hasEnglish(c, key) ? page(render[key + 'En'](c, base)) : page(render.notFound(c, base), 404);
+    }
+    // account deletion + loot-box odds: exist only once they have a title and text in the admin
+    if (p === '/delete-account' || p === '/odds') {
+      const key = p === '/odds' ? 'odds' : 'delete';
+      const pg = c.pages[key] || {};
+      return pg.h1 && String(pg.body || '').trim() ? page(render[key](c, base)) : page(render.notFound(c, base), 404);
     }
     // called by the cookie banner right after a "no": drops the id cookie straight away (JavaScript can't, it is HttpOnly)
     if (p === '/api/cc') {
@@ -498,6 +597,13 @@ const server = http.createServer(async (req, res) => {
       return n ? page(render.article(c, base, n)) : page(render.notFound(c, base), 404);
     }
     if (p === '/sitemap.xml') return send(res, 200, render.sitemap(c, base, store.savedAt()), MIME['.xml'], { 'Cache-Control': 'no-cache' });
+    // where security researchers can report a problem (RFC 9116); only published when a contact address is set in the admin
+    if (p === '/.well-known/security.txt') {
+      const ct = c.contact || {}, mail = [ct.reportEmail, ct.email].find(v => /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(String(v || '')));
+      if (!mail) return page(render.notFound(c, base), 404);
+      const exp = new Date(Date.now() + 365 * 86400e3).toISOString().replace(/\.\d+Z$/, 'Z');
+      return send(res, 200, `Contact: mailto:${mail}\nExpires: ${exp}\nPreferred-Languages: th, en\nCanonical: ${base}/.well-known/security.txt\n`, 'text/plain; charset=utf-8', { 'Cache-Control': 'public, max-age=86400' });
+    }
     if (p === '/robots.txt') return send(res, 200, render.robots(base), MIME['.txt'], { 'Cache-Control': 'public, max-age=3600' });
 
     // ---------- static files ----------
@@ -514,6 +620,7 @@ setInterval(() => {
   const t = Date.now();
   try { sessions.prune(); } catch (e) {}
   try { fails.prune(); } catch (e) {}
+  for (const [k, v] of pending2fa) if (v.exp < t) pending2fa.delete(k);
 }, 600e3).unref();
 // daily PageSpeed auto-check (only does anything when switched on in the admin)
 setInterval(() => { try { psi.autoTick(p => siteUrlFor(p, store.getContent())); } catch (e) { console.error('pagespeed auto:', e.message); } }, 300e3).unref();

@@ -1130,6 +1130,10 @@ html{scrollbar-gutter:stable}
 @media (max-width:560px){.cc{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:16px 16px 14px;max-height:calc(100vh - 20px);overflow:auto}.cc-b{flex-basis:100%}}
 @media (prefers-reduced-motion:reduce){.cc{animation:none}}
 
+.legal-rel{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:40px 0 0;padding-top:20px;border-top:1px solid var(--ln);font-size:15px}
+.legal-rel b{font-family:var(--f-disp);font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--sil)}
+.legal-rel a{color:#fff;text-decoration:underline;text-decoration-color:rgba(255,255,255,.3);text-underline-offset:3px}
+.legal-rel a:hover{text-decoration-color:var(--red-2)}
 .foot .legal-links{display:flex;flex-wrap:wrap;gap:6px 22px;width:100%;font-size:14px;color:var(--sil)}
 .foot .legal-links a:hover,.foot .legal-links .cc-open:hover{color:#fff}
 .cc-open{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer}

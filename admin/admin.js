@@ -27,15 +27,16 @@
   let reloginP = null;
   const relogin = () => reloginP || (reloginP = new Promise(done => {
     const u = h('input', { type: 'text', autocomplete: 'username', required: true }), p = h('input', { type: 'password', autocomplete: 'current-password', required: true });
+    const o = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, placeholder: '000000' });
     const m = h('div', { class: 'a-err' });
     const f = h('form', { class: 'a-dlg a-relog' }, h('div', { class: 'hd' }, h('b', {}, 'เซสชันหมดอายุ')),
       h('p', { class: 'a-note' }, 'กรุณาเข้าสู่ระบบอีกครั้ง งานที่ยังไม่บันทึกจะไม่หาย'),
-      h('label', { class: 'a-f' }, 'ชื่อผู้ใช้', u), h('label', { class: 'a-f' }, 'รหัสผ่าน', p), m, h('button', { class: 'btn', type: 'submit' }, 'เข้าสู่ระบบ'));
+      h('label', { class: 'a-f' }, 'ชื่อผู้ใช้', u), h('label', { class: 'a-f' }, 'รหัสผ่าน', p), h('label', { class: 'a-f' }, 'รหัส 6 หลักจากแอป Authenticator (ถ้าเปิดใช้)', o), m, h('button', { class: 'btn', type: 'submit' }, 'เข้าสู่ระบบ'));
     const bg = h('div', { class: 'a-modal' }, f);
     f.addEventListener('submit', async e => {
       e.preventDefault();
       try {
-        const r = await fetch('/admin/api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: u.value, password: p.value }) });
+        const r = await fetch('/admin/api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: u.value, password: p.value, code: o.value }) });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { m.textContent = d.error || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
         csrf = (await api('me')).csrf;
@@ -641,7 +642,7 @@
   }
 
   // ---------- legal pages (privacy, terms, support) ----------
-  const LEGAL_TOKENS = '{{app}} {{company}} {{email}} {{reportEmail}} {{phone}} {{line}} {{address}} {{hours}} {{response}} {{site}} {{updated}} {{retention}} {{minAge}} {{deleteDays}}';
+  const LEGAL_TOKENS = '{{app}} {{company}} {{email}} {{reportEmail}} {{phone}} {{line}} {{address}} {{hours}} {{response}} {{site}} {{updated}} {{retention}} {{minAge}} {{deleteDays}} · ลิงก์ไปหน้าอื่น (ว่างจนกว่าหน้านั้นจะมี): {{privacyUrl}} {{termsUrl}} {{supportUrl}} {{faqUrl}} {{deleteUrl}} {{oddsUrl}} ใช้แบบ [ข้อความ]({{deleteUrl}})';
   const legalHead = k => box('หัวข้อหน้า',
     two(field(C.pages[k], 'navLabel', 'ชื่อลิงก์ท้ายเว็บ'), field(C.pages[k], 'eyebrow', 'ข้อความเล็กเหนือหัวข้อ')),
     field(C.pages[k], 'h1', 'H1'), field(C.pages[k], 'h2', 'H2 (หัวข้อรอง, ไม่บังคับ)'), field(C.pages[k], 'intro', 'ย่อหน้าแนะนำ', { type: 'textarea' }),
@@ -667,6 +668,52 @@
   const pageShare = k => box('การแชร์ & การค้นหา',
     field(C.pages[k], 'ogImage', 'รูปแชร์ของหน้านี้', { type: 'image', ph: () => C.site.ogImage, help: 'เว้นว่าง = ใช้รูปแชร์หลักของเว็บ' }),
     check(C.pages[k], 'noindex', 'ซ่อนหน้านี้จาก Google (noindex) — ไม่แนะนำ เพราะสโตร์ต้องเปิดหน้านี้ได้'));
+
+  // ---------- the final URLs to type into App Store Connect / Play Console, with a "does it open" check ----------
+  function urlsView() {
+    const host = h('div', {}, h('div', { class: 'a-empty' }, 'กำลังโหลด…'));
+    let D = null, R = {}, busy = false, err = '';
+    const copy = async t => {
+      try { await navigator.clipboard.writeText(t); }
+      catch (e) { const ta = h('textarea', { style: 'position:fixed;opacity:0' }); ta.value = t; document.body.append(ta); ta.select(); try { document.execCommand('copy'); } catch (x) {} ta.remove(); }
+      toast('คัดลอกแล้ว ✓');
+    };
+    const chip = (t, k) => h('span', { class: 'a-chip' + (k === 'ok' ? ' on' : k === 'bad' ? ' bad' : '') }, t);
+    const status = (it, lang) => {
+      if (!it.exists) return chip('ยังไม่มีหน้านี้', '');
+      const r = R[it.key + '|' + lang];
+      if (!r) return chip(busy ? 'กำลังตรวจ…' : 'ยังไม่ได้ตรวจ', '');
+      if (r.error) return chip('✕ ' + r.error, 'bad');
+      const extra = (r.hops && r.hops.length > 1 ? ' · redirect ' + (r.hops.length - 1) + ' ครั้ง' : '') + (r.noindex ? ' · noindex!' : '');
+      return chip((r.status === 200 && !r.noindex ? '✓ ' : '✕ ') + r.status + ' · ' + r.ms + 'ms' + extra, r.status === 200 && !r.noindex ? 'ok' : 'bad');
+    };
+    const draw = () => {
+      if (cur !== 'urls' || !D) return;
+      const rows = [];
+      for (const it of D.items) for (const lang of ['th', 'en']) {
+        if (lang === 'en' && !it.en) continue;
+        const path = (lang === 'en' ? '/en' : '') + it.path, full = (D.base || '') + path;
+        rows.push(h('tr', {}, h('td', {}, it.label + (lang === 'en' ? ' (English)' : '')), h('td', { class: 'ip' }, it.exists ? full : '—'), h('td', {}, status(it, lang)),
+          h('td', {}, it.exists ? h('span', { style: 'display:flex;gap:6px' }, h('button', { type: 'button', class: 'ghost sm', onclick: () => copy(full) }, 'คัดลอก'), h('a', { class: 'ghost sm', href: path, target: '_blank', rel: 'noopener' }, 'เปิด ↗')) : null)));
+      }
+      const canCheck = /^https:\/\//i.test(D.base);
+      host.replaceChildren(
+        box('URL สำหรับกรอกในสโตร์',
+          !D.base ? note('ยังไม่ได้ตั้ง "โดเมนหลัก" (เมนู ข้อมูลเว็บ & SEO หลัก) ตอนนี้แสดงเป็นเส้นทางสั้นๆ ต้องตั้งโดเมน https:// ก่อนจึงจะได้ URL เต็มและตรวจลิงก์ได้') : null,
+          note('ใส่ URL เหล่านี้ในหน้าส่งแอปของ App Store Connect / Play Console และในแอป ห้ามเปลี่ยนที่อยู่หน้าหลังส่งสโตร์แล้ว เพราะสโตร์ตรวจลิงก์ ถ้าเสียอาจถูกถอดแอป'),
+          h('div', { class: 'an-wrap' }, h('table', { class: 'an-tbl' }, h('thead', {}, h('tr', {}, ...['หน้า', 'URL', 'สถานะ', ''].map(t => h('th', {}, t)))), h('tbody', {}, ...rows))),
+          h('div', { class: 'an-filter' },
+            h('button', { type: 'button', class: 'btn sm', disabled: !canCheck || busy, onclick: async () => {
+              busy = true; err = ''; R = {}; draw();
+              try { const d = await api('urls/check', 'POST', {}); for (const r of d.results) R[r.key + '|' + r.lang] = r; } catch (e) { err = e.message; }
+              busy = false; draw();
+            } }, busy ? 'กำลังตรวจ…' : 'ตรวจทุกลิงก์ (เปิดจากอินเทอร์เน็ตจริง)'),
+            h('small', { class: 'h' }, 'เซิร์ฟเวอร์จะเปิดแต่ละ URL ผ่าน HTTPS และดูว่าตอบ 200 ไม่ถูกซ่อนจาก Google และไม่ redirect วน'),
+            err ? h('div', { class: 'a-err', style: 'text-align:left' }, err) : null)));
+    };
+    api('urls').then(d => { D = d; draw(); }).catch(e => host.replaceChildren(h('div', { class: 'a-empty' }, 'โหลดไม่สำเร็จ: ' + e.message)));
+    return host;
+  }
 
   // ---------- store readiness checklist (computed live from the unsaved form) ----------
   function readinessView() {
@@ -740,7 +787,8 @@
         form: (d, u) => [field(d, 'title', 'ชื่อ (H3)', { onchange: u }), field(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), field(d, 'image', 'รูปภาพ', { type: 'image' }), field(d, 'alt', 'ข้อความอธิบายรูป (alt)', { ph: () => d.title, help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น · เว้นว่าง = ใช้ชื่อ' }),
           two(field(d, 'pos', 'ตำแหน่งรูป (CSS)', { help: 'เช่น center, 30% center' }), field(d, 'badge', 'ป้ายมุมการ์ด', { help: 'เช่น COMING SOON' }))] }) },
     { id: 'faq', g: 'เนื้อหา', label: 'FAQ', desc: 'คำถามที่พบบ่อย ระบบส่งข้อมูลให้ Google แสดงเป็นคำถาม-คำตอบอัตโนมัติ', paths: ['faq'], url: '/faq', count: () => C.faq.length,
-      view: () => listEditor(C.faq, { title: f => f.q, blank: () => ({ q: '', a: '' }), form: (f, u) => [field(f, 'q', 'คำถาม (H3)', { onchange: u }), field(f, 'a', 'คำตอบ', { type: 'textarea' })] }) },
+      view: () => [note('ช่อง English เว้นว่าง = รายการนั้นไม่แสดงในหน้า /en/faq (หน้า English จะแสดงเมื่อมีอย่างน้อย 1 รายการที่กรอกครบทั้งคำถามและคำตอบ และตั้ง H1 ภาษาอังกฤษที่เมนู หน้า FAQ)'),
+        ...listEditor(C.faq, { title: f => f.q, blank: () => ({ q: '', a: '', qEn: '', aEn: '' }), form: (f, u) => [field(f, 'q', 'คำถาม (H3)', { onchange: u }), field(f, 'a', 'คำตอบ', { type: 'textarea' }), field(f, 'qEn', 'Question (English)'), field(f, 'aEn', 'Answer (English)', { type: 'textarea' })] })] },
 
     { id: 'home', g: 'หน้าเว็บ', label: 'หน้าแรก', desc: 'หัวข้อ H1 H2 H3 ข้อความอธิบาย ปุ่มลงทะเบียน และ SEO ของหน้าแรก', paths: ['home'], url: '/',
       view: () => [
@@ -757,6 +805,10 @@
       view: () => [
         box('หัวข้อหน้า', two(field(C.pages[k], 'navLabel', 'ชื่อในเมนู'), field(C.pages[k], 'eyebrow', 'ข้อความเล็กเหนือหัวข้อ')), field(C.pages[k], 'h1', 'H1'), field(C.pages[k], 'h2', 'H2 (หัวข้อรอง)'), field(C.pages[k], 'intro', 'ย่อหน้าแนะนำ', { type: 'textarea' }),
           k === 'news' ? field(C.pages[k], 'empty', 'ข้อความเมื่อยังไม่มีข่าว') : null),
+        k === 'faq' ? box('English version  ·  /en/faq', h('a', { href: '/en/faq', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'),
+          note('หน้า /en/faq จะแสดงเมื่อใส่ H1 ภาษาอังกฤษด้านล่าง และมีรายการ FAQ ที่กรอกภาษาอังกฤษครบอย่างน้อย 1 รายการ (เมนู FAQ)'),
+          two(field(C.pages[k], 'navLabelEn', 'Footer link label'), field(C.pages[k], 'h1En', 'H1')), field(C.pages[k], 'introEn', 'Intro', { type: 'textarea' }),
+          field(C.pages[k], 'seoTitleEn', 'SEO title', { max: 60, min: 20 }), field(C.pages[k], 'seoDescriptionEn', 'SEO description', { type: 'textarea', max: 160, min: 60 })) : null,
         seoBox(C.pages[k], 'seoTitle', 'seoDescription', { url: '/' + k, fbT: () => C.pages[k].h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
         box('การแชร์ & การค้นหา',
           field(C.pages[k], 'ogImage', 'รูปแชร์ของหน้านี้ (Facebook / LINE / X)', { type: 'image', ph: () => C.site.ogImage, help: 'แนะนำ 1200×630 · เว้นว่าง = ใช้รูปแชร์หลักของเว็บ' }),
@@ -784,6 +836,15 @@
         box('English version  ·  /en/terms', h('a', { href: '/en/terms', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'), ...legalEn('terms')),
         seoBox(C.pages.terms, 'seoTitle', 'seoDescription', { url: '/terms', fbT: () => C.pages.terms.h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
         pageShare('terms')].filter(Boolean) },
+    ...[['delete', 'ลบบัญชี', '/delete-account', 'หน้าอธิบายวิธีขอลบบัญชีและข้อมูล (Google Play บังคับให้มี URL นี้สำหรับแอปที่สร้างบัญชีได้)'],
+        ['odds', 'อัตรากล่องสุ่ม', '/odds', 'หน้าแสดงอัตราการได้ไอเทมจากกล่องสุ่ม (Apple/Google บังคับถ้าเกมมีกล่องสุ่มที่ใช้เงินจริง)']].map(([k, label, url, desc]) => ({
+      id: 'p-' + k, g: 'หน้าเว็บ', label, desc: desc + ' เว้นหัวข้อและเนื้อหาว่างไว้ = ยังไม่มีหน้า ลิงก์ในเว็บจะถูกซ่อนจนกว่าจะกรอก', paths: ['pages.' + k], url,
+      view: () => [
+        legalHead(k),
+        box('เนื้อหา (ภาษาไทย)', legalBody(C.pages[k], 'body')),
+        box('English version  ·  /en' + url, ...legalEn(k)),
+        seoBox(C.pages[k], 'seoTitle', 'seoDescription', { url, fbT: () => C.pages[k].h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
+        pageShare(k)].filter(Boolean) })),
     { id: 'p-support', g: 'หน้าเว็บ', label: 'ซัพพอร์ต / ติดต่อเรา', desc: 'หน้า /support: ช่องทางติดต่อ ช่องทางรายงานผู้เล่น กฎชุมชน และคำถามที่พบบ่อย ข้อมูลติดต่อแสดงท้ายเว็บและถูกใช้ในนโยบาย/ข้อตกลงด้วย', paths: ['pages.support', 'contact', 'supportFaq', 'legal'], url: '/support',
       view: () => [
         legalWarn(),
@@ -792,12 +853,18 @@
           two(field(C.contact, 'email', 'อีเมลซัพพอร์ต', { help: 'แสดงเป็นลิงก์ mailto · Apple/Google ต้องมีช่องทางติดต่อที่ตอบจริง' }), field(C.contact, 'reportEmail', 'อีเมลรับรายงานผู้เล่น/เนื้อหา', { help: 'เว้นว่าง = ใช้อีเมลซัพพอร์ต' })),
           two(field(C.contact, 'phone', 'โทรศัพท์ (ไม่บังคับ)'), field(C.contact, 'line', 'LINE (ไอดี เช่น @raycitym หรือลิงก์ https://...)')),
           two(field(C.contact, 'hours', 'เวลาทำการ'), field(C.contact, 'response', 'เวลาตอบกลับโดยประมาณ')),
+          two(field(C.contact, 'hoursEn', 'Opening hours (English)'), field(C.contact, 'responseEn', 'Reply time (English)')),
           field(C.contact, 'address', 'ที่อยู่ (ไม่บังคับ แต่ Google ต้องการที่อยู่ผู้พัฒนาในบางกรณี)', { type: 'textarea' }),
           h('small', { class: 'h' }, 'Facebook ใช้ลิงก์จากเมนู "ลิงก์โซเชียล & ดาวน์โหลด" โดยอัตโนมัติ')),
         legalHead('support'),
         box('เนื้อหาหน้าซัพพอร์ต (ติดต่อ / รายงานผู้เล่น / กฎชุมชน)', legalBody(C.pages.support, 'body')),
         box('คำถามที่พบบ่อยเรื่องซัพพอร์ต', note('ค่าเริ่มต้นครอบคลุม: ลืมรหัสผ่าน, ติดตั้ง/อัปเดต, เน็ตมือถือ, รายงานบั๊ก, รายงานผู้เล่น และลบบัญชี แก้คำตอบให้ตรงกับวิธีที่ระบบของท่านใช้จริง (ใช้ตัวแปร {{email}} {{reportEmail}} {{deleteDays}} ได้)'),
-          ...listEditor(C.supportFaq, { title: f => f.q, blank: () => ({ q: '', a: '' }), form: (f, u) => [field(f, 'q', 'คำถาม', { onchange: u }), field(f, 'a', 'คำตอบ', { type: 'textarea' })] })),
+          ...listEditor(C.supportFaq, { title: f => f.q, blank: () => ({ q: '', a: '', qEn: '', aEn: '' }), form: (f, u) => [field(f, 'q', 'คำถาม', { onchange: u }), field(f, 'a', 'คำตอบ', { type: 'textarea', help: 'ขึ้นบรรทัดว่างเพื่อแยกย่อหน้า ใส่ลิงก์ได้แบบ [ข้อความ](/terms) หรือใช้ตัวแปร {{deleteUrl}} {{oddsUrl}} {{termsUrl}} {{privacyUrl}}' }), field(f, 'qEn', 'Question (English)'), field(f, 'aEn', 'Answer (English)', { type: 'textarea' })] })),
+        box('English version  ·  /en/support', h('a', { href: '/en/support', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'),
+          note('หน้า /en/support จะแสดงเมื่อมีเนื้อหาในช่อง Body ด้านล่าง คำถามที่พบบ่อยจะแสดงเฉพาะรายการที่กรอกภาษาอังกฤษแล้ว'),
+          two(field(C.pages.support, 'navLabelEn', 'Footer link label'), field(C.pages.support, 'h1En', 'H1')),
+          field(C.pages.support, 'introEn', 'Intro', { type: 'textarea' }), bodyEditor(C.pages.support, 'bodyEn'),
+          field(C.pages.support, 'seoTitleEn', 'SEO title', { max: 60, min: 20 }), field(C.pages.support, 'seoDescriptionEn', 'SEO description', { type: 'textarea', max: 160, min: 60 })),
         legalSettings(),
         seoBox(C.pages.support, 'seoTitle', 'seoDescription', { url: '/support', fbT: () => C.pages.support.h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
         pageShare('support')].filter(Boolean) },
@@ -834,6 +901,8 @@
             'vid — สถิติ: รหัสสุ่มไม่ระบุตัวตน ตั้งเมื่อกด "ยอมรับ" เท่านั้น (1 ปี)', h('br'),
             '_ga / _ga_* — สถิติ: เฉพาะเมื่อใส่ Google Analytics ในเมนู ข้อมูลเว็บ & SEO หลัก และผู้ใช้ยินยอม', h('br'),
             'rc-sfx / rc-ldr-seen — จำเป็น: จำเสียงและหน้าโหลด (เก็บในเบราว์เซอร์)'))] },
+    { id: 'urls', g: 'ตั้งค่าเว็บ', label: 'URL สำหรับสโตร์', desc: 'ที่อยู่หน้านโยบาย ข้อตกลง ซัพพอร์ต (และหน้าลบบัญชี/อัตรากล่องสุ่มเมื่อมี) ให้คัดลอกไปกรอกในสโตร์ พร้อมตรวจว่าทุกลิงก์เปิดได้จริง', paths: [],
+      view: () => urlsView() },
     { id: 'ready', g: 'ตั้งค่าเว็บ', label: 'ความพร้อมส่งสโตร์', desc: 'เช็กลิสต์ว่าหน้าเว็บที่ Apple / Google ต้องการครบและไม่มีข้อความร่างหลุดหรือไม่ อัปเดตตามที่แก้ในหลังบ้านทันที (ยังไม่ต้องกดบันทึก)', paths: [],
       view: () => readinessView() },
     { id: 'general', g: 'ตั้งค่าเว็บ', label: 'ข้อมูลเว็บ & SEO หลัก', desc: 'ชื่อเว็บ โดเมน รูปแชร์ และค่า SEO เริ่มต้นของทั้งเว็บ', paths: ['site'], url: '/',
@@ -911,11 +980,45 @@
       view: () => {
         const cur0 = h('input', { type: 'password', autocomplete: 'current-password' }), n1 = h('input', { type: 'password', autocomplete: 'new-password' }), n2 = h('input', { type: 'password', autocomplete: 'new-password' });
         const msg = h('div', { class: 'a-err' });
-        return box('เปลี่ยนรหัสผ่าน', h('label', { class: 'a-f' }, 'รหัสผ่านปัจจุบัน', cur0), h('label', { class: 'a-f' }, 'รหัสผ่านใหม่ (อย่างน้อย 10 ตัวอักษร)', n1), h('label', { class: 'a-f' }, 'ยืนยันรหัสผ่านใหม่', n2), msg,
+        const pwBox = box('เปลี่ยนรหัสผ่าน', h('label', { class: 'a-f' }, 'รหัสผ่านปัจจุบัน', cur0), h('label', { class: 'a-f' }, 'รหัสผ่านใหม่ (อย่างน้อย 10 ตัวอักษร)', n1), h('label', { class: 'a-f' }, 'ยืนยันรหัสผ่านใหม่', n2), msg,
           h('div', {}, h('button', { class: 'btn sm', type: 'button', onclick: async () => {
             if (n1.value !== n2.value) { msg.textContent = 'รหัสผ่านใหม่ไม่ตรงกัน'; return; }
             try { await api('password', 'POST', { current: cur0.value, next: n1.value }); msg.textContent = ''; cur0.value = n1.value = n2.value = ''; toast('เปลี่ยนรหัสผ่านแล้ว'); } catch (e) { msg.textContent = e.message; }
           } }, 'บันทึกรหัสผ่าน')));
+        // two-step login with an authenticator app
+        const host = h('div', {});
+        const paint = async () => {
+          let on = false; try { on = (await api('2fa')).enabled; } catch (e) {}
+          const m2 = h('div', { class: 'a-err' }), cur = h('input', { type: 'password', autocomplete: 'current-password' });
+          const code = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, placeholder: '000000' });
+          if (on) {
+            host.replaceChildren(box('ยืนยันตัวตน 2 ขั้นตอน: เปิดใช้อยู่',
+              note('การเข้าสู่ระบบต้องใช้รหัส 6 หลักจากแอป Authenticator ด้วย ถึงรหัสผ่านรั่วก็เข้าไม่ได้ ถ้าจะปิดต้องใส่รหัสผ่านและรหัสปัจจุบัน'),
+              h('label', { class: 'a-f' }, 'รหัสผ่านปัจจุบัน', cur), h('label', { class: 'a-f' }, 'รหัส 6 หลักในแอป', code), m2,
+              h('div', {}, h('button', { class: 'ghost sm', type: 'button', onclick: async () => {
+                try { await api('2fa/disable', 'POST', { current: cur.value, code: code.value }); toast('ปิด 2 ขั้นตอนแล้ว'); paint(); } catch (e) { m2.textContent = e.message; }
+              } }, 'ปิด 2 ขั้นตอน'))));
+            return;
+          }
+          host.replaceChildren(box('ยืนยันตัวตน 2 ขั้นตอน: ยังไม่เปิด (แนะนำ)',
+            note('ใช้แอป Google Authenticator, Microsoft Authenticator หรือ Authy สร้างรหัส 6 หลักทุก 30 วินาที ใช้ร่วมกับรหัสผ่านตอนเข้าสู่ระบบ ป้องกันคนที่รู้รหัสผ่านแต่ไม่มีมือถือของคุณ'),
+            h('label', { class: 'a-f' }, 'รหัสผ่านปัจจุบัน', cur), m2,
+            h('div', {}, h('button', { class: 'btn sm', type: 'button', onclick: async () => {
+              try {
+                const r = await api('2fa/begin', 'POST', { current: cur.value });
+                const key = r.secret.match(/.{1,4}/g).join(' ');
+                host.replaceChildren(box('ตั้งค่า 2 ขั้นตอน',
+                  note('1) เปิดแอป Authenticator แล้วเลือก "เพิ่มบัญชี" > "ใส่คีย์ตั้งค่า" (Enter a setup key)  2) ใส่ชื่อบัญชีอะไรก็ได้ และคีย์ด้านล่าง ชนิด "ตามเวลา" (Time based)  3) ใส่รหัส 6 หลักที่แอปแสดง แล้วกดยืนยัน'),
+                  h('div', { class: 'a-note', style: 'font-size:20px;letter-spacing:.12em;user-select:all;font-family:monospace' }, key),
+                  h('label', { class: 'a-f' }, 'รหัส 6 หลักในแอป', code), m2,
+                  h('div', {}, h('button', { class: 'btn sm', type: 'button', onclick: async () => {
+                    try { await api('2fa/enable', 'POST', { code: code.value }); toast('เปิด 2 ขั้นตอนแล้ว'); paint(); } catch (e) { m2.textContent = e.message; }
+                  } }, 'ยืนยันและเปิดใช้'))));
+              } catch (e) { m2.textContent = e.message; }
+            } }, 'เริ่มตั้งค่า'))));
+        };
+        paint();
+        return [pwBox, host];
       } }
   ];
   const sec = id => SECTIONS.find(s => s.id === id);
@@ -923,10 +1026,11 @@
   // ---------- screens ----------
   function loginScreen(err) {
     const u = h('input', { type: 'text', autocomplete: 'username', required: true }), p = h('input', { type: 'password', autocomplete: 'current-password', required: true });
+    const o = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, placeholder: '000000' });
     const m = h('div', { class: 'a-err' }, err || '');
     const f = h('form', {}, h('img', { src: '/img/logo.png', alt: '' }), h('h1', { class: 'disp' }, 'Admin Login'),
-      h('label', { class: 'a-f' }, 'ชื่อผู้ใช้', u), h('label', { class: 'a-f' }, 'รหัสผ่าน', p), m, h('button', { class: 'btn', type: 'submit' }, 'เข้าสู่ระบบ'));
-    f.addEventListener('submit', async e => { e.preventDefault(); try { await api('login', 'POST', { user: u.value, password: p.value }); start(); } catch (x) { m.textContent = x.message; } });
+      h('label', { class: 'a-f' }, 'ชื่อผู้ใช้', u), h('label', { class: 'a-f' }, 'รหัสผ่าน', p), h('label', { class: 'a-f' }, 'รหัส 6 หลักจากแอป Authenticator (ใส่เมื่อเปิดใช้ 2 ขั้นตอนเท่านั้น)', o), m, h('button', { class: 'btn', type: 'submit' }, 'เข้าสู่ระบบ'));
+    f.addEventListener('submit', async e => { e.preventDefault(); try { await api('login', 'POST', { user: u.value, password: p.value, code: o.value }); start(); } catch (x) { m.textContent = x.message; } });
     app.replaceChildren(h('div', { class: 'a-login' }, f)); u.focus();
   }
 

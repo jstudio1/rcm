@@ -62,6 +62,16 @@ $env:ADMIN_USER="admin"; $env:ADMIN_PASSWORD="รหัสผ่านของ�
 - Run npm test. Tests use isolated synthetic content/credentials; RCM_TEST_TMP can select a writable scratch directory.
 - Configure the web server document root to public/ only. Never expose data/, .git/, lib/, tests/ or source backups through nginx/Apache/IIS. Use a supported Node.js LTS, OS updates, restricted filesystem ACLs and backups.
 
+## Security round 2 (2026-10-27)
+- **Two-step login (TOTP)**: หลังบ้าน → บัญชีแอดมิน → "ยืนยันตัวตน 2 ขั้นตอน" ใช้ Google/Microsoft Authenticator หรือ Authy. เมื่อเปิด การล็อกอินต้องมีรหัส 6 หลักด้วย (รหัสเดียวใช้ซ้ำไม่ได้, รหัสผิดกับรหัสผ่านผิดตอบเหมือนกัน), การเปิด/ปิดทำให้ทุกเซสชันอื่นหลุด. ถ้าทำเครื่องมือถือหาย: หยุดเซิร์ฟเวอร์ แล้วลบฟิลด์ `totp` ออกจาก `data/admin.json`.
+- A successful login gives its attempt back, so signing in repeatedly no longer counts toward the 5-per-IP lockout (wrong guesses still do).
+- Admin sessions also end after 2 hours without activity (`SESSION_IDLE_MIN` to change), on top of the 8-hour limit.
+- Per-address request cap: 900 requests/minute (`RATE_LIMIT_PER_MIN`), answered with 429. Traffic from a local proxy that forwards no client address is never limited.
+- Request bodies: small ones (login, settings) have their own pool and a 10-second deadline, so slow-drip connections can't starve logins or uploads.
+- Compressed copies of identical pages are cached (compression was the most expensive thing a request could trigger).
+- Visit recording is capped at 600 views/hour per address (`ANALYTICS_MAX_PER_IP_HOUR`) and 60 MB per day file (`ANALYTICS_DAY_CAP_BYTES`) so a flood can't fill the disk.
+- New headers: `X-Permitted-Cross-Domain-Policies: none`; admin responses add `Cross-Origin-Resource-Policy: same-origin`. `/.well-known/security.txt` is published when a report/contact email is set.
+
 
 ## สถิติผู้เข้าชม (Visitor statistics)
 - ดูได้ที่หลังบ้าน เมนู **รายงาน → สถิติผู้เข้าชม** (เฉพาะแอดมิน): วันนี้ / เมื่อวาน / 7 / 15 / 30 วัน หรือเลือกช่วงวันที่เองย้อนหลังได้
@@ -93,4 +103,7 @@ $env:ADMIN_USER="admin"; $env:ADMIN_PASSWORD="รหัสผ่านของ�
 - ตัวแปรในข้อความ: `{{app}} {{company}} {{email}} {{reportEmail}} {{phone}} {{line}} {{address}} {{hours}} {{response}} {{site}} {{updated}} {{retention}} {{minAge}} {{deleteDays}}` ค่ามาจาก "ซัพพอร์ต / ติดต่อเรา" และกล่อง "ค่าที่ใช้ในนโยบาย/ข้อตกลง" **บรรทัดที่มีตัวแปรที่ยังว่างจะไม่แสดงบนหน้าสาธารณะ** (ไม่มี `[ยังไม่ได้ตั้งค่า]` หรือข้อความร่างหลุดออกไป)
 - หัวข้อรองใส่ id ได้: `## หัวข้อ {#report}` · หน้าซัพพอร์ตมีช่องทางรายงานผู้เล่น กฎชุมชน และ FAQ แก้ได้ในหลังบ้าน
 - **ตั้งค่าเว็บ → ความพร้อมส่งสโตร์** เช็กลิสต์ตามเอกสารข้อกำหนดของสโตร์ อัปเดตตามที่แก้ทันที
-- ยังไม่มีในระบบนี้: หน้าลบบัญชี และหน้าอัตราการได้ของจากกล่องสุ่ม
+- หน้า Support และ FAQ มีฉบับอังกฤษ (`/en/support`, `/en/faq`) เช่นกัน (FAQ ใส่คำถาม/คำตอบอังกฤษต่อรายการ)
+- **ลิงก์โยงกัน**: ทุกหน้ากฎหมายมีแถว "หน้าที่เกี่ยวข้อง" ท้ายหน้า + ลิงก์ท้ายเว็บ + sitemap ใช้ตัวแปร `{{deleteUrl}} {{oddsUrl}} {{termsUrl}} {{privacyUrl}} {{supportUrl}} {{faqUrl}}` ในข้อความได้
+- **หน้าลบบัญชี (`/delete-account`) และหน้าอัตรากล่องสุ่ม (`/odds`)**: มีที่แก้ในหลังบ้าน (หน้าเว็บ → ลบบัญชี / อัตรากล่องสุ่ม) ยังไม่มีเนื้อหาให้ ต้องเขียนเอง ลิงก์ทั้งหมดจะปรากฏเองเมื่อใส่หัวข้อ + เนื้อหา ถ้าว่างอยู่จะถูกซ่อนทุกที่
+- **ตั้งค่าเว็บ → URL สำหรับสโตร์**: รวม URL ที่ต้องกรอกในสโตร์พร้อมปุ่มคัดลอก และปุ่ม "ตรวจทุกลิงก์" (ต้องตั้ง URL เว็บเป็น https ก่อน; ตัวตรวจถูกกันไม่ให้เรียกที่อยู่ภายใน/ SSRF)
