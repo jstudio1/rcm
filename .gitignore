@@ -19,3 +19,4 @@ data/*.json.lock
 data/*.tmp
 data/uploads-quota.lock
 data/visits/
+data/analytics.salt

@@ -258,9 +258,10 @@
   }
 
   // ---------- news body editor with toolbar ----------
-  function bodyEditor(n) {
-    const ta = h('textarea', { class: 'big' }); ta.value = n.body || '';
-    const sync = () => { n.body = ta.value; mark(); };
+  function bodyEditor(n, key) {
+    key = key || 'body';
+    const ta = h('textarea', { class: 'big' }); ta.value = n[key] || '';
+    const sync = () => { n[key] = ta.value; mark(); };
     ta.addEventListener('input', sync);
     const wrap = (a, b, ph) => { const s = ta.selectionStart, e = ta.selectionEnd, sel = ta.value.slice(s, e) || ph; ta.setRangeText(a + sel + b, s, e, 'select'); ta.focus(); sync(); };
     const prefix = p => { const s = ta.selectionStart; const ls = ta.value.lastIndexOf('\n', s - 1) + 1; ta.setRangeText(p, ls, ls, 'end'); ta.focus(); sync(); };
@@ -623,7 +624,7 @@
       botChk.addEventListener('change', async () => { showBots = botChk.checked; await loadRows(true); draw(); });
       const vrows = rows.map(r => h('tr', {},
         h('td', {}, fmtTime(r.t)), h('td', { class: 'ip' }, r.ip), h('td', {}, r.bot ? h('span', { class: 'an-chip' }, 'บอท: ' + r.bot_name) : h('span', { class: 'an-dev ' + r.device }, DEV_SHORT[r.device] || r.device)),
-        h('td', {}, r.os + ' · ' + r.browser), h('td', { class: 'p', title: r.path }, r.path), h('td', {}, r.source), h('td', {}, r.isNew ? h('span', { class: 'an-chip up' }, 'ใหม่') : '')));
+        h('td', {}, r.os + ' · ' + r.browser), h('td', { class: 'p', title: r.path }, r.path), h('td', {}, r.source), h('td', {}, r.isNew ? h('span', { class: 'an-chip up' }, 'ใหม่') : '', r.anon ? h('span', { class: 'an-chip', title: 'ผู้เข้าชมที่ไม่ได้ยินยอมคุกกี้: IP ถูกตัดท่อนท้าย ไม่มีคุกกี้' }, 'ไม่ระบุตัวตน') : '')));
       const more = rows.length < rowsTotal ? h('div', { style: 'text-align:center' }, h('button', { type: 'button', class: 'ghost sm', onclick: async () => { await loadRows(false); draw(); } }, 'โหลดเพิ่ม (' + nf(rows.length) + ' / ' + nf(rowsTotal) + ')')) : null;
       const logBox = box('รายการเข้าชมล่าสุด', h('div', { id: 'an-visits', class: 'an-filter' },
         ipOnly ? h('span', { class: 'an-chip up' }, 'IP: ' + ipOnly) : null,
@@ -632,12 +633,84 @@
         h('div', { class: 'an-wrap' }, h('table', { class: 'an-tbl' }, h('thead', {}, h('tr', {}, ...['เวลา', 'IP', 'อุปกรณ์', 'ระบบ · เบราว์เซอร์', 'หน้า', 'มาจาก', ''].map(t => h('th', {}, t)))),
           h('tbody', {}, ...(vrows.length ? vrows : [h('tr', {}, h('td', { colspan: 7, style: 'text-align:center;color:var(--mu);padding:24px' }, 'ยังไม่มีการเข้าชมในช่วงนี้'))])))), more);
       const bots = R.botNames.length ? box('บอท / ระบบที่เข้ามา (ไม่นับเป็นผู้เข้าชมจริง)', barRows(R.botNames.map(([k, v]) => ({ label: k, value: v })), T.bots, { alt: true })) : null;
-      host.replaceChildren(...[picker, kpis, h('div', { style: 'height:12px' }), kpis2, h('div', { style: 'height:18px' }), growthBox, devBox, two, two2, hourBox, ipBox, logBox, bots,
+      host.replaceChildren(...[picker, kpis, h('div', { style: 'height:12px' }), kpis2, (T.anonViews ? h('small', { class: 'h', style: 'display:block;margin-top:10px' }, 'ในช่วงนี้มี ' + nf(T.anonViews) + ' การเข้าชม (' + Math.round((T.anonViews / Math.max(1, T.views)) * 100) + '%) จากผู้ที่ไม่ได้ยินยอมคุกกี้: นับแบบไม่ระบุตัวตน (IP ถูกตัดท่อนท้าย ไม่มีคุกกี้ และนับ "ไม่ซ้ำ" ได้เฉพาะภายในวันเดียวกัน)') : null), h('div', { style: 'height:18px' }), growthBox, devBox, two, two2, hourBox, ipBox, logBox, bots,
         (R.to === R.today && !single ? h('small', { class: 'h' }, 'เส้นประช่วงท้ายของกราฟคือ "วันนี้" ซึ่งยังไม่จบวัน ตัวเลขจึงต่ำกว่าวันอื่นเป็นเรื่องปกติ') : null), h('small', { class: 'h' }, 'ข้อมูลเก็บ ' + R.keepDays + ' วันล่าสุด · เข้าชมจริง = คนที่เปิดหน้าเว็บ (ตัดบอทและตัวตรวจระบบออก) · ไม่ซ้ำ = นับด้วยคุกกี้ที่ไม่ระบุตัวตน (vid)')].filter(Boolean));
     };
     load();
     return host;
   }
+
+  // ---------- legal pages (privacy, terms, support) ----------
+  const LEGAL_TOKENS = '{{app}} {{company}} {{email}} {{reportEmail}} {{phone}} {{line}} {{address}} {{hours}} {{response}} {{site}} {{updated}} {{retention}} {{minAge}} {{deleteDays}}';
+  const legalHead = k => box('หัวข้อหน้า',
+    two(field(C.pages[k], 'navLabel', 'ชื่อลิงก์ท้ายเว็บ'), field(C.pages[k], 'eyebrow', 'ข้อความเล็กเหนือหัวข้อ')),
+    field(C.pages[k], 'h1', 'H1'), field(C.pages[k], 'h2', 'H2 (หัวข้อรอง, ไม่บังคับ)'), field(C.pages[k], 'intro', 'ย่อหน้าแนะนำ', { type: 'textarea' }),
+    k === 'support' ? null : field(C.pages[k], 'updated', 'วันที่อัปเดตล่าสุด / วันที่มีผล (แสดงบนหน้า และใช้แทนตัวแปร {{updated}})', { type: 'date', help: 'แก้สาระสำคัญแล้วอย่าลืมเปลี่ยนวันที่ และพิจารณาเปลี่ยน "เลขเวอร์ชันความยินยอม" ในเมนูคุกกี้' }));
+  function legalBody(page, key) {
+    return [bodyEditor(page, key || 'body'), h('div', { class: 'a-note' }, 'ตัวแปรที่ใช้ในข้อความได้ (ระบบแทนค่าให้อัตโนมัติ): ' + LEGAL_TOKENS + ' — บรรทัดที่มีตัวแปรที่ยังว่างจะไม่แสดงบนหน้าเว็บ ส่วน {{company}} {{email}} {{reportEmail}} {{phone}} {{address}} {{hours}} {{response}} กรอกที่เมนู "ซัพพอร์ต / ติดต่อเรา" และ {{minAge}} {{deleteDays}} กรอกในกล่อง "ค่าที่ใช้ในนโยบาย/ข้อตกลง" ด้านล่าง')];
+  }
+  const legalEn = k => [
+    note('สโตร์ตรวจโดยผู้ตรวจที่อ่านภาษาอังกฤษ จึงควรมีฉบับอังกฤษ หน้า /en/' + k + ' จะแสดงเมื่อมีเนื้อหาด้านล่าง เว้นว่างเนื้อหา = ไม่มีหน้า English'),
+    two(field(C.pages[k], 'navLabelEn', 'Footer link label'), field(C.pages[k], 'h1En', 'H1')),
+    field(C.pages[k], 'introEn', 'Intro', { type: 'textarea' }),
+    bodyEditor(C.pages[k], 'bodyEn'),
+    field(C.pages[k], 'seoTitleEn', 'SEO title', { max: 60, min: 20 }), field(C.pages[k], 'seoDescriptionEn', 'SEO description', { type: 'textarea', max: 160, min: 60 })];
+  const legalSettings = () => box('ค่าที่ใช้ในนโยบาย / ข้อตกลง',
+    two(field(C.legal, 'minAge', 'อายุขั้นต่ำของผู้เล่น (ปี)', { help: 'ต้องตรงกับ age rating ที่ตั้งในสโตร์ ใช้แทนตัวแปร {{minAge}}' }),
+      field(C.legal, 'deleteDays', 'ลบข้อมูลถาวรภายในกี่วันหลังยืนยันคำขอ', { help: 'ต้องตรงกับระบบลบบัญชีจริง ใช้แทนตัวแปร {{deleteDays}}' })));
+  const legalWarn = () => {
+    const miss = [];
+    if (!(C.contact.company || '').trim()) miss.push('ชื่อบริษัท');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((C.contact.email || '').trim())) miss.push('อีเมลซัพพอร์ต');
+    return miss.length ? note('ยังไม่ได้กรอก: ' + miss.join(', ') + ' (ไปที่เมนู "ซัพพอร์ต / ติดต่อเรา") บรรทัดในนโยบาย/ข้อตกลงที่ใช้ข้อมูลนี้จะถูกซ่อนจนกว่าจะกรอก และสโตร์จะไม่ผ่านถ้าไม่มีช่องทางติดต่อ') : null;
+  };
+  const pageShare = k => box('การแชร์ & การค้นหา',
+    field(C.pages[k], 'ogImage', 'รูปแชร์ของหน้านี้', { type: 'image', ph: () => C.site.ogImage, help: 'เว้นว่าง = ใช้รูปแชร์หลักของเว็บ' }),
+    check(C.pages[k], 'noindex', 'ซ่อนหน้านี้จาก Google (noindex) — ไม่แนะนำ เพราะสโตร์ต้องเปิดหน้านี้ได้'));
+
+  // ---------- store readiness checklist (computed live from the unsaved form) ----------
+  function readinessView() {
+    const ct = C.contact, lg = C.legal, P = C.pages, T = s => String(s || '').trim();
+    const vals = { company: ct.company, email: ct.email, reportEmail: T(ct.reportEmail) || ct.email, phone: ct.phone, line: ct.line, address: ct.address, hours: ct.hours, response: ct.response, minAge: lg.minAge, deleteDays: lg.deleteDays };
+    const missing = txt => [...new Set((String(txt || '').match(/\{\{(\w+)\}\}/g) || []).map(t => t.slice(2, -2)))].filter(k => k in vals && !T(vals[k]));
+    const lineMiss = txt => String(txt || '').split('\n').filter(l => (l.match(/\{\{(\w+)\}\}/g) || []).some(t => { const k = t.slice(2, -2); return k in vals && !T(vals[k]); })).length;
+    const draft = /ร่าง|ตัวอย่าง|draft|ก่อนเผยแพร่|แก้ให้ตรง|lorem|todo/i;
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(T(ct.email));
+    const pageOk = (k, en) => { const b = T(P[k][en ? 'bodyEn' : 'body']); return b.length > 400 && !lineMiss(b); };
+    const texts = [['privacy', 'body'], ['privacy', 'bodyEn'], ['terms', 'body'], ['terms', 'bodyEn'], ['support', 'body']].map(([k, f]) => P[k][f]).concat(C.supportFaq.map(f => f.a), Object.values(C.cookies));
+    const num = v => /^\d{1,3}$/.test(T(v));
+    const rows = [
+      ['ข้อมูลติดต่อ', [
+        [!!T(ct.company), 'ใส่ชื่อบริษัท / ผู้ให้บริการ', 'p-support'],
+        [emailOk, 'ใส่อีเมลซัพพอร์ตที่ถูกต้อง (สโตร์ตรวจว่าตอบจริง)', 'p-support'],
+        [!!T(ct.reportEmail) || emailOk, 'มีช่องทางรายงานผู้เล่น/เนื้อหา (ใช้อีเมลซัพพอร์ตได้)', 'p-support']]],
+      ['หน้าที่สโตร์ต้องมี', [
+        [pageOk('privacy', false), 'นโยบายความเป็นส่วนตัว (ไทย) ครบ ไม่มีบรรทัดที่ถูกซ่อนเพราะข้อมูลว่าง' + (lineMiss(P.privacy.body) ? ' — ซ่อนอยู่ ' + lineMiss(P.privacy.body) + ' บรรทัด (ขาด: ' + missing(P.privacy.body).join(', ') + ')' : ''), 'p-privacy'],
+        [pageOk('privacy', true), 'นโยบายความเป็นส่วนตัว (English) ครบ', 'p-privacy'],
+        [pageOk('terms', false), 'ข้อตกลงการใช้บริการ (ไทย) ครบ' + (lineMiss(P.terms.body) ? ' — ขาด: ' + missing(P.terms.body).join(', ') : ''), 'p-terms'],
+        [pageOk('terms', true), 'ข้อตกลงการใช้บริการ (English) ครบ', 'p-terms'],
+        [T(P.support.body).length > 200 && C.supportFaq.length >= 5, 'หน้าซัพพอร์ตมีเนื้อหา ช่องทางรายงานผู้เล่น และ FAQ อย่างน้อย 5 ข้อ', 'p-support'],
+        ]],
+      ['ค่าที่ต้องตรงกับสโตร์', [
+        [num(lg.minAge), 'อายุขั้นต่ำของผู้เล่นกรอกแล้ว (' + (T(lg.minAge) || '-') + ') — ต้องตรงกับ age rating', 'p-privacy'],
+        [num(lg.deleteDays), 'จำนวนวันที่ลบข้อมูลถาวรกรอกแล้ว (' + (T(lg.deleteDays) || '-') + ') — ต้องตรงกับระบบลบบัญชีจริง', 'p-privacy']]],
+      ['ความปลอดภัยของเนื้อหา', [
+        [!texts.some(t => draft.test(String(t || ''))), 'ไม่มีข้อความร่าง/ตัวอย่างในหน้ากฎหมาย ซัพพอร์ต และแบนเนอร์', null],
+        [!/COMING SOON/i.test(C.home.badge || ''), 'ป้ายหน้าแรกไม่ใช่ "COMING SOON" (สโตร์ไม่ชอบฟีเจอร์ที่ยังไม่เปิด)', 'home']]],
+      ['เว็บไซต์', [
+        [/^https:\/\//i.test(T(C.site.url)), 'ตั้ง "โดเมนหลัก" เป็น https:// แล้ว (เมนู ข้อมูลเว็บ & SEO หลัก)', 'general'],
+        [on(C.cookies.enabled), 'เปิดแบนเนอร์ขอความยินยอมคุกกี้', 'cookies']]]
+    ];
+    const flat = rows.flatMap(r => r[1]), pass = flat.filter(x => x[0]).length;
+    const todo = ['หน้าลบบัญชี (Google บังคับเป็น URL บนเว็บ ใส่ในฟอร์ม Data safety)', 'หน้าอัตราการได้ของจากกล่องสุ่ม (ต้องมีถ้าขายกล่องสุ่มด้วยเงินจริงหรือ Cash)'];
+    return [box(null, h('div', { class: 'an-kpis' }, h('div', { class: 'an-kpi red' }, h('small', {}, 'ผ่านแล้ว'), h('b', {}, pass + ' / ' + flat.length), h('div', { class: 'sub' }, pass === flat.length ? 'พร้อมส่งสโตร์ (เท่าที่เว็บตรวจได้)' : 'ยังมีรายการที่ต้องแก้'))),
+      h('small', { class: 'h' }, 'หมายเหตุ: ระบบตรวจได้เฉพาะสิ่งที่อยู่ในเว็บนี้ เรื่องสิทธิ์ใช้ชื่อ/โลโก้ ภาพหน้าจอจากเกมจริง บัญชีทดสอบ age rating และฟอร์ม Data safety / App Privacy ทีมต้องตรวจเอง')),
+    box('ยังไม่มีในระบบนี้ (ต้องทำเพิ่มก่อนส่งสโตร์ ไม่นับในคะแนน)', ...todo.map(t => h('div', { class: 'rd-row' }, h('span', { class: 'rd-i no' }, '!'), h('span', { class: 'rd-t' }, t)))),
+    ...rows.map(([title, items]) => box(title, ...items.map(([ok, text, go]) => h('div', { class: 'rd-row' },
+      h('span', { class: 'rd-i ' + (ok ? 'ok' : 'no') }, ok ? '✓' : '✕'), h('span', { class: 'rd-t' }, text),
+      go && !ok ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { cur = go; render(); window.scrollTo(0, 0); } }, 'ไปแก้') : null))))];
+  }
+  const on = v => v === true || v === 'true' || v === '1';
 
   // ---------- sections ----------
   const PN = { rewards: 'Rewards', gameplay: 'Gameplay', drivers: 'Drivers', news: 'News', faq: 'FAQ' };
@@ -690,8 +763,79 @@
           check(C.pages[k], 'noindex', 'ซ่อนหน้านี้จาก Google (noindex) — หน้ายังเปิดได้ แต่จะไม่ขึ้นในผลค้นหาและไม่อยู่ใน sitemap'))]
     })),
 
+    // ---- legal pages + contact + cookie banner (all texts editable) ----
+    { id: 'p-privacy', g: 'หน้าเว็บ', label: 'นโยบายความเป็นส่วนตัว', desc: 'หน้า /privacy และ /en/privacy (Apple และ Google บังคับให้มี URL นี้) ข้อความแก้ได้ทั้งหมด ส่วนตารางคุกกี้ท้ายหน้าอัปเดตตามการตั้งค่าจริงอัตโนมัติ', paths: ['pages.privacy', 'legal'], url: '/privacy',
+      view: () => [
+        legalWarn(),
+        note('ข้อความเริ่มต้นเขียนตามรายการที่สโตร์ต้องการและแนว PDPA ต้องให้ผู้รู้กฎหมายตรวจ และเทียบกับสิ่งที่เกมเก็บจริง (แชท การซื้อ ข้อมูลเครื่อง) ก่อนส่งสโตร์ บรรทัดที่ใช้ตัวแปรที่ยังว่างจะถูกซ่อนจากหน้าสาธารณะอัตโนมัติ'),
+        legalHead('privacy'),
+        box('เนื้อหานโยบาย (ภาษาไทย)', legalBody(C.pages.privacy, 'body')),
+        legalSettings(),
+        box('English version  ·  /en/privacy', h('a', { href: '/en/privacy', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'), ...legalEn('privacy')),
+        seoBox(C.pages.privacy, 'seoTitle', 'seoDescription', { url: '/privacy', fbT: () => C.pages.privacy.h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
+        pageShare('privacy')].filter(Boolean) },
+    { id: 'p-terms', g: 'หน้าเว็บ', label: 'ข้อตกลงการใช้บริการ', desc: 'หน้า /terms และ /en/terms กติกาเกม เงินและไอเทมในเกม ข้อห้าม กฎแชท การคืนเงิน และข้อกำหนดเพิ่มเติมสำหรับ App Store / Google Play', paths: ['pages.terms', 'legal'], url: '/terms',
+      view: () => [
+        legalWarn(),
+        note('ข้อความเริ่มต้นครอบคลุมหัวข้อที่สโตร์แนะนำ (เงินและไอเทมไม่มีมูลค่าจริง, ห้ามโกง/ซื้อขายด้วยเงินจริง, กฎแชท, การคืนเงินผ่านสโตร์, การหยุดให้บริการ) ควรให้ผู้รู้กฎหมายตรวจก่อนใช้งานจริง'),
+        legalHead('terms'),
+        box('เนื้อหาข้อตกลง (ภาษาไทย)', legalBody(C.pages.terms, 'body')),
+        legalSettings(),
+        box('English version  ·  /en/terms', h('a', { href: '/en/terms', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'), ...legalEn('terms')),
+        seoBox(C.pages.terms, 'seoTitle', 'seoDescription', { url: '/terms', fbT: () => C.pages.terms.h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
+        pageShare('terms')].filter(Boolean) },
+    { id: 'p-support', g: 'หน้าเว็บ', label: 'ซัพพอร์ต / ติดต่อเรา', desc: 'หน้า /support: ช่องทางติดต่อ ช่องทางรายงานผู้เล่น กฎชุมชน และคำถามที่พบบ่อย ข้อมูลติดต่อแสดงท้ายเว็บและถูกใช้ในนโยบาย/ข้อตกลงด้วย', paths: ['pages.support', 'contact', 'supportFaq', 'legal'], url: '/support',
+      view: () => [
+        legalWarn(),
+        box('ช่องทางติดต่อ',
+          field(C.contact, 'company', 'ชื่อบริษัท / ผู้ให้บริการ', { help: 'แสดงท้ายเว็บ หน้าซัพพอร์ต และในนโยบายความเป็นส่วนตัว / ข้อตกลง' }),
+          two(field(C.contact, 'email', 'อีเมลซัพพอร์ต', { help: 'แสดงเป็นลิงก์ mailto · Apple/Google ต้องมีช่องทางติดต่อที่ตอบจริง' }), field(C.contact, 'reportEmail', 'อีเมลรับรายงานผู้เล่น/เนื้อหา', { help: 'เว้นว่าง = ใช้อีเมลซัพพอร์ต' })),
+          two(field(C.contact, 'phone', 'โทรศัพท์ (ไม่บังคับ)'), field(C.contact, 'line', 'LINE (ไอดี เช่น @raycitym หรือลิงก์ https://...)')),
+          two(field(C.contact, 'hours', 'เวลาทำการ'), field(C.contact, 'response', 'เวลาตอบกลับโดยประมาณ')),
+          field(C.contact, 'address', 'ที่อยู่ (ไม่บังคับ แต่ Google ต้องการที่อยู่ผู้พัฒนาในบางกรณี)', { type: 'textarea' }),
+          h('small', { class: 'h' }, 'Facebook ใช้ลิงก์จากเมนู "ลิงก์โซเชียล & ดาวน์โหลด" โดยอัตโนมัติ')),
+        legalHead('support'),
+        box('เนื้อหาหน้าซัพพอร์ต (ติดต่อ / รายงานผู้เล่น / กฎชุมชน)', legalBody(C.pages.support, 'body')),
+        box('คำถามที่พบบ่อยเรื่องซัพพอร์ต', note('ค่าเริ่มต้นครอบคลุม: ลืมรหัสผ่าน, ติดตั้ง/อัปเดต, เน็ตมือถือ, รายงานบั๊ก, รายงานผู้เล่น และลบบัญชี แก้คำตอบให้ตรงกับวิธีที่ระบบของท่านใช้จริง (ใช้ตัวแปร {{email}} {{reportEmail}} {{deleteDays}} ได้)'),
+          ...listEditor(C.supportFaq, { title: f => f.q, blank: () => ({ q: '', a: '' }), form: (f, u) => [field(f, 'q', 'คำถาม', { onchange: u }), field(f, 'a', 'คำตอบ', { type: 'textarea' })] })),
+        legalSettings(),
+        seoBox(C.pages.support, 'seoTitle', 'seoDescription', { url: '/support', fbT: () => C.pages.support.h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
+        pageShare('support')].filter(Boolean) },
     { id: 'stats', g: 'รายงาน', label: 'สถิติผู้เข้าชม', desc: 'ดูจำนวนผู้เข้าชมจริง ผู้เข้าชมไม่ซ้ำ IP อุปกรณ์ Android / iOS / คอม และกราฟการเติบโต เลือกดูย้อนหลังได้ทุกช่วงวัน', paths: [],
       view: () => analyticsView() },
+    { id: 'cookies', g: 'ตั้งค่าเว็บ', label: 'คุกกี้ & ความยินยอม', desc: 'แบนเนอร์ขอความยินยอมคุกกี้ (ยอมรับทั้งหมด / ปฏิเสธ / ตั้งค่า) ทุกข้อความแก้ได้ กดปุ่ม "ดูหน้านี้" เพื่อดูแบนเนอร์จริง', paths: ['cookies'], url: '/?cc=open',
+      view: () => [
+        box('การทำงาน',
+          check(C.cookies, 'enabled', 'เปิดแบนเนอร์ขอความยินยอมคุกกี้ (แนะนำให้เปิด)'),
+          check(C.cookies, 'anonymousCount', 'ผู้ที่ยังไม่ยินยอม/ปฏิเสธ ให้นับสถิติแบบไม่ระบุตัวตน (ตัดเลข IP ท่อนท้าย ไม่ตั้งคุกกี้) ถ้าไม่ติ๊ก จะไม่นับคนเหล่านี้เลย'),
+          field(C.cookies, 'version', 'เลขเวอร์ชันความยินยอม', { help: 'เมื่อแก้นโยบายสำคัญ ให้เปลี่ยนเลข (เช่น 1 → 2) ทุกคนจะเห็นแบนเนอร์และต้องเลือกใหม่ · ใช้ตัวอักษร/ตัวเลขได้ไม่เกิน 12 ตัว' }),
+          note('ถ้าปิดแบนเนอร์ เว็บจะตั้งคุกกี้สถิติและโหลด Google Analytics (ถ้าตั้งไว้) โดยไม่ขอความยินยอม ซึ่งไม่แนะนำตาม PDPA')),
+        box('ข้อความในแบนเนอร์',
+          field(C.cookies, 'title', 'หัวข้อ'), field(C.cookies, 'text', 'ข้อความ', { type: 'textarea' }),
+          two(field(C.cookies, 'acceptAll', 'ปุ่ม: ยอมรับทั้งหมด'), field(C.cookies, 'rejectAll', 'ปุ่ม: ปฏิเสธที่ไม่จำเป็น')),
+          two(field(C.cookies, 'customize', 'ปุ่ม: ตั้งค่า'), field(C.cookies, 'policyLabel', 'ลิงก์ไปนโยบายความเป็นส่วนตัว'))),
+        box('หน้าตั้งค่า (เมื่อกด "ตั้งค่า")',
+          two(field(C.cookies, 'settingsTitle', 'หัวข้อ'), field(C.cookies, 'save', 'ปุ่ม: บันทึกการตั้งค่า')),
+          two(field(C.cookies, 'necessaryTitle', 'ชื่อกลุ่ม: จำเป็น'), field(C.cookies, 'analyticsTitle', 'ชื่อกลุ่ม: สถิติ')),
+          field(C.cookies, 'necessaryDesc', 'คำอธิบายกลุ่มที่จำเป็น', { type: 'textarea' }),
+          field(C.cookies, 'analyticsDesc', 'คำอธิบายกลุ่มสถิติ', { type: 'textarea' }),
+          field(C.cookies, 'settingsLink', 'ข้อความลิงก์ท้ายเว็บสำหรับเปิดตั้งค่าอีกครั้ง', { help: 'ผู้ใช้ถอนความยินยอมได้ทุกเมื่อจากลิงก์นี้' })),
+        box('English texts (หน้า /en/privacy และ /en/terms)',
+          field(C.cookies, 'titleEn', 'Title'), field(C.cookies, 'textEn', 'Text', { type: 'textarea' }),
+          two(field(C.cookies, 'acceptAllEn', 'Button: Accept all'), field(C.cookies, 'rejectAllEn', 'Button: Decline non-essential')),
+          two(field(C.cookies, 'customizeEn', 'Button: Settings'), field(C.cookies, 'policyLabelEn', 'Privacy policy link')),
+          two(field(C.cookies, 'settingsTitleEn', 'Settings title'), field(C.cookies, 'saveEn', 'Button: Save settings')),
+          two(field(C.cookies, 'necessaryTitleEn', 'Necessary: title'), field(C.cookies, 'analyticsTitleEn', 'Analytics: title')),
+          field(C.cookies, 'necessaryDescEn', 'Necessary: description', { type: 'textarea' }), field(C.cookies, 'analyticsDescEn', 'Analytics: description', { type: 'textarea' }),
+          field(C.cookies, 'settingsLinkEn', 'Footer link text')),
+        box('คุกกี้ที่ระบบใช้ (ตารางนี้แสดงอัตโนมัติในนโยบายความเป็นส่วนตัว)',
+          h('div', { class: 'a-empty', style: 'text-align:left;line-height:1.9' },
+            'rc_consent — จำเป็น: จำการเลือกในแบนเนอร์ (6 เดือน)', h('br'),
+            'vid — สถิติ: รหัสสุ่มไม่ระบุตัวตน ตั้งเมื่อกด "ยอมรับ" เท่านั้น (1 ปี)', h('br'),
+            '_ga / _ga_* — สถิติ: เฉพาะเมื่อใส่ Google Analytics ในเมนู ข้อมูลเว็บ & SEO หลัก และผู้ใช้ยินยอม', h('br'),
+            'rc-sfx / rc-ldr-seen — จำเป็น: จำเสียงและหน้าโหลด (เก็บในเบราว์เซอร์)'))] },
+    { id: 'ready', g: 'ตั้งค่าเว็บ', label: 'ความพร้อมส่งสโตร์', desc: 'เช็กลิสต์ว่าหน้าเว็บที่ Apple / Google ต้องการครบและไม่มีข้อความร่างหลุดหรือไม่ อัปเดตตามที่แก้ในหลังบ้านทันที (ยังไม่ต้องกดบันทึก)', paths: [],
+      view: () => readinessView() },
     { id: 'general', g: 'ตั้งค่าเว็บ', label: 'ข้อมูลเว็บ & SEO หลัก', desc: 'ชื่อเว็บ โดเมน รูปแชร์ และค่า SEO เริ่มต้นของทั้งเว็บ', paths: ['site'], url: '/',
       view: () => [
         box('ข้อมูลเว็บไซต์', field(C.site, 'name', 'ชื่อเว็บไซต์', { help: 'แสดงที่โลโก้ ฟุตเตอร์ และต่อท้าย title' }),

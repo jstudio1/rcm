@@ -278,3 +278,12 @@ textarea.big{min-height:300px}
 .an-2 .a-box{align-content:start}
 .an-tbl .ghost{white-space:nowrap;padding:5px 12px;font-size:13px}
 .an-tbl td{vertical-align:middle}
+
+.a-grid2{align-items:start}
+
+.rd-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--ln)}
+.rd-row:first-of-type{border-top:0}
+.rd-i{flex:none;width:24px;height:24px;display:grid;place-items:center;font-weight:700;font-size:14px;border-radius:50%}
+.rd-i.ok{background:rgba(74,222,128,.18);color:var(--ok)}
+.rd-i.no{background:rgba(255,107,107,.18);color:#ff7b74}
+.rd-t{flex:1;font-size:14.5px;color:var(--sil)}

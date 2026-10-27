@@ -26,7 +26,12 @@ const UA = {
   pc: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 Edg/124.0',
   bot: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
 };
-const hit = (p, ua, ip, extra = {}) => fetch(base + p, { redirect: 'manual', method: extra.method || 'GET', headers: { 'User-Agent': ua, 'X-Forwarded-For': ip, ...(extra.headers || {}) } });
+// these tests are about counting, so visitors here have accepted analytics in the cookie banner (see consent.test.cjs for the rest)
+const hit = (p, ua, ip, extra = {}) => {
+  const h = { 'User-Agent': ua, 'X-Forwarded-For': ip, ...(extra.headers || {}) };
+  h.Cookie = ['rc_consent=1.1', h.Cookie].filter(Boolean).join('; ');
+  return fetch(base + p, { redirect: 'manual', method: extra.method || 'GET', headers: h });
+};
 const dayOf = t => new Date(t + 7 * 3600e3).toISOString().slice(0, 10);
 let cookie, csrf;
 const api = async p => { const r = await fetch(base + '/admin/api/' + p, { headers: { Cookie: cookie } }); return { status: r.status, json: await r.json().catch(() => null) }; };

@@ -114,7 +114,7 @@ function send(res, code, body, type, extra) {
 function sendPage(req, res, code, html, extra) {
   const etag = 'W/"' + crypto.createHash('sha1').update(html).digest('base64url').slice(0, 20) + '"';
   const hd = Object.assign({ 'Cache-Control': 'no-cache', ETag: etag }, extra || {});
-  if (code === 200 && req.headers['if-none-match'] === etag) { res.writeHead(304, hd); return res.end(); }
+  if (code === 200 && !(extra && extra['Set-Cookie']) && req.headers['if-none-match'] === etag) { res.writeHead(304, hd); return res.end(); }
   send(res, code, html, 'text/html; charset=utf-8', hd);
 }
 const json = (res, code, obj, extra) => send(res, code, JSON.stringify(obj), 'application/json; charset=utf-8', Object.assign({ 'Cache-Control': 'no-store' }, extra));
@@ -187,7 +187,7 @@ function serveStatic(req, res, root, rel, cache) {
   let file = path.normalize(path.join(root, p));
   if (!file.startsWith(root + path.sep) || p.includes('\0')) return send(res, 403, 'Forbidden', 'text/plain');
   try { file = fs.realpathSync(file); const realRoot = fs.realpathSync(root); if (!file.startsWith(realRoot + path.sep)) return send(res, 403, 'Forbidden', 'text/plain'); } catch (e) { return send(res, 404, 'Not found', 'text/plain'); }
-  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
+  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/consent.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
   const staticExt = path.extname(file).toLowerCase();
   if (/^\/(?:img|uploads)\//i.test(p) && !MEDIA_EXT[staticExt] && staticExt !== '.ico') return send(res, 404, 'Not found', 'text/plain');
   // only known web file types are served (no .rar/.zip/.psd or other stray files left in public/)
@@ -382,20 +382,40 @@ async function adminApi(req, res, url) {
 }
 
 // ---- visitor statistics: one anonymous first-party cookie (vid) tells returning visitors apart ----
-function track(req, extra, p, url) {
+// consent given in the cookie banner: true (analytics ok), false (declined), null (no valid choice yet)
+const isOn = v => v === true || v === 'true' || v === '1';
+const consentVersion = c => String((c.cookies || {}).version || '1').replace(/[^\w-]/g, '').slice(0, 12) || '1';
+function consentOf(req, c) {
+  if (!isOn((c.cookies || {}).enabled)) return true; // banner switched off in the admin: no consent step at all
+  const m = /^([\w-]{1,12})\.([01])$/.exec(cookies(req).rc_consent || '');
+  return !m || m[1] !== consentVersion(c) ? null : m[2] === '1';
+}
+const cookieAttrs = req => `Path=/; HttpOnly; SameSite=Lax${isHttps(req) || process.env.COOKIE_SECURE === '1' ? '; Secure' : ''}`;
+const clearVid = req => `vid=; Max-Age=0; ${cookieAttrs(req)}`;
+
+// ---- visitor statistics. With consent: id cookie (vid) + full IP. Without: counted anonymously (masked IP, no cookie), or not at all ----
+function track(req, extra, p, url, c) {
   if (req.method !== 'GET') return;
   if (/prefetch|prerender/i.test(String(req.headers['sec-purpose'] || req.headers.purpose || ''))) return;
   const ua = String(req.headers['user-agent'] || '');
-  let vid = '', isNew = false;
+  let vid = '', isNew = false, anon = false;
+  const out = [];
   if (!analytics.parseUA(ua).bot) {
-    const ck = cookies(req).vid;
-    vid = /^[0-9a-f]{24}$/.test(ck || '') ? ck : '';
-    if (!vid) {
-      vid = crypto.randomBytes(12).toString('hex'); isNew = true;
-      extra['Set-Cookie'] = `vid=${vid}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Lax${isHttps(req) || process.env.COOKIE_SECURE === '1' ? '; Secure' : ''}`;
+    if (consentOf(req, c) === true) {
+      const ck = cookies(req).vid;
+      vid = /^[0-9a-f]{24}$/.test(ck || '') ? ck : '';
+      if (!vid) {
+        vid = crypto.randomBytes(12).toString('hex'); isNew = true;
+        out.push(`vid=${vid}; Max-Age=31536000; ${cookieAttrs(req)}`);
+      }
+    } else {
+      if (cookies(req).vid) out.push(clearVid(req)); // the id cookie must not outlive a "no"
+      anon = true;
     }
   }
-  analytics.record({ t: Date.now(), ip: ip(req), path: p, vid, isNew, ua, ref: req.headers.referer, host: (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host, utm: url.searchParams.get('utm_source') });
+  if (out.length) extra['Set-Cookie'] = out.length === 1 ? out[0] : out;
+  if (anon && !isOn((c.cookies || {}).anonymousCount)) return; // admin chose: count nobody without consent
+  analytics.record({ t: Date.now(), ip: ip(req), path: p, vid, isNew, anon, ua, ref: req.headers.referer, host: (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host, utm: url.searchParams.get('utm_source') });
 }
 
 const server = http.createServer(async (req, res) => {
@@ -449,7 +469,7 @@ const server = http.createServer(async (req, res) => {
     const ga = GA_RE.test(c.site.ga4 || '');
     const page = (html, code) => {
       const extra = ga ? { 'Content-Security-Policy': GA_CSP } : {};
-      if (!code || code === 200) { try { track(req, extra, p, url); } catch (e) { console.error('track:', e.message); } }
+      if (!code || code === 200) { try { track(req, extra, p, url, c); } catch (e) { console.error('track:', e.message); } }
       return sendPage(req, res, code || 200, html, extra);
     };
 
@@ -460,7 +480,18 @@ const server = http.createServer(async (req, res) => {
       const pv = url.searchParams.get('loader') === 'preview' ? (LOADER_STYLES.includes(url.searchParams.get('style')) ? url.searchParams.get('style') : (c.site.loaderStyle || 'launcher')) : null;
       return page(render.home(c, base, { loaderPreview: pv }));
     }
-    if (['/rewards', '/gameplay', '/drivers', '/news', '/faq'].includes(p)) return page(render[p.slice(1)](c, base));
+    if (['/rewards', '/gameplay', '/drivers', '/news', '/faq', '/privacy', '/terms', '/support'].includes(p)) return page(render[p.slice(1)](c, base));
+    // English versions of the legal pages (same content, lang="en", linked with hreflang)
+    if (p === '/en/privacy' || p === '/en/terms') {
+      const key = p.slice(4), pg = c.pages[key];
+      return pg && pg.bodyEn && pg.bodyEn.trim() ? page(render[key + 'En'](c, base)) : page(render.notFound(c, base), 404);
+    }
+    // called by the cookie banner right after a "no": drops the id cookie straight away (JavaScript can't, it is HttpOnly)
+    if (p === '/api/cc') {
+      const hd = { 'Cache-Control': 'no-store' };
+      if (consentOf(req, c) !== true && cookies(req).vid) hd['Set-Cookie'] = clearVid(req);
+      res.writeHead(204, hd); return res.end();
+    }
     if (p.startsWith('/news/')) {
       let slug; try { slug = decodeURIComponent(p.slice(6)).replace(/\/$/, ''); } catch (e) { return page(render.notFound(c, base), 404); }
       const n = c.news.find(x => x.published && x.slug === slug);
