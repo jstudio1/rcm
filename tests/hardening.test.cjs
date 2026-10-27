@@ -156,6 +156,25 @@ test('hardening round 2', async t => {
     assert.equal(a.headers.get('content-encoding'), 'br'); assert.equal(await a.text(), await b.text());
   });
 
+  await t.test('a lock left behind by a crashed process is cleared; a fresh one still blocks', () => {
+    const locked = require(path.join(tmp, 'lib/lock')), f = path.join(tmp, 'data/stale-test');
+    fs.writeFileSync(f + '.lock', '999999');
+    assert.throws(() => locked(f, () => 1), e => e.code === 503, 'a recent lock is respected');
+    const old = new Date(Date.now() - 5 * 60e3); fs.utimesSync(f + '.lock', old, old);
+    assert.equal(locked(f, () => 'ran'), 'ran', 'an old lock is taken over');
+    assert.equal(fs.existsSync(f + '.lock'), false, 'and released afterwards');
+  });
+
+  await t.test('statistics ranges are bounded before anything is built', async () => {
+    const a = await login('', '198.51.100.99'), cs = (await api(a.cookie, '', 'me', 'GET', null, '198.51.100.99')).json.csrf;
+    const t0 = Date.now();
+    for (const p of ['analytics?from=0001-01-01&to=9999-12-31', 'analytics/visits?from=0001-01-01&to=9999-12-31', 'analytics?from=2026-01-01&to=2026-12-31&x=1']) {
+      const r = await api(a.cookie, cs, p, 'GET', null, '198.51.100.99');
+      if (!p.includes('x=1')) assert.equal(r.status, 400, p);
+    }
+    assert.ok(Date.now() - t0 < 3000, 'answered quickly');
+  });
+
   await t.test('admin responses carry the cross-origin and framing protections', async () => {
     const r = await fetch(base + '/admin/api/me', { headers: { Cookie: cookie } });
     assert.equal(r.headers.get('cross-origin-resource-policy'), 'same-origin');
