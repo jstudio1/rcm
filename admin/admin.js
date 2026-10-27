@@ -278,14 +278,14 @@
   }
 
   // ---------- link cards ----------
-  function linkCard(obj, key, name, mark2, hint) {
+  function linkCard(obj, key, name, mark2, hint, showObj) {
     const chip = h('span', { class: 'a-chip' });
     const open = h('a', { target: '_blank', rel: 'noopener noreferrer', href: '#' }, 'ทดสอบเปิดลิงก์ ↗');
     const inp = h('input', { type: 'url', placeholder: 'https://...' }); inp.value = obj[key] || '';
     const upd = () => { const on = !!inp.value.trim(); chip.textContent = on ? 'ใส่ลิงก์แล้ว' : 'ยังว่าง · ' + hint; chip.className = 'a-chip' + (on ? ' on' : ''); open.style.display = on ? '' : 'none'; open.href = safeLink(inp.value); };
     inp.addEventListener('input', () => { obj[key] = inp.value; upd(); mark(); });
     upd();
-    return h('div', { class: 'a-lc' }, h('div', { class: 'ic' }, mark2), h('div', {}, h('div', { class: 'row' }, h('b', {}, name), chip), inp, h('div', { style: 'margin-top:8px' }, open)));
+    return h('div', { class: 'a-lc' }, h('div', { class: 'ic' }, mark2), h('div', {}, h('div', { class: 'row' }, h('b', {}, name), chip), inp, h('div', { style: 'margin-top:8px' }, open), showObj ? check(showObj, key, 'แสดงปุ่มนี้บนหน้าแรก (ปิด = ซ่อนปุ่มทั้งปุ่ม)') : null));
   }
 
   // ---------- PageSpeed Insights ----------
@@ -797,7 +797,7 @@
           field(C.home, 'heroVideoMobile', 'วิดีโอพื้นหลัง (มือถือ)', { type: 'video', ph: '/img/rc_burn_v2_m.mp4', help: 'ไฟล์เล็กสำหรับมือถือ แนะนำ 720p ไม่เกิน ~3MB · เว้นว่างและตั้งวิดีโอคอมไว้ = ใช้วิดีโอเดียวกับคอม' }),
           field(C.home, 'heroImage', 'รูปพื้นหลัง / รูปสำรอง', { type: 'image', ph: '/img/keyart_rc_v1_web.jpg', help: 'แนะนำ 1920×1080 ขึ้นไป ควรเป็นภาพเดียวกับเฟรมแรกของวิดีโอ' })),
         box('หัวข้อใหญ่', field(C.home, 'badge', 'ป้ายเล็กด้านบน'), field(C.home, 'h1', 'H1'), two(field(C.home, 'h2', 'H2'), field(C.home, 'h3', 'H3 (ตัวสีแดง)')), field(C.home, 'lead', 'ข้อความอธิบาย', { type: 'textarea' })),
-        box('ปุ่มลงทะเบียน', two(field(C.home, 'registerText', 'ข้อความบนปุ่ม'), field(C.home, 'registerLink', 'ลิงก์ปุ่ม', { help: 'เว้นว่าง = แสดงข้อความ "เร็วๆ นี้"' })), field(C.home, 'registerMsg', 'ข้อความเมื่อกดปุ่ม (ตอนยังไม่มีลิงก์)')),
+        box('ปุ่มลงทะเบียน', two(field(C.home, 'registerText', 'ข้อความบนปุ่ม'), field(C.home, 'registerLink', 'ลิงก์ปุ่ม', { help: 'เว้นว่าง = แสดงข้อความ "เร็วๆ นี้"' })), field(C.home, 'registerMsg', 'ข้อความเมื่อกดปุ่ม (ตอนยังไม่มีลิงก์)'), check(C.links.show, 'register', 'แสดงปุ่มลงทะเบียนบนหน้าแรก (ปิด = ซ่อนปุ่ม)')),
         box('ป้ายข้อความอื่นๆ', two(field(C.home, 'storesLabel', 'หัวข้อปุ่มดาวน์โหลด'), field(C.home, 'followLabel', 'หัวข้อโซเชียล')), two(field(C.home, 'soonLabel', 'คำว่า "เร็วๆ นี้บน"'), field(C.home, 'downloadLabel', 'คำว่า "ดาวน์โหลดบน"')), two(field(C.home, 'gameplayMore', 'ปุ่มใต้ส่วน Gameplay (หน้าแรก)', { help: 'หัวข้อและรายการของส่วนนี้แก้ที่เมนู Gameplay / หน้า Gameplay' }), field(C.home, 'latestNewsTitle', 'หัวข้อส่วนข่าวใต้หน้าแรก'))),
         seoBox(C.home, 'seoTitle', 'seoDescription', { url: '/', fbT: () => C.site.defaultTitle, fbD: () => C.site.description })] },
     ...Object.keys(PN).map(k => ({
@@ -956,10 +956,10 @@
     { id: 'links', g: 'ตั้งค่าเว็บ', label: 'ลิงก์โซเชียล & ดาวน์โหลด', desc: 'ใส่ลิงก์แล้วปุ่มบนหน้าแรกกดไปลิงก์นั้นทันที เว้นว่าง = แสดง "เร็วๆ นี้"', paths: ['links'], url: '/',
       view: () => [
         box('ลิงก์ดาวน์โหลด', note('ใส่ลิงก์แล้วป้าย SOON จะหายไปจากปุ่มนั้น'),
-          linkCard(C.links.download, 'windows', 'Windows PC', 'WIN', 'แสดง SOON'), linkCard(C.links.download, 'ios', 'App Store', 'iOS', 'แสดง SOON'), linkCard(C.links.download, 'android', 'Google Play', 'AND', 'แสดง SOON')),
+          linkCard(C.links.download, 'windows', 'Windows PC', 'WIN', 'แสดง SOON', C.links.show), linkCard(C.links.download, 'ios', 'App Store', 'iOS', 'แสดง SOON', C.links.show), linkCard(C.links.download, 'android', 'Google Play', 'AND', 'แสดง SOON', C.links.show)),
         box('ลิงก์โซเชียล',
-          linkCard(C.links.social, 'facebook', 'Facebook', 'FB', 'ปุ่มกด = เร็วๆ นี้'), linkCard(C.links.social, 'tiktok', 'TikTok', 'TT', 'ปุ่มกด = เร็วๆ นี้'),
-          linkCard(C.links.social, 'discord', 'Discord', 'DC', 'ปุ่มกด = เร็วๆ นี้'), linkCard(C.links.social, 'youtube', 'YouTube', 'YT', 'ปุ่มกด = เร็วๆ นี้'))] },
+          linkCard(C.links.social, 'facebook', 'Facebook', 'FB', 'ปุ่มกด = เร็วๆ นี้', C.links.show), linkCard(C.links.social, 'tiktok', 'TikTok', 'TT', 'ปุ่มกด = เร็วๆ นี้', C.links.show),
+          linkCard(C.links.social, 'discord', 'Discord', 'DC', 'ปุ่มกด = เร็วๆ นี้', C.links.show), linkCard(C.links.social, 'youtube', 'YouTube', 'YT', 'ปุ่มกด = เร็วๆ นี้', C.links.show))] },
     { id: 'media', g: 'ตั้งค่าเว็บ', label: 'คลังรูป & วิดีโอ', desc: 'ไฟล์รูปและวิดีโอทั้งหมดบนเว็บ อัปโหลด ดูตัวอย่าง คัดลอกลิงก์ หรือลบไฟล์ที่อัปโหลดเอง (ไฟล์ระบบใน /img ลบจากที่นี่ไม่ได้)', paths: [],
       view: () => mediaLibrary({ kind: 'all' }) },
     { id: 'pagespeed', g: 'ตั้งค่าเว็บ', label: 'PageSpeed', desc: 'ตรวจความเร็วและคะแนน SEO ของเว็บจริงด้วย Google PageSpeed Insights ดูแนวโน้มย้อนหลัง และตั้งให้ตรวจอัตโนมัติทุกวัน', paths: [],
@@ -975,6 +975,30 @@
             } }, 'โหลดเข้าตัวแก้ไข'))) : [h('div', { class: 'a-empty' }, 'ยังไม่มีประวัติ (จะเริ่มเก็บเมื่อบันทึกครั้งแรก)')]));
         }).catch(() => { host.textContent = 'โหลดไม่สำเร็จ'; });
         return host;
+      } },
+    { id: 'portal', g: 'ตั้งค่าเว็บ', label: 'ระบบสมาชิก (ล็อกอิน/สมัคร)', desc: 'หน้า /login /register /account และเมนูบัญชีผู้เล่น เตรียมไว้สำหรับต่อ API จริงในอนาคต', paths: ['portal'], url: '/login',
+      view: () => {
+        const P = C.portal, modeSel = h('select', { onchange: e => { P.mode = e.target.value; mark(); } }, h('option', { value: 'mock' }, 'Mockup (ข้อมูลตัวอย่าง ยังไม่ต่อ API)'), h('option', { value: 'api' }, 'API จริง'));
+        modeSel.value = P.mode === 'api' ? 'api' : 'mock';
+        return [
+          box('เปิด/ปิดระบบสมาชิก',
+            note('ปิดอยู่ = ไม่มีหน้า /login /register /account และไม่มีปุ่มเข้าสู่ระบบบนเมนู · เว็บไซต์นี้ไม่เก็บรหัสผ่านหรือข้อมูลสมาชิกเอง ทุกอย่างอยู่ที่ API ของคุณ'),
+            check(P, 'enabled', 'เปิดระบบสมาชิก (แสดงปุ่มเข้าสู่ระบบบนเมนูและเปิดหน้าสมาชิก)'),
+            check(P, 'registerOpen', 'เปิดรับสมัครสมาชิกใหม่ (ปิด = ไม่มีหน้าสมัคร)'),
+            field(P, 'navLabel', 'ข้อความปุ่มบนเมนู', { ph: 'เข้าสู่ระบบ' }),
+            h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, h('a', { class: 'ghost sm', href: '/login', target: '_blank', rel: 'noopener' }, 'ดูหน้า Login ↗'), h('a', { class: 'ghost sm', href: '/register', target: '_blank', rel: 'noopener' }, 'ดูหน้า สมัคร ↗'), h('a', { class: 'ghost sm', href: '/account', target: '_blank', rel: 'noopener' }, 'ดูหน้าบัญชี ↗'))),
+          box('การเชื่อมต่อ',
+            h('label', { class: 'a-f' }, h('span', {}, 'โหมด'), modeSel, h('span', { class: 'h' }, 'Mockup = ใช้ข้อมูลสมมุติในเบราว์เซอร์ของผู้เยี่ยมชมเอง (ไม่ส่งอะไรออกไป) · API จริง = หน้าต่างๆ เรียก API ด้านล่าง')),
+            field(P, 'apiBase', 'ที่อยู่ API (เฉพาะ https://...)', { ph: 'https://api.example.com/v1', help: 'ใช้เมื่อเลือกโหมด API จริง · ระบบอนุญาตให้หน้าเว็บเรียกเฉพาะที่อยู่นี้ (ตั้ง CORS ให้โดเมนเว็บนี้ และ credentials ที่ฝั่ง API) · http ใช้ได้เฉพาะ localhost'}),
+            note('API ควรเก็บการล็อกอินเป็นคุกกี้ HttpOnly + Secure + SameSite และป้องกัน CSRF/จำกัดจำนวนครั้งที่ฝั่งของตัวเอง หน้าเว็บส่งคำขอแบบ credentials: include')),
+          box('เส้นทาง API (ต่อท้ายที่อยู่ด้านบน)',
+            two(field(P, 'epLogin', 'POST เข้าสู่ระบบ', { help: 'ส่ง {username, password} → {user}' }), field(P, 'epRegister', 'POST สมัคร', { help: 'ส่ง {username, email, password}' })),
+            two(field(P, 'epLogout', 'POST ออกจากระบบ'), field(P, 'epForgot', 'POST ลืมรหัสผ่าน', { help: 'ส่ง {email}' })),
+            two(field(P, 'epMe', 'GET โปรไฟล์ / PUT แก้ไขโปรไฟล์', { help: 'คืน {name, username, email, phone, cash, point}' }), field(P, 'epPassword', 'POST เปลี่ยนรหัสผ่าน', { help: 'ส่ง {current, next}' })),
+            two(field(P, 'epHistory', 'GET ประวัติ', { help: 'คืน [{date,type,detail,amount}]' }), field(P, 'epCoupons', 'GET คูปอง', { help: 'คืน [{code,title,expires,status}]' })),
+            two(field(P, 'epItems', 'GET ไอเทมพิเศษ', { help: 'คืน [{name,qty,note}]' }), field(P, 'epPayments', 'GET วิธีชำระเงิน', { help: 'คืน [{type,label,note}] (ห้ามส่งเลขบัตรเต็ม)' })),
+            field(P, 'epRedeem', 'POST แลกรหัส', { help: 'ส่ง {code} → {message, user?}  ถ้าผิดพลาดตอบ 4xx พร้อม {message}' }))
+        ];
       } },
     { id: 'account', g: 'ตั้งค่าเว็บ', label: 'บัญชีแอดมิน', desc: 'เปลี่ยนรหัสผ่านผู้ดูแลระบบ', paths: [],
       view: () => {

@@ -12,6 +12,7 @@ const psi = require('./lib/pagespeed');
 const analytics = require('./lib/analytics');
 const linkcheck = require('./lib/linkcheck');
 const totp = require('./lib/totp');
+const portal = require('./lib/portal');
 let linkCheckBusy = false, linkCheckLast = 0;
 const pending2fa = new Map(); // session token -> { secret, exp }: a two-step key that is shown but not yet confirmed
 
@@ -208,7 +209,7 @@ function serveStatic(req, res, root, rel, cache) {
   let file = path.normalize(path.join(root, p));
   if (!file.startsWith(root + path.sep) || p.includes('\0')) return send(res, 403, 'Forbidden', 'text/plain');
   try { file = fs.realpathSync(file); const realRoot = fs.realpathSync(root); if (!file.startsWith(realRoot + path.sep)) return send(res, 403, 'Forbidden', 'text/plain'); } catch (e) { return send(res, 404, 'Not found', 'text/plain'); }
-  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/consent.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
+  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/account.js', '/account.css', '/consent.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
   const staticExt = path.extname(file).toLowerCase();
   if (/^\/(?:img|uploads)\//i.test(p) && !MEDIA_EXT[staticExt] && staticExt !== '.ico') return send(res, 404, 'Not found', 'text/plain');
   // only known web file types are served (no .rar/.zip/.psd or other stray files left in public/)
@@ -560,8 +561,11 @@ const server = http.createServer(async (req, res) => {
     if (p.length > 1 && p.endsWith('/')) return moved('/' + p.replace(/^\/+|\/+$/g, '') + url.search);
 
     const ga = GA_RE.test(c.site.ga4 || '');
+    // the member portal may talk to the API address set in the admin (and only that address)
+    const ao = portal.enabled(c) ? portal.apiOrigin(c) : '';
     const page = (html, code) => {
-      const extra = ga ? { 'Content-Security-Policy': GA_CSP } : {};
+      const csp = ga ? GA_CSP : PUBLIC_CSP;
+      const extra = ga || ao ? { 'Content-Security-Policy': ao ? csp.replace("connect-src 'self'", "connect-src 'self' " + ao) : csp } : {};
       if (!code || code === 200) { try { track(req, extra, p, url, c); } catch (e) { console.error('track:', e.message); } }
       return sendPage(req, res, code || 200, html, extra);
     };
@@ -574,6 +578,11 @@ const server = http.createServer(async (req, res) => {
       return page(render.home(c, base, { loaderPreview: pv }));
     }
     if (['/rewards', '/gameplay', '/drivers', '/news', '/faq', '/privacy', '/terms', '/support'].includes(p)) return page(render[p.slice(1)](c, base));
+    // member portal: only exists while it is switched on in the admin (and registration only while it is open)
+    if (portal.PATHS[p]) {
+      const key = portal.PATHS[p];
+      return portal.enabled(c) && (key !== 'register' || portal.registerOpen(c)) ? page(render.account(c, base, key)) : page(render.notFound(c, base), 404);
+    }
     // English versions of the legal pages (same content, lang="en", linked with hreflang)
     if (p === '/en/privacy' || p === '/en/terms' || p === '/en/support' || p === '/en/faq' || p === '/en/delete-account' || p === '/en/odds') {
       const key = p === '/en/delete-account' ? 'delete' : p.slice(4);
