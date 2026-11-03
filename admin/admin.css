@@ -47,7 +47,7 @@ body::before{display:none}
 .a-f .h{font-size:12.5px;color:var(--dim)}
 .a-cnt{font-family:var(--f-disp);font-weight:600;font-size:13px;color:var(--dim);letter-spacing:.04em}
 .a-cnt.ok{color:var(--ok)}.a-cnt.bad{color:#ff7b74}
-input[type=text],input[type=email],input[type=tel],input[type=number],input[type=url],input[type=password],input[type=date],input[type=search],textarea{width:100%;background:#131418;border:1px solid var(--ln-2);padding:10px 12px;color:#fff;font-family:var(--f-body);font-weight:400;font-size:15px;border-radius:0}
+input[type=text],input[type=email],input[type=tel],input[type=number],input[type=url],input[type=password],input[type=date],input[type=datetime-local],input[type=search],textarea{width:100%;background:#131418;border:1px solid var(--ln-2);padding:10px 12px;color:#fff;font-family:var(--f-body);font-weight:400;font-size:15px;border-radius:0}
 input:focus,textarea:focus{outline:2px solid var(--red-2);outline-offset:-1px;border-color:transparent}
 textarea{min-height:92px;resize:vertical;line-height:1.55}
 textarea.big{min-height:300px}

@@ -43,7 +43,8 @@ test('pre-registration rewards', async t => {
       const { status, html } = await get(p); assert.equal(status, 200, p);
       assert.match(html, /<b data-count data-n="13002">13,002<\/b>/, p); assert.ok(html.includes('/prereg.js') && html.includes('/prereg.css'), p);
       assert.deepEqual(states(html), ['reached:1000', 'reached:3000', 'reached:5000', 'reached:10000', 'next:20000', 'locked:30000'], p);
-      assert.deepEqual([...html.matchAll(/<li class="pr-col \w+" data-goal="\d+" style="--f:([\d.]+)%"/g)].map(m => Number(m[1])), [100, 100, 100, 30, 0, 0], 'the line between two goals is filled as far as the count has come: ' + p);
+      assert.deepEqual([...html.matchAll(/<li class="pr-col \w+" data-goal="\d+" style="--f:([\d.]+)%/g)].map(m => Number(m[1])), [100, 100, 100, 30, 0, 0], 'the line between two goals is filled as far as the count has come: ' + p);
+      assert.match(html, /data-goal="1000" style="--f:100%;--lead:100%"/, 'the lead-in up to the first goal is full once it is reached');
       assert.match(html, /อีกเพียง <b data-left>6,998<\/b> คน/); assert.match(html, /<b data-reached>4<\/b> \/ 6/);
       assert.ok(html.includes('ถึงเป้าหมายแล้ว') && html.includes('เป้าหมายถัดไป') && html.includes('ยังไม่ถึงเป้า'));
     }
@@ -51,6 +52,34 @@ test('pre-registration rewards', async t => {
     assert.match((await get('/')).html, /<h2 class="disp">รวมพลังสตาร์/);
     assert.equal(((await get('/')).html.match(/<h1/g) || []).length, 1, 'one h1 on the home page');
     const pr = (await get('/rewards')).html; assert.match(pr, /aria-pressed="true"/); assert.equal(cfgOf(pr).api, '');
+  });
+
+  await t.test('before the first goal the lead-in shows the progress; equal goals never divide by zero; goals stay on one line', async () => {
+    await edit(c => { c.prereg.mockCount = '2500'; c.rewards = [rw('a', '', '10000', 'A'), rw('b', '', '10000', 'B'), rw('c', '', '20000', 'C')]; });
+    const h = (await get('/rewards')).html;
+    assert.match(h, /data-goal="10000" style="--f:0%;--lead:25%"/, '2,500 of 10,000 = a quarter of the way to the first goal');
+    assert.equal(/NaN|Infinity/.test(h), false);
+    const css = fs.readFileSync(path.join(source, 'public/prereg.css'), 'utf8');
+    assert.ok(/\.pr-grid\{[^}]*grid-auto-flow:column/.test(css), 'goals never wrap to a second row on wide screens');
+    await edit(c => { c.prereg.mockCount = '13002'; c.rewards = seed.rewards; });
+  });
+
+  await t.test('closing time: countdown before it, closed state after it (button, register page, portal)', async () => {
+    const fmt = d => new Date(d + 7 * 3600e3).toISOString().slice(0, 16);
+    await edit(c => { c.prereg.endAt = fmt(Date.now() + 3 * 86400e3 + 3600e3); c.portal.enabled = true; c.portal.registerOpen = true; });
+    let h = (await get('/rewards')).html, home = (await get('/')).html;
+    assert.match(h, /class="pr-cd" data-cd data-end="\d+"/); assert.match(h, /data-cd-v>3 วัน 0\d:\d\d:\d\d</);
+    assert.match(home, /class="dk-cd" data-cd/, 'countdown under the register button on the home page');
+    assert.equal((await get('/register')).status, 200, 'sign-up open before the time');
+    await edit(c => { c.prereg.endAt = fmt(Date.now() - 60e3); });
+    h = (await get('/rewards')).html; home = (await get('/')).html;
+    assert.equal(h.includes('data-cd'), false); assert.match(h, /class="btn pr-btn" type="button" disabled>/); assert.match(h, /ปิดรับลงทะเบียนแล้ว/);
+    assert.match(home, /<button class="btn" type="button" disabled>ปิดรับลงทะเบียนแล้ว<\/button>/);
+    assert.equal((await get('/register')).status, 404, 'the sign-up page closes by itself');
+    assert.equal((await get('/login')).html.includes('href="/register"'), false);
+    await edit(c => { c.prereg.endAt = 'not a date'; });
+    assert.equal((await get('/register')).status, 200, 'a broken value means no closing time');
+    await edit(c => { c.prereg.endAt = ''; c.portal.enabled = false; });
   });
 
   await t.test('the number drives which goals are reached; goals are sorted; all-done message', async () => {

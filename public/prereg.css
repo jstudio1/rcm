@@ -28,10 +28,14 @@
 .pr-bar span{display:inline-flex;align-items:center;gap:8px}
 .pr-bar b{color:var(--acc-2);font-size:17px;font-weight:500}
 /* goals: a dot on a line above each card */
-.pr-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+/* the goals always stay on one line (the tube is one line); many goals scroll sideways instead of wrapping */
+.pr-grid{list-style:none;margin:0;padding:0 2px 6px;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(118px,1fr);gap:14px;overflow-x:auto;scrollbar-width:thin;scroll-snap-type:x proximity}
+.pr-grid>li{scroll-snap-align:start}
 .pr-col{position:relative;display:grid;gap:14px;padding-top:34px}
 .pr-col::before{content:"";position:absolute;left:50%;width:calc(100% + 14px);top:11px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--acc-2) var(--f,0%),var(--ln-2) var(--f,0%))}
 .pr-col:last-child::before{display:none}
+/* lead-in: from the start of the line to the first goal, filled as far as the count has come */
+.pr-col:first-child::after{content:"";position:absolute;left:0;width:50%;top:11px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--acc-2) var(--lead,0%),var(--ln-2) var(--lead,0%))}
 .pr-dot{position:absolute;left:50%;top:0;transform:translateX(-50%);z-index:1;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--bg-3);border:2px solid var(--ln-2);color:var(--dim);font-size:13px}
 .pr-dot .k,.pr-dot .l{display:none}
 .pr-col.reached .pr-dot{background:var(--acc-2);border-color:var(--acc-2);color:#fff}.pr-col.reached .pr-dot .k{display:block}
@@ -67,17 +71,27 @@
 .pr-btn{padding:16px 36px}
 @media(max-width:700px){
   /* goals become a vertical tube: dots on the left, the line fills downward as sign-ups grow */
-  .pr-grid{grid-template-columns:minmax(0,1fr);row-gap:14px}
+  .pr-grid{grid-auto-flow:row;grid-template-columns:minmax(0,1fr);row-gap:14px;overflow:visible;padding:0}
   .pr-col{padding:0 0 0 46px}
   .pr-col::before{display:block;left:10px;top:34px;width:4px;height:calc(100% + 14px);background:linear-gradient(180deg,var(--acc-2) var(--f,0%),var(--ln-2) var(--f,0%))}
   .pr-col:last-child::before{display:none}
+  .pr-col:first-child::after{left:10px;top:0;width:4px;height:22px;background:linear-gradient(180deg,var(--acc-2) var(--lead,0%),var(--ln-2) var(--lead,0%))}
   .pr-dot{left:0;top:22px;transform:none}
   .pr-card{grid-template-columns:78px minmax(0,1fr);grid-template-areas:"img g" "img t" "img chip";column-gap:14px;row-gap:4px;justify-items:start;align-items:center;text-align:left;padding:12px 14px}
   .pr-img{grid-area:img;max-width:78px}.pr-img.ph{font-size:38px}
-  .pr-g{grid-area:g}.pr-t{grid-area:t;font-size:16px}.pr-chip{grid-area:chip}
+  .pr-g{grid-area:g}.pr-t{grid-area:t;font-size:16px}.pr-card .pr-chip{grid-area:chip}
   .pr-v{display:none}
   .pr-card:hover{transform:none}
   .pr-d{flex-wrap:wrap}.pr-ds{width:100%}
   .pr-head .eyebrow::before,.pr-head .eyebrow::after{width:24px}
 }
 @media(prefers-reduced-motion:reduce){.pr-card{transition:none}.pr-card:hover{transform:none}}
+
+/* closing countdown and the closed state */
+.pr-cd{display:inline-flex;align-items:baseline;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px;padding:6px 14px;border-radius:999px;background:rgba(255,42,42,.12);border:1px solid rgba(255,42,42,.35);font-size:14px;color:var(--sil)}
+.pr-cd b{font-family:var(--f-disp);font-weight:800;font-size:18px;letter-spacing:.04em;color:#fff;font-variant-numeric:tabular-nums}
+.pr-cd.cd-done{color:#fff}
+.pr-chip.end{background:rgba(255,42,42,.18);color:#ffb3ae}
+.pr-btn[disabled]{opacity:.65;cursor:not-allowed;filter:grayscale(.3)}
+.pr-g{white-space:nowrap}
+.pr-g b{font-size:clamp(22px,2.1vw,30px)}

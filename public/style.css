@@ -1265,3 +1265,8 @@ body.mnt{min-height:100vh;display:grid;place-items:center;padding:24px;backgroun
 /* more room above and below the slanted band */
 .hflow .gb{padding:24px 0 30px}
 @media(max-width:860px){.hflow .gb{padding:16px 0 20px}}
+
+/* home dock: the closing countdown under the register button */
+.dk-cd{display:flex;justify-content:center;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--sil)}
+.dk-cd b{font-family:var(--f-disp);font-weight:800;font-size:16px;letter-spacing:.05em;color:#fff;font-variant-numeric:tabular-nums}
+.dk-cta .btn[disabled]{opacity:.6;cursor:not-allowed;filter:grayscale(.35)}

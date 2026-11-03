@@ -193,3 +193,13 @@ $$('[data-stay]').forEach(el=>el.addEventListener('click',e=>{e.preventDefault()
 if(!('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('in'));return;}
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
 els.forEach(e=>io.observe(e));})();
+
+/* registration countdown: ticks every second; at zero it shows the closed message and reloads once to show the closed state */
+(function(){const els=[...document.querySelectorAll('[data-cd]')];if(!els.length)return;
+const pad=n=>String(n).padStart(2,'0');let iv;
+const tick=()=>{const now=Date.now();let done=false;
+  els.forEach(el=>{const v=el.querySelector('[data-cd-v]');let s=Math.floor((Number(el.dataset.end)-now)/1000);
+    if(s<=0){done=true;el.textContent=el.dataset.ended||'';el.classList.add('cd-done');return;}
+    const d=Math.floor(s/86400);s%=86400;if(v)v.textContent=(d?d+' '+el.dataset.day+' ':'')+pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(s%60);});
+  if(done){clearInterval(iv);try{if(!sessionStorage.getItem('rc-cd-reload')){sessionStorage.setItem('rc-cd-reload','1');setTimeout(()=>location.reload(),1500);}}catch(e){}}};
+iv=setInterval(tick,1000);tick();})();

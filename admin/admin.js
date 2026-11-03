@@ -1037,7 +1037,7 @@
           group('ทั้งเว็บ', C.site, [['defaultTitle', 'Title หลัก'], ['description', 'Description หลัก', true], ['footer', 'ข้อความท้ายเว็บ']]),
           group('หน้าแรก', C.home, [['badge', 'ป้ายเล็กด้านบน'], ['h1', 'H1'], ['h2', 'H2'], ['h3', 'H3'], ['lead', 'ข้อความอธิบาย', true], ['registerText', 'ข้อความบนปุ่มลงทะเบียน'], ['registerMsg', 'ข้อความเมื่อกดปุ่มที่ยังไม่เปิด', true], ['storesLabel', 'หัวข้อปุ่มดาวน์โหลด'], ['followLabel', 'หัวข้อโซเชียล'], ['soonLabel', 'ข้อความเหนือปุ่มสโตร์ (ยังไม่เปิด)'], ['downloadLabel', 'ข้อความเหนือปุ่มสโตร์ (เปิดแล้ว)'], ['gameplayMore', 'ปุ่มดูทั้งหมด (Gameplay)'], ['bandTitle', 'แถบแนะนำเกม: หัวข้อ'], ['bandText', 'แถบแนะนำเกม: ข้อความ', true], ['bandBtn1', 'แถบแนะนำเกม: ปุ่มที่ 1'], ['bandBtn2', 'แถบแนะนำเกม: ปุ่มที่ 2'], ['latestNewsTitle', 'หัวข้อข่าวล่าสุด'], ['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]),
           ...['news', 'gameplay', 'drivers', 'rewards'].map(k => group('หน้า ' + PN[k], C.pages[k], [['navLabel', 'ชื่อในเมนู'], ['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['h1', 'H1'], ['h2', 'H2'], ['intro', 'ย่อหน้าแนะนำ', true]].concat(k === 'news' ? [['empty', 'ข้อความเมื่อยังไม่มีข่าว']] : [], [['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]))),
-          group('ตัวนับลงทะเบียนล่วงหน้า', C.prereg, [['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['title', 'หัวข้อ'], ['titleAccent', 'หัวข้อ (ส่วนสีแดง)'], ['intro', 'ข้อความแนะนำ', true], ['statusLabel', 'ป้ายสถานะ'], ['counterLabel', 'ป้ายตัวนับ'], ['unit', 'หน่วย'], ['nextText', 'ข้อความเป้าหมายถัดไป ({n} = จำนวนที่เหลือ)'], ['allDoneText', 'ข้อความเมื่อถึงทุกเป้า'], ['goalsLabel', 'หัวข้อรายการรางวัล'], ['reachedCount', 'ข้อความ "ถึงเป้าหมายแล้ว" (ตัวนับ)'], ['reachedLabel', 'ป้ายถึงเป้าหมายแล้ว'], ['nextLabel', 'ป้ายเป้าหมายถัดไป'], ['lockedLabel', 'ป้ายยังไม่ถึงเป้า'], ['viewLabel', 'ปุ่มดูรางวัล'], ['detailReached', 'สถานะรางวัล (ถึงเป้า)'], ['detailLocked', 'สถานะรางวัล (ยังไม่ถึง)']])];
+          group('ตัวนับลงทะเบียนล่วงหน้า', C.prereg, [['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['title', 'หัวข้อ'], ['titleAccent', 'หัวข้อ (ส่วนสีแดง)'], ['intro', 'ข้อความแนะนำ', true], ['statusLabel', 'ป้ายสถานะ'], ['counterLabel', 'ป้ายตัวนับ'], ['unit', 'หน่วย'], ['nextText', 'ข้อความเป้าหมายถัดไป ({n} = จำนวนที่เหลือ)'], ['allDoneText', 'ข้อความเมื่อถึงทุกเป้า'], ['goalsLabel', 'หัวข้อรายการรางวัล'], ['reachedCount', 'ข้อความ "ถึงเป้าหมายแล้ว" (ตัวนับ)'], ['reachedLabel', 'ป้ายถึงเป้าหมายแล้ว'], ['nextLabel', 'ป้ายเป้าหมายถัดไป'], ['lockedLabel', 'ป้ายยังไม่ถึงเป้า'], ['viewLabel', 'ปุ่มดูรางวัล'], ['detailReached', 'สถานะรางวัล (ถึงเป้า)'], ['detailLocked', 'สถานะรางวัล (ยังไม่ถึง)'], ['countdownLabel', 'ข้อความหน้าเวลานับถอยหลัง'], ['dayUnit', 'คำว่า "วัน"'], ['closedButton', 'ปุ่มเมื่อปิดรับแล้ว'], ['endedText', 'ข้อความเมื่อปิดรับแล้ว', true]])];
       } },
     { id: 'home', g: 'หน้าเว็บ', label: 'หน้าแรก', desc: 'หัวข้อ H1 H2 H3 ข้อความอธิบาย ปุ่มลงทะเบียน และ SEO ของหน้าแรก', paths: ['home'], url: '/',
       view: () => [
@@ -1271,6 +1271,24 @@
             check(C.links.show, 'register', 'แสดงปุ่ม "ลงทะเบียนล่วงหน้า" บนหน้าแรกและหน้า Rewards'),
             check(C.prereg, 'enabled', 'เปิดส่วนตัวนับผู้ลงทะเบียนและรางวัลตามเป้าหมาย (ปิด = แสดงการ์ดรางวัลธรรมดาที่หน้า /rewards)'),
             check(C.prereg, 'onHome', 'แสดงส่วนลงทะเบียนล่วงหน้าบนหน้าแรกด้วย'),
+            (() => {
+              // when the sign-up closes: shows the state now, and how long is left
+              const st = h('div', { class: 'a-note' });
+              const paint = () => {
+                const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(String(C.prereg.endAt || ''));
+                if (!m) { st.textContent = 'ไม่มีกำหนดปิด: เปิดรับลงทะเบียนไปเรื่อยๆ จนกว่าจะปิดสวิตช์เอง'; st.className = 'a-note'; return; }
+                const t = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00+07:00`), ms = t - Date.now();
+                if (ms <= 0) { st.textContent = 'ปิดรับลงทะเบียนแล้ว (เลยเวลาที่ตั้งไว้): ปุ่มลงทะเบียนถูกปิด หน้าสมัครสมาชิกปิด และหน้าเว็บแสดงข้อความปิดรับ'; st.className = 'a-note warn'; return; }
+                const d = Math.floor(ms / 864e5), hr = Math.floor(ms % 864e5 / 36e5), mi = Math.floor(ms % 36e5 / 6e4);
+                st.textContent = 'เปิดรับอยู่ · จะปิดเองในอีก ' + (d ? d + ' วัน ' : '') + hr + ' ชั่วโมง ' + mi + ' นาที (หน้าเว็บแสดงเวลานับถอยหลัง)'; st.className = 'a-note ok';
+              };
+              const f = field(C.prereg, 'endAt', 'ปิดรับลงทะเบียนอัตโนมัติเมื่อ (เวลาประเทศไทย)', { type: 'datetime-local', onchange: paint, help: 'เมื่อถึงเวลานี้ ระบบปิดการสมัครเอง: ปุ่มลงทะเบียนกดไม่ได้ หน้า /register ปิด และระบบสมาชิกไม่เปิดให้สมัคร · เว้นว่าง = ไม่มีกำหนดปิด' });
+              const clear = h('button', { type: 'button', class: 'ghost sm', onclick: () => { C.prereg.endAt = ''; f.querySelector('input').value = ''; paint(); mark(); } }, 'ไม่มีกำหนดปิด');
+              paint();
+              return h('div', { class: 'a-stack' }, f, h('div', {}, clear), st,
+                two(field(C.prereg, 'countdownLabel', 'ข้อความหน้าเวลานับถอยหลัง', { ph: 'ปิดรับลงทะเบียนใน' }), field(C.prereg, 'dayUnit', 'คำว่า "วัน"', { ph: 'วัน' })),
+                two(field(C.prereg, 'closedButton', 'ข้อความบนปุ่มเมื่อปิดรับแล้ว', { ph: 'ปิดรับลงทะเบียนแล้ว' }), field(C.prereg, 'endedText', 'ข้อความเมื่อปิดรับแล้ว', { type: 'textarea' })));
+            })(),
             h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, h('a', { class: 'ghost sm', href: '/register', target: '_blank', rel: 'noopener' }, 'ดูหน้าสมัคร ↗'), h('a', { class: 'ghost sm', href: '/rewards', target: '_blank', rel: 'noopener' }, 'ดูหน้า Rewards ↗')))
         ];
       } },
