@@ -34,7 +34,8 @@
   var I = {
     arrow: 'M5 12h14M13 6l6 6-6 6', copy: 'M9 9h10v11H9zM5 15V4h10', qr: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v6h-3',
     wallet: 'M3 7h18v12H3zM3 7l3-3h12l3 3M16 13h2', coin: 'M12 21a9 9 0 100-18 9 9 0 000 18zM9 9h4.5a1.5 1.5 0 010 3H9m0 0h5a1.5 1.5 0 010 3H9m0-6v6', star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
-    card: 'M3 6h18v12H3zM3 10h18M6 15h4', gift: 'M3 9h18v4H3zM5 13v8h14v-8M12 9v12M12 9c-3 0-4-4-1-4 2 0 1 4 1 4zm0 0c3 0 4-4 1-4-2 0-1 4-1 4z'
+    card: 'M3 6h18v12H3zM3 10h18M6 15h4', shield: 'M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5',
+    gift: 'M3 9h18v4H3zM5 13v8h14v-8M12 9v12M12 9c-3 0-4-4-1-4 2 0 1 4 1 4zm0 0c3 0 4-4 1-4-2 0-1 4-1 4z'
   };
   var num = function (n) { return Number(n || 0).toLocaleString('th-TH'); };
   var $ = function (s, r) { return (r || root).querySelector(s); };
@@ -88,7 +89,7 @@
         case 'logout': demo.clear(); return { ok: true };
         case 'forgot': return { ok: true };
         case 'me': guard(); return u;
-        case 'profile': guard(); u.name = body.name || u.name; u.email = body.email || u.email; u.phone = body.phone || ''; demo.set(u); return u;
+        case 'profile': guard(); u.name = body.name || u.name; u.email = body.email || u.email; u.phone = body.phone || ''; u.gender = body.gender || ''; if (body.twofa !== undefined) u.twofa = !!body.twofa; demo.set(u); return u;
         case 'password': guard(); if (!body.current) throw new Error('ใส่รหัสผ่านปัจจุบัน'); return { ok: true };
         case 'history': guard(); return DEMO.history;
         case 'coupons': guard(); return DEMO.coupons;
@@ -230,6 +231,26 @@
       el('div', { class: 'mc-uid' }, el('small', { text: 'MEMBER UID' }), el('div', {}, el('b', { text: uid }), copy)), qr);
   }
 
+  // stacked sections shared by personal data and security: title + short text on the left, fields on the right
+  var pf = function (id, label, value, attrs) {
+    var inp = el('input', Object.assign({ id: id, name: id, type: 'text', placeholder: ' ' }, attrs || {})); inp.value = value || '';
+    return el('label', { class: 'pf-f' }, inp, el('span', { text: label }));
+  };
+  var section = function (title, desc, fields, onSave, saveText) {
+    var form = el('form', { class: 'pf-sec', novalidate: '' }, el('div', { class: 'pf-l' }, el('h2', { text: title }), desc ? el('p', { text: desc }) : null), el('div', { class: 'pf-r' }));
+    var right = form.lastChild; fields.forEach(function (f) { right.appendChild(f); });
+    if (onSave) {
+      var err = el('p', { class: 'aerr', role: 'alert' }), ok = el('p', { class: 'aok', role: 'status' }), b = el('button', { class: 'btn sm', type: 'submit', text: saveText || 'บันทึก' });
+      right.appendChild(err); right.appendChild(ok); right.appendChild(b);
+      form.addEventListener('submit', function (e) {
+        e.preventDefault(); err.textContent = ''; ok.textContent = '';
+        var r = onSave(form); if (typeof r === 'string') { err.textContent = r; return; }
+        b.disabled = true; r.then(function () { ok.textContent = 'บันทึกแล้ว'; }, function (x) { err.textContent = x.message; }).then(function () { b.disabled = false; });
+      });
+    }
+    return form;
+  };
+
   var VIEWS = {
     overview: function () {
       var box = el('div', { class: 'ov' });
@@ -268,21 +289,48 @@
       return box;
     },
     profile: function () {
-      return formWith('', [field('name', 'ชื่อที่แสดง', 'text', me.name, { maxlength: 40 }), field('email', 'อีเมล', 'email', me.email, { maxlength: 120 }), field('phone', 'เบอร์โทร (ไม่บังคับ)', 'tel', me.phone, { maxlength: 20 })], 'บันทึกข้อมูล', function (f) {
-        var em = val(f, 'email').trim();
-        if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return 'อีเมลไม่ถูกต้อง';
-        return call('profile', { name: val(f, 'name').trim(), email: em, phone: val(f, 'phone').trim() }).then(function (d) { me = userOf(d) || me; bind(me); });
-      });
+      // stacked sections: the title and a short explanation on the left, the fields on the right
+      var box = el('div', { class: 'pf' });
+      var save = function (extra) { return call('profile', Object.assign({ name: me.name, email: me.email, phone: me.phone || '', gender: me.gender || '' }, extra)).then(function (d) { me = userOf(d) || me; bind(me); }); };
+      var mask = function (em) { var m = /^([^@]{1,3})([^@]*)(@.+)$/.exec(String(em || '')); return m ? m[1] + new Array(Math.max(m[2].length, 3) + 1).join('*') + m[3] : (em || '–'); };
+      box.appendChild(section(cfg.idLabel || 'RAYCITY-M ID', 'ข้อมูล', [pf('pf-name', 'ชื่อตัวละคร', me.name || me.username, { readonly: '' }), pf('pf-user', 'ชื่อผู้ใช้', me.username, { readonly: '' })]));
+      var sel = el('select', { id: 'pf-gender' }, el('option', { value: '', text: 'ไม่ระบุ' }), el('option', { value: 'male', text: 'ชาย' }), el('option', { value: 'female', text: 'หญิง' }));
+      sel.value = me.gender || '';
+      box.appendChild(section('เพศ', 'เพศนี้จะแสดงในเกมในรูปแบบตัวละครของคุณ', [el('label', { class: 'pf-f pf-sel' }, sel, el('span', { text: 'เพศ' })), el('p', { class: 'pf-note', text: 'ภายใน 1 วัน คุณทำรายการได้เพียง 3 ครั้งเท่านั้น' })],
+        function () { return save({ gender: sel.value }); }));
+      box.appendChild(section('อีเมล', 'อีเมลนี้ใช้สำหรับเข้าสู่ระบบ และการยืนยันตัวตนในธุรกรรมต่าง ๆ โปรดตรวจสอบให้แน่ใจก่อนดำเนินการ', [pf('pf-email', 'อีเมล', mask(me.email), { readonly: '' }), el('p', { class: 'pf-note', text: 'การเปลี่ยนอีเมลต้องยืนยันผ่านอีเมลเดิม (ทำผ่านระบบสมาชิกจริง)' })]));
+      box.appendChild(section('เบอร์โทร', 'ใช้ติดต่อกรณีมีปัญหากับบัญชี ไม่บังคับ', [pf('pf-phone', 'เบอร์โทร', me.phone, { type: 'tel', maxlength: '20', inputmode: 'tel', autocomplete: 'tel' })],
+        function (f) { var v = f.querySelector('#pf-phone').value.trim(); if (v && !/^[0-9+\-\s]{6,20}$/.test(v)) return 'เบอร์โทรไม่ถูกต้อง'; return save({ phone: v }); }));
+      return box;
     },
     security: function () {
-      var box = el('div');
-      box.appendChild(formWith('เปลี่ยนรหัสผ่าน', [field('current', 'รหัสผ่านปัจจุบัน', 'password', '', { autocomplete: 'current-password', maxlength: 200 }), field('next', 'รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)', 'password', '', { autocomplete: 'new-password', maxlength: 200 }), field('next2', 'ยืนยันรหัสผ่านใหม่', 'password', '', { autocomplete: 'new-password', maxlength: 200 })], 'เปลี่ยนรหัสผ่าน', function (f) {
-        if (val(f, 'next').length < 8) return 'รหัสผ่านใหม่ต้องยาวอย่างน้อย 8 ตัวอักษร';
-        if (val(f, 'next') !== val(f, 'next2')) return 'รหัสผ่านใหม่ไม่ตรงกัน';
-        return call('password', { current: val(f, 'current'), next: val(f, 'next') }).then(function (d) { f.reset(); return d; });
-      }, 'เปลี่ยนรหัสผ่านแล้ว'));
-      box.appendChild(el('div', { class: 'acct-card wide' }, el('h2', { text: 'ยืนยันตัวตน 2 ขั้นตอน' }), el('p', { class: 'aintro', text: 'ส่วนนี้รอเชื่อมต่อ API (ตัวอย่างหน้าจอเท่านั้น)' }), el('button', { class: 'btn ghost', type: 'button', disabled: '', text: 'เปิดใช้งาน (เร็วๆ นี้)' })));
-      if (cfg.deleteUrl) box.appendChild(el('p', { class: 'aintro' }, 'ต้องการลบบัญชีและข้อมูล? ', el('a', { href: cfg.deleteUrl, text: 'ดูขั้นตอนการลบบัญชี' })));
+      var box = el('div', { class: 'pf' });
+      box.appendChild(section('เข้าสู่ระบบด้วย ' + (cfg.idLabel || 'RAYCITY-M ID'), 'รหัสผ่านบัญชี', [
+        el('div', { class: 'pf-h' }, el('b', { text: 'เปลี่ยนรหัสผ่าน' }), el('span', { text: 'กำหนดรหัสผ่านใหม่' })),
+        pf('sc-cur', 'รหัสผ่านปัจจุบัน', '', { type: 'password', autocomplete: 'current-password', maxlength: '200' }),
+        pf('sc-new', 'รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)', '', { type: 'password', autocomplete: 'new-password', maxlength: '200' }),
+        pf('sc-new2', 'ยืนยันรหัสผ่าน', '', { type: 'password', autocomplete: 'new-password', maxlength: '200' })],
+      function (f) {
+        var v = function (id) { return f.querySelector('#' + id).value; };
+        if (!v('sc-cur')) return 'ใส่รหัสผ่านปัจจุบัน';
+        if (v('sc-new').length < 8) return 'รหัสผ่านใหม่ต้องยาวอย่างน้อย 8 ตัวอักษร';
+        if (v('sc-new') !== v('sc-new2')) return 'รหัสผ่านใหม่ไม่ตรงกัน';
+        return call('password', { current: v('sc-cur'), next: v('sc-new') }).then(function (d) { f.reset(); return d; });
+      }, 'ดำเนินการต่อ'));
+      // two-step sign-in: switched on and off here in the mockup; the real thing is done by the game's API
+      var on = !!me.twofa, tf = el('button', { class: 'btn sm', type: 'button' });
+      var note = el('p', { class: 'pf-note', text: MOCK ? '' : 'รอเชื่อมต่อ API' });
+      var paint = function () { tf.textContent = on ? 'ปิดใช้งาน' : 'เปิดใช้งาน'; tf.classList.toggle('ghost', on); stateEl.textContent = on ? 'เปิดอยู่' : 'ปิดอยู่'; stateEl.className = 'pf-st' + (on ? ' on' : ''); };
+      var stateEl = el('em');
+      if (!MOCK) tf.disabled = true;
+      tf.addEventListener('click', function () {
+        tf.disabled = true;
+        call('profile', { name: me.name, email: me.email, phone: me.phone || '', gender: me.gender || '', twofa: !on }).then(function (d) { me = userOf(d) || me; on = !!me.twofa; paint(); }, function (e) { note.textContent = e.message; }).then(function () { tf.disabled = !MOCK; });
+      });
+      paint();
+      box.appendChild(section('2FA', 'การยืนยันตัวตนแบบสองขั้นตอน', [
+        el('div', { class: 'pf-2fa' }, el('span', { class: 'ic', 'aria-hidden': 'true' }, icon(I.shield)), el('div', {}, el('b', { text: 'การยืนยันแบบสองขั้นตอนด้วยแอป Authenticator' }), stateEl), tf), note]));
+      if (cfg.deleteUrl) box.appendChild(section('ลบบัญชี', 'ลบบัญชีและข้อมูลส่วนบุคคลของคุณ', [el('p', { class: 'pf-note' }, 'อ่านขั้นตอนและผลที่ตามมาก่อนดำเนินการ ', el('a', { href: cfg.deleteUrl, text: 'ดูขั้นตอนการลบบัญชี' }))]));
       return box;
     },
     topup: function () {
