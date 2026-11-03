@@ -64,3 +64,14 @@ test('a wrapper that only redraws a box joins the columns like the box (admin ac
   assert.ok(src.includes("const host = h('div', { class: 'a-host' })") && src.includes("e.classList.contains('a-host')"), 'the 2-step box is grouped with the password box');
   assert.ok(/\.a-host\{display:contents\}/.test(css));
 });
+
+test('settings pages: an index of numbered sections, each with a title and one sentence; a "go to section" menu on narrow screens', () => {
+  const css = fs.readFileSync(path.resolve(__dirname, '../admin/admin.css'), 'utf8');
+  const tabs = /const SET_TABS = \[([^\]]+)\]/.exec(src)[1];
+  for (const id of ['general', 'lr-api', 'p-privacy', 'p-terms', 'p-support', 'p-delete', 'p-odds', 'cookies', 'prereg', 'en', 'home', 'links']) assert.ok(tabs.includes("'" + id + "'"), id + ' uses the settings layout');
+  assert.ok(src.includes("h('nav', { class: 'a-toc'") && src.includes("class: 'a-toc-sel'") && src.includes('IntersectionObserver'), 'index, narrow-screen menu, and the index follows the scroll');
+  assert.ok(/\.a-set\{display:grid;grid-template-columns:232px minmax\(0,1fr\)/.test(css), 'index beside the sections on wide screens');
+  assert.ok(/\.a-secs \.a-sec>h3::before[^{]*\{content:counter\(sec\)/.test(css), 'sections are numbered');
+  assert.ok(/@media\(max-width:1100px\)\{[\s\S]*?\.a-toc\{display:none\}[\s\S]*?\.a-toc-sel\{display:block;position:sticky/.test(css), 'narrow screens: a sticky "go to section" menu instead of a side rail');
+  assert.ok(/\.a-note\{border-left:3px solid rgba\(143,176,255/.test(css), 'notes are calm, not red alarms');
+});

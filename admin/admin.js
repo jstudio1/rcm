@@ -219,11 +219,122 @@
     };
     upd();
     return h('details', { class: 'a-seo', open: !!o.open },
-      h('summary', {}, o.label || 'ตั้งค่า SEO'),
+      h('summary', {}, o.label || 'SEO (การแสดงผลบน Google)'),
       h('div', { class: 'a-in' },
         field(obj, tk, 'Title (แท็บเบราว์เซอร์ / หัวข้อบน Google)', { max: 60, min: 30, onchange: upd, ph: o.fbT, help: o.fbT ? 'เว้นว่าง = ใช้ค่าอัตโนมัติ (ตัวอย่างสีเทาในช่อง)' : 'แนะนำ 30–60 ตัวอักษร' }),
         field(obj, dk, 'Meta description (คำอธิบายใต้หัวข้อบน Google)', { type: 'textarea', max: 160, min: 70, onchange: upd, ph: o.fbD, help: 'แนะนำ 70–160 ตัวอักษร' }),
         h('div', { class: 'a-g' }, h('small', {}, 'ตัวอย่างบน Google'), g.u, g.t, g.d)));
+  }
+
+  // ---------- settings pages: an index of the sections on the left, one section after another on the right ----------
+  // Each section is a numbered card with a title and one sentence saying what it changes on the site,
+  // so a page reads as "1 พื้นหลัง · 2 หัวข้อใหญ่ · 3 ปุ่มลงทะเบียน …" and is easy to find again next time.
+  const SET_TABS = ['home', 'links', 'prereg', 'en', 'p-privacy', 'p-terms', 'p-support', 'p-delete', 'p-odds', 'cookies', 'general', 'lr-login', 'lr-register', 'lr-api', 'lr-member', 'account'];
+  const SECTION_DESC = {
+    'พื้นหลังหน้าแรก (Hero)': 'วิดีโอและรูปด้านหลังหัวข้อใหญ่ ส่วนแรกที่ผู้เข้าชมเห็น',
+    'หัวข้อใหญ่': 'ข้อความตัวใหญ่ H1–H3 และคำอธิบายใต้หัวข้อบนหน้าแรก',
+    'ปุ่มลงทะเบียน': 'ปุ่มสีแดงบนหน้าแรก: ข้อความ ลิงก์ และข้อความเมื่อยังไม่เปิด',
+    'ป้ายข้อความอื่นๆ': 'ข้อความเล็กรอบปุ่มดาวน์โหลด โซเชียล และหัวข้อส่วนข่าวบนหน้าแรก',
+    'SEO (การแสดงผลบน Google)': 'ชื่อและคำอธิบายที่ Google แสดงสำหรับหน้านี้',
+    'ฉบับภาษาอังกฤษ': 'หน้าเดียวกันภาษาอังกฤษที่ /en/… เว้นว่าง = ไม่มีหน้าอังกฤษ',
+    'ลิงก์ดาวน์โหลด': 'ปุ่ม App Store / Google Play บนหน้าแรก ใส่ลิงก์แล้วป้าย SOON จะหายไป',
+    'ลิงก์โซเชียล': 'ไอคอน Facebook TikTok Discord YouTube ใต้ปุ่มดาวน์โหลด',
+    'เปิด/ปิดส่วนนี้': 'เลือกว่าจะแสดงส่วนลงทะเบียนล่วงหน้าที่หน้าไหนบ้าง',
+    'จำนวนผู้ลงทะเบียน': 'ตัวเลขบนตัวนับ ใส่เองหรือดึงจากระบบเกมผ่าน API',
+    'ข้อความบนหน้า': 'หัวข้อ คำอธิบาย และป้ายสถานะรอบตัวนับและการ์ดรางวัล',
+    'หัวข้อหน้า': 'ชื่อในเมนู หัวข้อ H1/H2 และย่อหน้าแนะนำของหน้านี้',
+    'การแชร์ & การค้นหา': 'รูปเมื่อแชร์ลิงก์ และการซ่อนหน้านี้จาก Google',
+    'ทั้งเว็บ': 'ชื่อแท็บ คำอธิบายบน Google และข้อความท้ายเว็บของหน้าภาษาอังกฤษ',
+    'หน้าแรก': 'ข้อความภาษาอังกฤษของหน้า /en (เว้นว่าง = แสดงภาษาไทย)',
+    'หน้า News': 'ข้อความภาษาอังกฤษของหน้า /en/news',
+    'หน้า Gameplay': 'ข้อความภาษาอังกฤษของหน้า /en/gameplay',
+    'หน้า Drivers': 'ข้อความภาษาอังกฤษของหน้า /en/drivers',
+    'หน้า Rewards': 'ข้อความภาษาอังกฤษของหน้า /en/rewards',
+    'ตัวนับลงทะเบียนล่วงหน้า': 'ข้อความภาษาอังกฤษรอบตัวนับและการ์ดรางวัล',
+    'ข้อมูลเว็บไซต์': 'ชื่อเว็บ โดเมนหลัก และข้อความท้ายเว็บ',
+    'โลโก้ ไอคอน และรูปแชร์': 'รูปบนเมนู แท็บเบราว์เซอร์ และเมื่อแชร์ลิงก์',
+    'SEO เริ่มต้น (หน้าแรก)': 'ชื่อและคำอธิบายที่ Google แสดง เมื่อหน้าไหนไม่ได้ตั้งเอง',
+    'เครื่องมือ SEO & สถิติ': 'รหัสยืนยัน Google / Bing และ Google Analytics',
+    'หน้า Loading (ก่อนเข้าเว็บ)': 'หน้าจอโหลดก่อนเข้าเว็บ: เปิด/ปิด รูปแบบ และหน้าที่แสดง',
+    'การเชื่อมต่อ': 'เลือกโหมด Mockup หรือ API จริง และที่อยู่ของ API',
+    'เส้นทาง API การเติมเงิน': 'เส้นทางที่หน้าเติมเงินเรียก เมื่อต่อ API จริง',
+    'เส้นทาง API บัญชีผู้เล่น': 'เส้นทางของระบบบัญชีผู้เล่น ต่อท้ายที่อยู่ API',
+    'เนื้อหานโยบาย (ภาษาไทย)': 'ข้อความนโยบายฉบับภาษาไทย ที่หน้า /privacy',
+    'เนื้อหาข้อตกลง (ภาษาไทย)': 'ข้อความข้อตกลงฉบับภาษาไทย ที่หน้า /terms',
+    'เนื้อหา (ภาษาไทย)': 'ข้อความหน้านี้ภาษาไทย ถ้าเว้นหัวข้อและเนื้อหาว่าง = ยังไม่มีหน้านี้',
+    'เนื้อหาหน้าซัพพอร์ต': 'ข้อความในหน้า /support',
+    'ค่าที่ใช้ในนโยบาย / ข้อตกลง': 'ค่าที่แทรกในข้อความอัตโนมัติ เช่น อายุขั้นต่ำ จำนวนวันลบข้อมูล',
+    'ช่องทางติดต่อ': 'อีเมล โทรศัพท์ และ LINE ที่แสดงท้ายเว็บและหน้าซัพพอร์ต',
+    'คำถามที่พบบ่อยเรื่องซัพพอร์ต': 'คำถาม-คำตอบท้ายหน้าซัพพอร์ต',
+    'แบนเนอร์คุกกี้ภาษาอังกฤษ': 'ข้อความแบนเนอร์และหน้าต่างตั้งค่าคุกกี้ ที่ผู้เข้าชมหน้า /en เห็น',
+    'การทำงาน': 'เปิด/ปิดแบนเนอร์ขอความยินยอม และการนับสถิติ',
+    'ข้อความในแบนเนอร์': 'ข้อความและปุ่มบนแถบขอความยินยอมด้านล่างจอ',
+    'หน้าต่างตั้งค่าคุกกี้': 'ข้อความในหน้าต่างเลือกประเภทคุกกี้',
+    'คุกกี้ที่ระบบใช้': 'รายการคุกกี้จริงของเว็บ อัปเดตเองตามการตั้งค่า',
+    'เปิด/ปิดระบบสมาชิก': 'เปิดหน้าสมาชิกและปุ่มเข้าสู่ระบบบนเมนู',
+    'หน้าเข้าสู่ระบบ': 'หัวข้อ ข้อความ และลิงก์ลืมรหัสผ่านในหน้า /login',
+    'หน้าสมัครสมาชิก': 'เปิด/ปิดการสมัคร และข้อความในหน้า /register',
+    'ลงทะเบียนล่วงหน้า': 'สิ่งที่ผู้เข้าชมเห็นช่วงก่อนเปิดเกม',
+    'การ์ดสมาชิกและชื่อสกุลเงิน': 'ข้อความบนการ์ดสมาชิก และชื่อเงิน/แต้มในหน้าบัญชี',
+    'ระบบเติมเงิน': 'เปิด/ปิดหน้าเติมเงิน และชื่อเมนู',
+    'เปลี่ยนรหัสผ่าน': 'รหัสผ่านสำหรับเข้าหลังบ้านนี้'
+  };
+  const descOf = t => SECTION_DESC[t] || (t.startsWith('English version') ? 'ฉบับภาษาอังกฤษของหน้านี้ เว้นว่าง = ไม่มีหน้าอังกฤษ' : '');
+  let spy = null;
+  function settingsLayout(items) {
+    const isSec = e => e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo') || e.classList.contains('a-host'));
+    const intro = [], secs = [];
+    let group = '', groupUsed = false, free = null;
+    for (const e of items) {
+      if (!e) continue;
+      // a sub-heading ("ตั้งค่าหน้า: Rewards") starts a group in the index
+      if (e.classList && e.classList.contains('a-sub')) { group = e.textContent.replace(/\s+·\s+.*$/, '').replace(/^ตั้งค่าหน้า: หน้า /, 'ตั้งค่าหน้า ').replace(/^ตั้งค่าหน้า: /, 'ตั้งค่าหน้า '); groupUsed = false; free = null; continue; }
+      if (isSec(e)) { secs.push({ el: e, group: groupUsed ? '' : group }); groupUsed = true; free = null; continue; }
+      if (free) { free.append(e); continue; }
+      // a list or note right under a sub-heading becomes its own section, named after the heading
+      if (group && !groupUsed) { free = h('div', { class: 'a-box a-free' }, h('h3', {}, group)); free.append(e); secs.push({ el: free, group: '' }); groupUsed = true; continue; }
+      if (secs.length) secs[secs.length - 1].el.append(e); else intro.push(e);
+    }
+    const titleOf = el => {
+      if (el.classList.contains('a-seo')) return (el.querySelector(':scope > summary') || {}).textContent || 'SEO';
+      const t = el.querySelector(':scope > h3') || el.querySelector(':scope > .a-box > h3');
+      return t ? t.textContent : '';
+    };
+    const nav = h('nav', { class: 'a-toc', 'aria-label': 'ส่วนในหน้านี้' }, h('div', { class: 'a-toc-t' }, 'ส่วนในหน้านี้'));
+    const sel = h('select', { class: 'a-toc-sel', 'aria-label': 'ไปที่ส่วน' });
+    const body = h('div', { class: 'a-secs' }, ...intro);
+    const links = [];
+    const go = el => { el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); };
+    let og = null;
+    secs.forEach(({ el, group: g }, i) => {
+      const id = 'sec-' + (i + 1), title = titleOf(el);
+      el.id = id; el.classList.add('a-sec');
+      if (el.classList.contains('a-seo')) { el.open = true; const sm = el.querySelector(':scope > summary'); if (sm) sm.addEventListener('click', ev => ev.preventDefault()); }
+      const d = descOf(title), h3 = el.querySelector(':scope > h3');
+      if (d && h3 && !el.querySelector(':scope > .a-desc')) h3.after(h('p', { class: 'a-desc' }, d));
+      if (d && el.classList.contains('a-seo')) { const sm = el.querySelector(':scope > summary'); if (sm && !el.querySelector(':scope > .a-desc')) sm.after(h('p', { class: 'a-desc' }, d)); }
+      if (g) { nav.append(h('div', { class: 'a-toc-g' }, g)); body.append(h('h2', { class: 'a-gh' }, g)); og = h('optgroup', { label: g }); sel.append(og); }
+      const short = title.split(/\s+·\s+/)[0];
+      const a = h('a', { href: '#' + id, onclick: ev => { ev.preventDefault(); go(el); } }, h('span', { class: 'n' }, String(i + 1)), h('span', {}, short));
+      links.push([el, a]); nav.append(a);
+      (og || sel).append(h('option', { value: id }, (i + 1) + '. ' + short));
+      body.append(el);
+    });
+    sel.addEventListener('change', () => { const el = document.getElementById(sel.value); if (el) go(el); });
+    // the index follows the reader: the section at the top of the screen is lit
+    requestAnimationFrame(() => {
+      if (spy) spy.disconnect();
+      if (!('IntersectionObserver' in window) || !links.length) return;
+      spy = new IntersectionObserver(es => {
+        const hit = es.filter(x => x.isIntersecting).sort((p, q) => p.boundingClientRect.top - q.boundingClientRect.top)[0];
+        if (!hit) return;
+        links.forEach(([el, a]) => a.classList.toggle('on', el === hit.target));
+        sel.value = hit.target.id;
+      }, { rootMargin: '-15% 0px -70% 0px' });
+      links.forEach(([el]) => spy.observe(el));
+      links[0][1].classList.add('on');
+    });
+    return secs.length > 1 ? h('div', { class: 'a-set' }, nav, h('div', { class: 'a-setc' }, sel, body)) : h('div', { class: 'a-set solo' }, h('div', { class: 'a-setc' }, body));
   }
 
   // ---------- card list + side editor (news, gameplay, drivers, rewards) ----------
@@ -917,10 +1028,10 @@
         const group = (title, obj, rows) => box(title, ...rows.map(([k, label, big]) => enField(obj, k, label, big ? { type: 'textarea' } : {})));
         return [
           note('ปุ่มสลับภาษา TH | EN อยู่บนเมนูของทุกหน้า หน้าภาษาอังกฤษอยู่ที่ /en ข้อความที่ยังไม่ได้แปลจะแสดงเป็นภาษาไทยจนกว่าจะกรอก'),
-          group('ทั้งเว็บ (ชื่อแท็บและคำอธิบายเริ่มต้นบน Google)', C.site, [['defaultTitle', 'Title หลัก'], ['description', 'Description หลัก', true], ['footer', 'ข้อความท้ายเว็บ']]),
+          group('ทั้งเว็บ', C.site, [['defaultTitle', 'Title หลัก'], ['description', 'Description หลัก', true], ['footer', 'ข้อความท้ายเว็บ']]),
           group('หน้าแรก', C.home, [['badge', 'ป้ายเล็กด้านบน'], ['h1', 'H1'], ['h2', 'H2'], ['h3', 'H3'], ['lead', 'ข้อความอธิบาย', true], ['registerText', 'ข้อความบนปุ่มลงทะเบียน'], ['registerMsg', 'ข้อความเมื่อกดปุ่มที่ยังไม่เปิด', true], ['storesLabel', 'หัวข้อปุ่มดาวน์โหลด'], ['followLabel', 'หัวข้อโซเชียล'], ['soonLabel', 'ข้อความเหนือปุ่มสโตร์ (ยังไม่เปิด)'], ['downloadLabel', 'ข้อความเหนือปุ่มสโตร์ (เปิดแล้ว)'], ['gameplayMore', 'ปุ่มดูทั้งหมด (Gameplay)'], ['latestNewsTitle', 'หัวข้อข่าวล่าสุด'], ['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]),
           ...['news', 'gameplay', 'drivers', 'rewards'].map(k => group('หน้า ' + PN[k], C.pages[k], [['navLabel', 'ชื่อในเมนู'], ['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['h1', 'H1'], ['h2', 'H2'], ['intro', 'ย่อหน้าแนะนำ', true]].concat(k === 'news' ? [['empty', 'ข้อความเมื่อยังไม่มีข่าว']] : [], [['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]))),
-          group('ลงทะเบียนล่วงหน้า (ตัวนับและรางวัล)', C.prereg, [['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['title', 'หัวข้อ'], ['titleAccent', 'หัวข้อ (ส่วนสีแดง)'], ['intro', 'ข้อความแนะนำ', true], ['statusLabel', 'ป้ายสถานะ'], ['counterLabel', 'ป้ายตัวนับ'], ['unit', 'หน่วย'], ['nextText', 'ข้อความเป้าหมายถัดไป ({n} = จำนวนที่เหลือ)'], ['allDoneText', 'ข้อความเมื่อถึงทุกเป้า'], ['goalsLabel', 'หัวข้อรายการรางวัล'], ['reachedCount', 'ข้อความ "ถึงเป้าหมายแล้ว" (ตัวนับ)'], ['reachedLabel', 'ป้ายถึงเป้าหมายแล้ว'], ['nextLabel', 'ป้ายเป้าหมายถัดไป'], ['lockedLabel', 'ป้ายยังไม่ถึงเป้า'], ['viewLabel', 'ปุ่มดูรางวัล'], ['detailReached', 'สถานะรางวัล (ถึงเป้า)'], ['detailLocked', 'สถานะรางวัล (ยังไม่ถึง)']])];
+          group('ตัวนับลงทะเบียนล่วงหน้า', C.prereg, [['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['title', 'หัวข้อ'], ['titleAccent', 'หัวข้อ (ส่วนสีแดง)'], ['intro', 'ข้อความแนะนำ', true], ['statusLabel', 'ป้ายสถานะ'], ['counterLabel', 'ป้ายตัวนับ'], ['unit', 'หน่วย'], ['nextText', 'ข้อความเป้าหมายถัดไป ({n} = จำนวนที่เหลือ)'], ['allDoneText', 'ข้อความเมื่อถึงทุกเป้า'], ['goalsLabel', 'หัวข้อรายการรางวัล'], ['reachedCount', 'ข้อความ "ถึงเป้าหมายแล้ว" (ตัวนับ)'], ['reachedLabel', 'ป้ายถึงเป้าหมายแล้ว'], ['nextLabel', 'ป้ายเป้าหมายถัดไป'], ['lockedLabel', 'ป้ายยังไม่ถึงเป้า'], ['viewLabel', 'ปุ่มดูรางวัล'], ['detailReached', 'สถานะรางวัล (ถึงเป้า)'], ['detailLocked', 'สถานะรางวัล (ยังไม่ถึง)']])];
       } },
     { id: 'home', g: 'หน้าเว็บ', label: 'หน้าแรก', desc: 'หัวข้อ H1 H2 H3 ข้อความอธิบาย ปุ่มลงทะเบียน และ SEO ของหน้าแรก', paths: ['home'], url: '/',
       view: () => [
@@ -937,7 +1048,7 @@
       view: () => [
         box('หัวข้อหน้า', two(field(C.pages[k], 'navLabel', 'ชื่อในเมนู'), field(C.pages[k], 'eyebrow', 'ข้อความเล็กเหนือหัวข้อ')), field(C.pages[k], 'h1', 'H1'), field(C.pages[k], 'h2', 'H2 (หัวข้อรอง)'), field(C.pages[k], 'intro', 'ย่อหน้าแนะนำ', { type: 'textarea' }),
           k === 'news' ? field(C.pages[k], 'empty', 'ข้อความเมื่อยังไม่มีข่าว') : null),
-        k === 'faq' ? box('English version  ·  /en/faq', h('a', { href: '/en/faq', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'),
+        k === 'faq' ? box('ฉบับภาษาอังกฤษ', h('a', { href: '/en/faq', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'),
           note('หน้า /en/faq จะแสดงเมื่อใส่ H1 ภาษาอังกฤษด้านล่าง และมีรายการ FAQ ที่กรอกภาษาอังกฤษครบอย่างน้อย 1 รายการ (เมนู FAQ)'),
           two(field(C.pages[k], 'navLabelEn', 'Footer link label'), field(C.pages[k], 'h1En', 'H1')), field(C.pages[k], 'introEn', 'Intro', { type: 'textarea' }),
           field(C.pages[k], 'seoTitleEn', 'SEO title', { max: 60, min: 20 }), field(C.pages[k], 'seoDescriptionEn', 'SEO description', { type: 'textarea', max: 160, min: 60 })) : null,
@@ -955,7 +1066,7 @@
         legalHead('privacy'),
         box('เนื้อหานโยบาย (ภาษาไทย)', legalBody(C.pages.privacy, 'body')),
         legalSettings(),
-        box('English version  ·  /en/privacy', h('a', { href: '/en/privacy', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'), ...legalEn('privacy')),
+        box('ฉบับภาษาอังกฤษ', h('a', { href: '/en/privacy', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'), ...legalEn('privacy')),
         seoBox(C.pages.privacy, 'seoTitle', 'seoDescription', { url: '/privacy', fbT: () => C.pages.privacy.h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
         pageShare('privacy')].filter(Boolean) },
     { id: 'p-terms', g: 'หน้าเว็บ', label: 'ข้อตกลงการใช้บริการ', desc: 'หน้า /terms และ /en/terms กติกาเกม เงินและไอเทมในเกม ข้อห้าม กฎแชท การคืนเงิน และข้อกำหนดเพิ่มเติมสำหรับ App Store / Google Play', paths: ['pages.terms', 'legal'], url: '/terms',
@@ -965,7 +1076,7 @@
         legalHead('terms'),
         box('เนื้อหาข้อตกลง (ภาษาไทย)', legalBody(C.pages.terms, 'body')),
         legalSettings(),
-        box('English version  ·  /en/terms', h('a', { href: '/en/terms', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'), ...legalEn('terms')),
+        box('ฉบับภาษาอังกฤษ', h('a', { href: '/en/terms', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'), ...legalEn('terms')),
         seoBox(C.pages.terms, 'seoTitle', 'seoDescription', { url: '/terms', fbT: () => C.pages.terms.h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
         pageShare('terms')].filter(Boolean) },
     ...[['delete', 'ลบบัญชี', '/delete-account', 'หน้าอธิบายวิธีขอลบบัญชีและข้อมูล (Google Play บังคับให้มี URL นี้สำหรับแอปที่สร้างบัญชีได้)'],
@@ -974,7 +1085,7 @@
       view: () => [
         legalHead(k),
         box('เนื้อหา (ภาษาไทย)', legalBody(C.pages[k], 'body')),
-        box('English version  ·  /en' + url, ...legalEn(k)),
+        box('ฉบับภาษาอังกฤษ', ...legalEn(k)),
         seoBox(C.pages[k], 'seoTitle', 'seoDescription', { url, fbT: () => C.pages[k].h1 + ' | ' + C.site.name, fbD: () => C.site.description }),
         pageShare(k)].filter(Boolean) })),
     { id: 'p-support', g: 'หน้าเว็บ', label: 'ซัพพอร์ต / ติดต่อเรา', desc: 'หน้า /support: ช่องทางติดต่อ ช่องทางรายงานผู้เล่น กฎชุมชน และคำถามที่พบบ่อย ข้อมูลติดต่อแสดงท้ายเว็บและถูกใช้ในนโยบาย/ข้อตกลงด้วย', paths: ['pages.support', 'contact', 'supportFaq', 'legal'], url: '/support',
@@ -989,10 +1100,10 @@
           field(C.contact, 'address', 'ที่อยู่ (ไม่บังคับ แต่ Google ต้องการที่อยู่ผู้พัฒนาในบางกรณี)', { type: 'textarea' }),
           h('small', { class: 'h' }, 'Facebook ใช้ลิงก์จาก หน้าแรก → ปุ่มดาวน์โหลด & โซเชียล โดยอัตโนมัติ')),
         legalHead('support'),
-        box('เนื้อหาหน้าซัพพอร์ต (ติดต่อ / รายงานผู้เล่น / กฎชุมชน)', legalBody(C.pages.support, 'body')),
+        box('เนื้อหาหน้าซัพพอร์ต', legalBody(C.pages.support, 'body')),
         box('คำถามที่พบบ่อยเรื่องซัพพอร์ต', note('ค่าเริ่มต้นครอบคลุม: ลืมรหัสผ่าน, ติดตั้ง/อัปเดต, เน็ตมือถือ, รายงานบั๊ก, รายงานผู้เล่น และลบบัญชี แก้คำตอบให้ตรงกับวิธีที่ระบบของท่านใช้จริง (ใช้ตัวแปร {{email}} {{reportEmail}} {{deleteDays}} ได้)'),
           ...listEditor(C.supportFaq, { title: f => f.q, blank: () => ({ q: '', a: '', qEn: '', aEn: '' }), form: (f, u) => [field(f, 'q', 'คำถาม', { onchange: u }), field(f, 'a', 'คำตอบ', { type: 'textarea', help: 'ขึ้นบรรทัดว่างเพื่อแยกย่อหน้า ใส่ลิงก์ได้แบบ [ข้อความ](/terms) หรือใช้ตัวแปร {{deleteUrl}} {{oddsUrl}} {{termsUrl}} {{privacyUrl}}' }), field(f, 'qEn', 'Question (English)'), field(f, 'aEn', 'Answer (English)', { type: 'textarea' })] })),
-        box('English version  ·  /en/support', h('a', { href: '/en/support', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'),
+        box('ฉบับภาษาอังกฤษ', h('a', { href: '/en/support', target: '_blank', rel: 'noopener', class: 'ghost sm', style: 'justify-self:start' }, 'ดูหน้า English ↗'),
           note('หน้า /en/support จะแสดงเมื่อมีเนื้อหาในช่อง Body ด้านล่าง คำถามที่พบบ่อยจะแสดงเฉพาะรายการที่กรอกภาษาอังกฤษแล้ว'),
           two(field(C.pages.support, 'navLabelEn', 'Footer link label'), field(C.pages.support, 'h1En', 'H1')),
           field(C.pages.support, 'introEn', 'Intro', { type: 'textarea' }), bodyEditor(C.pages.support, 'bodyEn'),
@@ -1013,13 +1124,13 @@
           field(C.cookies, 'title', 'หัวข้อ'), field(C.cookies, 'text', 'ข้อความ', { type: 'textarea' }),
           two(field(C.cookies, 'acceptAll', 'ปุ่ม: ยอมรับทั้งหมด'), field(C.cookies, 'rejectAll', 'ปุ่ม: ปฏิเสธที่ไม่จำเป็น')),
           two(field(C.cookies, 'customize', 'ปุ่ม: ตั้งค่า'), field(C.cookies, 'policyLabel', 'ลิงก์ไปนโยบายความเป็นส่วนตัว'))),
-        box('หน้าตั้งค่า (เมื่อกด "ตั้งค่า")',
+        box('หน้าต่างตั้งค่าคุกกี้',
           two(field(C.cookies, 'settingsTitle', 'หัวข้อ'), field(C.cookies, 'save', 'ปุ่ม: บันทึกการตั้งค่า')),
           two(field(C.cookies, 'necessaryTitle', 'ชื่อกลุ่ม: จำเป็น'), field(C.cookies, 'analyticsTitle', 'ชื่อกลุ่ม: สถิติ')),
           field(C.cookies, 'necessaryDesc', 'คำอธิบายกลุ่มที่จำเป็น', { type: 'textarea' }),
           field(C.cookies, 'analyticsDesc', 'คำอธิบายกลุ่มสถิติ', { type: 'textarea' }),
           field(C.cookies, 'settingsLink', 'ข้อความลิงก์ท้ายเว็บสำหรับเปิดตั้งค่าอีกครั้ง', { help: 'ผู้ใช้ถอนความยินยอมได้ทุกเมื่อจากลิงก์นี้' })),
-        box('English texts (หน้า /en/privacy และ /en/terms)',
+        box('แบนเนอร์คุกกี้ภาษาอังกฤษ',
           field(C.cookies, 'titleEn', 'Title'), field(C.cookies, 'textEn', 'Text', { type: 'textarea' }),
           two(field(C.cookies, 'acceptAllEn', 'Button: Accept all'), field(C.cookies, 'rejectAllEn', 'Button: Decline non-essential')),
           two(field(C.cookies, 'customizeEn', 'Button: Settings'), field(C.cookies, 'policyLabelEn', 'Privacy policy link')),
@@ -1027,7 +1138,7 @@
           two(field(C.cookies, 'necessaryTitleEn', 'Necessary: title'), field(C.cookies, 'analyticsTitleEn', 'Analytics: title')),
           field(C.cookies, 'necessaryDescEn', 'Necessary: description', { type: 'textarea' }), field(C.cookies, 'analyticsDescEn', 'Analytics: description', { type: 'textarea' }),
           field(C.cookies, 'settingsLinkEn', 'Footer link text')),
-        box('คุกกี้ที่ระบบใช้ (ตารางนี้แสดงอัตโนมัติในนโยบายความเป็นส่วนตัว)',
+        box('คุกกี้ที่ระบบใช้',
           h('div', { class: 'a-empty', style: 'text-align:left;line-height:1.9' },
             'rc_consent — จำเป็น: จำการเลือกในแบนเนอร์ (6 เดือน)', h('br'),
             'vid — สถิติ: รหัสสุ่มไม่ระบุตัวตน ตั้งเมื่อกด "ยอมรับ" เท่านั้น (1 ปี)', h('br'),
@@ -1154,7 +1265,7 @@
           box('เส้นทาง API การเติมเงิน',
             two(field(P, 'epTopup', 'GET ช่องทางเติมเงิน', { help: 'คืน {methods:[{id,name,title,logo,mode,packages:[{price,cash,point}]}]}' }), field(P, 'epTopupRedeem', 'POST เติมด้วยรหัสบัตร', { help: 'ส่ง {method, code} → {message, user}  (เซิร์ฟเวอร์เกมต้องตรวจรหัสเอง)' })),
             field(P, 'epTopupCheckout', 'POST เริ่มชำระเงิน (PromptPay / Alipay / Wallet)', { help: 'ส่ง {method, methodName, price} → {url} (https เท่านั้น หน้าเว็บจะพาไปที่ url นั้น)' })),
-          box('เส้นทาง API (ต่อท้ายที่อยู่ด้านบน)',
+          box('เส้นทาง API บัญชีผู้เล่น',
             two(field(P, 'epLogin', 'POST เข้าสู่ระบบ', { help: 'ส่ง {username, password} → {user}' }), field(P, 'epRegister', 'POST สมัคร', { help: 'ส่ง {username, email, password}' })),
             two(field(P, 'epLogout', 'POST ออกจากระบบ'), field(P, 'epForgot', 'POST ลืมรหัสผ่าน', { help: 'ส่ง {email}' })),
             two(field(P, 'epMe', 'GET โปรไฟล์ / PUT แก้ไขโปรไฟล์', { help: 'คืน {uid, name, username, email, phone, level, club, joined, cash, rain, point, pointExpire}' }), field(P, 'epPassword', 'POST เปลี่ยนรหัสผ่าน', { help: 'ส่ง {current, next}' })),
@@ -1332,11 +1443,13 @@
     })) : null;
     // on wide screens neighbouring settings boxes sit side by side instead of leaving the right half of the page empty
     if (tabs) requestAnimationFrame(() => { const on = tabs.querySelector('.on'); if (on) tabs.scrollLeft = Math.max(0, on.offsetLeft - (tabs.clientWidth - on.offsetWidth) / 2); });
-    const view = [].concat(s.view()).flat(Infinity).reduce((out, e) => {
+    const isSet = SET_TABS.includes(s.id);
+    if (spy) { spy.disconnect(); spy = null; }
+    const view = isSet ? [settingsLayout([].concat(s.view()).flat(Infinity))] : [].concat(s.view()).flat(Infinity).reduce((out, e) => {
       if (e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo') || e.classList.contains('a-host')) && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
       return out;
     }, []);
-    const main = h('main', { class: 'a-main' }, head, tabs, ...view);
+    const main = h('main', { class: 'a-main' + (isSet ? ' is-set' : '') }, head, tabs, ...view);
 
     barEls = { st: h('span', { class: 'st' }) };
     const bar = s.paths.length ? h('div', { class: 'a-bar' }, barEls.st,
