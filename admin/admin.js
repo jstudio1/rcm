@@ -88,7 +88,7 @@
 
   const thumb = it => it.kind === 'video'
     ? h('video', { src: it.url + '#t=0.5', muted: true, preload: 'metadata', playsinline: true })
-    : h('img', { src: it.url, alt: '', loading: 'lazy' });
+    : h('img', { src: it.url, alt: '', loading: 'lazy', onerror: e => { const n = h('div', { class: 'a-imgerr' }, 'โหลดรูปไม่ได้ ไฟล์อยู่บนเซิร์ฟเวอร์แต่เปิดไม่ได้ (ตรวจสิทธิ์ไฟล์ 644 หรือการตั้งค่า proxy)'); e.target.replaceWith(n); } });
 
   // Grid of every image/video on the site (built-in /img and admin uploads).
   // kind: 'image' | 'video' | 'all'. onPick(url) makes each tile selectable; without it the grid is a manager.

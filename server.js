@@ -22,6 +22,8 @@ const PUBLIC = path.join(__dirname, 'public');
 const ADMIN_DIR = path.join(__dirname, 'admin');
 const UPLOADS = path.join(PUBLIC, 'uploads');
 fs.mkdirSync(UPLOADS, { recursive: true });
+// files uploaded by older versions were saved as 600; make them readable by a front web server (no-op on Windows)
+try { const r = require('./lib/fixuploads')(UPLOADS); if (r.fixed) console.log('uploads: made ' + r.fixed + ' file(s) readable by the web server'); } catch (e) { console.error('fix-uploads:', e.message); }
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8', '.woff2': 'font/woff2' };
 // uploadable media: extension, size limit, and a check on the file's first bytes
@@ -388,7 +390,8 @@ async function adminApi(req, res, url) {
       const maxStorage = Number(process.env.UPLOAD_QUOTA_BYTES) || 1024 * 1024 * 1024;
       const used = fs.readdirSync(UPLOADS).reduce((n, f) => { const st = fs.lstatSync(path.join(UPLOADS, f)); return n + (st.isFile() ? st.size : 0); }, 0);
       if (used + buf.length > maxStorage) return true;
-      fs.writeFileSync(path.join(UPLOADS, name), buf, { flag: 'wx', mode: 0o600 });
+      // uploaded media is public by nature: 0644, so a front web server (Plesk/nginx serving static files itself) running as another user can read it
+      fs.writeFileSync(path.join(UPLOADS, name), buf, { flag: 'wx', mode: 0o644 });
       return false;
       });
       if (quotaError) return json(res, 413, { error: 'Upload storage quota exceeded' });

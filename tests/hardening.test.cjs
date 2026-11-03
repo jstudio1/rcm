@@ -175,6 +175,23 @@ test('hardening round 2', async t => {
     assert.ok(Date.now() - t0 < 3000, 'answered quickly');
   });
 
+  await t.test('uploaded media is world-readable (a front web server running as another user must be able to serve it)', async () => {
+    const a = await login('', '198.51.100.120'), cs = (await api(a.cookie, '', 'me', 'GET', null, '198.51.100.120')).json.csrf;
+    const png = Buffer.alloc(24); Buffer.from('89504e470d0a1a0a', 'hex').copy(png); png.writeUInt32BE(1, 16); png.writeUInt32BE(1, 20);
+    const r = await fetch(base + '/admin/api/upload', { method: 'POST', headers: { Cookie: a.cookie, 'X-CSRF-Token': cs, 'Content-Type': 'image/png', 'X-Forwarded-For': '198.51.100.120' }, body: Buffer.concat([png, Buffer.alloc(40)]) });
+    assert.equal(r.status, 200); const { url } = await r.json();
+    if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(tmp, 'public', url)).mode & 0o777, 0o644);
+  });
+
+  await t.test('fix-uploads makes old 600 uploads readable and leaves everything else alone', () => {
+    const fix = require(path.join(tmp, 'lib/fixuploads')), d = fs.mkdtempSync(path.join(tmp, 'fx-'));
+    fs.writeFileSync(path.join(d, 'a.png'), 'x', { mode: 0o600 }); fs.writeFileSync(path.join(d, 'b.png'), 'x', { mode: 0o644 }); fs.mkdirSync(path.join(d, 'sub'));
+    const r = fix(d);
+    assert.equal(r.total, 2);
+    if (process.platform !== 'win32') { assert.equal(r.fixed, 1); assert.equal(fs.statSync(path.join(d, 'a.png')).mode & 0o777, 0o644); }
+    assert.deepEqual(fix(path.join(d, 'missing')), { total: 0, fixed: 0 });
+  });
+
   await t.test('admin responses carry the cross-origin and framing protections', async () => {
     const r = await fetch(base + '/admin/api/me', { headers: { Cookie: cookie } });
     assert.equal(r.headers.get('cross-origin-resource-policy'), 'same-origin');
