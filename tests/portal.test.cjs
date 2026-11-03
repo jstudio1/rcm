@@ -78,9 +78,9 @@ test('buttons and member portal', async t => {
     }
     const reg = (await get('/register')).html; assert.match(reg, /href="\/terms"/); assert.match(reg, /id="agree"/);
     const acc = (await get('/account')).html;
-    for (const p of ['/account', '/account/profile', '/account/security', '/account/payment', '/account/history', '/account/coupon', '/account/items', '/account/redeem']) assert.ok(acc.includes(`href="${p}"`), p);
+    for (const p of ['/account', '/account/profile', '/account/security', '/account/topup', '/account/history', '/account/coupon', '/account/items', '/account/redeem']) assert.ok(acc.includes(`href="${p}"`), p);
     assert.match(acc, /data-page="overview"/); assert.match(acc, /data-bind="cash"/);
-    for (const p of ['/account/profile', '/account/security', '/account/payment', '/account/history', '/account/coupon', '/account/items', '/account/redeem']) assert.equal((await get(p)).status, 200, p);
+    for (const p of ['/account/profile', '/account/security', '/account/topup', '/account/history', '/account/coupon', '/account/items', '/account/redeem']) assert.equal((await get(p)).status, 200, p);
     const sm = await (await fetch(base + '/sitemap.xml')).text(); assert.equal(/\/login|\/account|\/register/.test(sm), false, 'not in the sitemap');
     await edit(c => { c.portal.registerOpen = false; });
     assert.equal((await get('/register')).status, 404); assert.equal((await get('/login')).html.includes('href="/register"'), false);
@@ -105,6 +105,46 @@ test('buttons and member portal', async t => {
     const e = cfgOf((await get('/login')).html).ep;
     assert.equal(e.login, '/auth/login'); assert.equal(e.me, '/me'); assert.equal(e.history, '/me/history'); assert.equal(e.redeem, '/me/redeem');
     await edit(c => { c.portal.mode = 'mock'; c.portal.apiBase = ''; c.portal.epLogin = '/auth/login'; c.portal.epMe = '/me'; c.portal.epRedeem = '/me/redeem'; });
+  });
+
+  await t.test('login / register settings: titles, intro, forgot-password and register switches', async () => {
+    await edit(c => { c.portal.enabled = true; c.portal.loginTitle = 'ล็อกอินเข้าเกม'; c.portal.loginIntro = '<b>x</b> ยินดีต้อนรับ'; c.portal.registerTitle = 'เป็นสมาชิก'; c.portal.registerIntro = 'ฟรี'; });
+    const login = (await get('/login')).html;
+    assert.match(login, /<h1 class="disp">ล็อกอินเข้าเกม<\/h1>/); assert.ok(login.includes('&lt;b&gt;x&lt;/b&gt;') && !login.includes('<b>x</b>'), 'intro escaped');
+    assert.ok(login.includes('href="/forgot-password"'));
+    assert.match((await get('/register')).html, /<h1 class="disp">เป็นสมาชิก<\/h1>/);
+    await edit(c => { c.portal.forgotOpen = false; });
+    assert.equal((await get('/forgot-password')).status, 404); assert.equal((await get('/login')).html.includes('href="/forgot-password"'), false);
+    await edit(c => { c.portal.forgotOpen = true; c.portal.loginTitle = 'เข้าสู่ระบบ'; c.portal.loginIntro = ''; c.portal.registerTitle = 'สมัครสมาชิก'; c.portal.registerIntro = ''; });
+  });
+
+  await t.test('account area: member card, currency names and the top-up page come from the admin', async () => {
+    await edit(c => { c.portal.enabled = true; c.portal.memberLabel = 'RC MEMBER'; c.portal.cashName = 'Cash'; c.portal.pointName = 'Point'; c.portal.topupTitle = 'เติมเงิน'; });
+    const acc = (await get('/account')).html, cfg = cfgOf(acc);
+    assert.equal(cfg.memberLabel, 'RC MEMBER'); assert.equal(cfg.names.cash, 'Cash'); assert.equal(cfg.names.point, 'Point'); assert.equal(cfg.topup.on, true);
+    assert.ok(acc.includes('href="/account/topup"') && !acc.includes('href="/account/payment"'));
+    assert.match(acc, /<nav class="acrumb"/);
+    const t = (await get('/account/topup')).html; assert.match(t, /<h1 class="disp">เติมเงิน<\/h1>/); assert.match(t, /data-crumb/);
+    const m = cfgOf(t).topup.methods; assert.equal(m.length, 5); assert.equal(m[0].packages.length, 6); assert.deepEqual(m[0].packages[0], { price: '50', cash: '5000', point: '38' });
+    assert.deepEqual(m.map(x => x.mode), ['code', 'code', 'checkout', 'checkout', 'checkout']);
+    // methods and prices are edited in the admin; junk is cleaned, a switched-off method disappears
+    await edit(c => {
+      c.topup.methods[1].enabled = false; c.topup.methods[0].mode = 'weird'; c.topup.methods[0].logo = 'javascript:alert(1)';
+      c.topup.methods[0].packages = [{ price: '1,000฿', cash: '<b>9</b>', point: '5' }, { price: '', cash: '1', point: '1' }];
+    });
+    const m2 = cfgOf((await get('/account/topup')).html).topup.methods;
+    assert.equal(m2.length, 4); assert.equal(m2.some(x => x.name === 'Razer Gold'), false);
+    assert.equal(m2[0].mode, 'code'); assert.equal(m2[0].logo, '', 'unsafe logo address dropped'); assert.deepEqual(m2[0].packages, [{ price: '1,000', cash: '9', point: '5' }], 'numbers only; empty price row dropped');
+    // switched off: no menu entry, no page
+    await edit(c => { c.portal.topupEnabled = false; });
+    assert.equal((await get('/account/topup')).status, 404); assert.equal((await get('/account')).html.includes('href="/account/topup"'), false);
+    await edit(c => { c.portal.topupEnabled = true; c.topup.methods.forEach(x => { x.enabled = true; }); c.portal.cashName = 'แคช'; c.portal.pointName = 'แต้มพ้อย'; c.portal.memberLabel = 'RAYCITY-M MEMBER'; });
+  });
+
+  await t.test('script: top-up and member card are built with DOM nodes; only https goes to the payment redirect', () => {
+    const js = fs.readFileSync(path.join(source, 'public/account.js'), 'utf8');
+    assert.ok(js.includes('topupRedeem') && js.includes('topupCheckout') && /typeof d\.url === 'string' && \/\^https:/.test(js), 'checkout redirect accepts https only');
+    assert.ok(js.includes('DEMO-'), 'mock codes are DEMO-<price>');
   });
 
   await t.test('script uses no innerHTML and no eval (API data cannot inject markup)', () => {

@@ -1,6 +1,6 @@
-// Member portal front end: login, register and the account area.
+// Member portal front end: login, register and the account area (overview, profile, security, top-up, history, coupons, items, redeem).
 // Two modes, chosen in the admin:
-//   mock - demo data kept in this browser only (nothing is sent anywhere, no password is ever stored)
+//   mock - demo data kept in this browser only (nothing is sent anywhere, no password or card code is ever stored)
 //   api  - the same screens talk to the real API (cfg.base + the endpoint paths below), using the API's own cookie session
 // Everything is built with DOM nodes and textContent (no HTML strings), so API data can't inject markup.
 (function () {
@@ -10,17 +10,44 @@
   var cfg = {}, page = root.getAttribute('data-page');
   try { cfg = JSON.parse(root.getAttribute('data-cfg') || '{}'); } catch (e) {}
   var MOCK = cfg.mode !== 'api';
+  var NAMES = cfg.names || { cash: 'แคช', rain: 'เรน', point: 'แต้มพ้อย' };
 
   // ---------- small helpers ----------
   function el(tag, attrs) {
     var e = document.createElement(tag);
     for (var k in (attrs || {})) { if (k === 'class') e.className = attrs[k]; else if (k === 'text') e.textContent = attrs[k]; else if (attrs[k] !== false && attrs[k] != null) e.setAttribute(k, attrs[k]); }
-    for (var i = 2; i < arguments.length; i++) { var kid = arguments[i]; if (kid != null && kid !== false) e.appendChild(typeof kid === 'object' ? kid : document.createTextNode(String(kid))); }
+    var add = function (kid) {
+      if (kid == null || kid === false) return;
+      if (Array.isArray(kid)) { kid.forEach(add); return; }
+      e.appendChild(typeof kid === 'object' ? kid : document.createTextNode(String(kid)));
+    };
+    for (var i = 2; i < arguments.length; i++) add(arguments[i]);
     return e;
   }
+  var NS = 'http://www.w3.org/2000/svg';
+  function icon(d, cls) {
+    var s = document.createElementNS(NS, 'svg'), p = document.createElementNS(NS, 'path');
+    s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '1.8'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true');
+    if (cls) s.setAttribute('class', cls);
+    p.setAttribute('d', d); s.appendChild(p); return s;
+  }
+  var I = {
+    arrow: 'M5 12h14M13 6l6 6-6 6', copy: 'M9 9h10v11H9zM5 15V4h10', qr: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v6h-3',
+    wallet: 'M3 7h18v12H3zM3 7l3-3h12l3 3M16 13h2', coin: 'M12 21a9 9 0 100-18 9 9 0 000 18zM9 9h4.5a1.5 1.5 0 010 3H9m0 0h5a1.5 1.5 0 010 3H9m0-6v6', star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
+    card: 'M3 6h18v12H3zM3 10h18M6 15h4', gift: 'M3 9h18v4H3zM5 13v8h14v-8M12 9v12M12 9c-3 0-4-4-1-4 2 0 1 4 1 4zm0 0c3 0 4-4 1-4-2 0-1 4-1 4z'
+  };
   var num = function (n) { return Number(n || 0).toLocaleString('th-TH'); };
   var $ = function (s, r) { return (r || root).querySelector(s); };
   var delay = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var dateTh = function (d) { var t = new Date(d); return isNaN(t) ? '' : t.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }); };
+  function since(d) {
+    var t = new Date(d); if (isNaN(t)) return '';
+    var now = new Date(), m = (now.getFullYear() - t.getFullYear()) * 12 + now.getMonth() - t.getMonth(), day = now.getDate() - t.getDate();
+    if (day < 0) { m--; day += new Date(now.getFullYear(), now.getMonth(), 0).getDate(); }
+    return (m > 0 ? m + ' เดือน ' : '') + day + ' วัน';
+  }
+  // a picture address from the API is only used when it is https or on this site
+  var safeSrc = function (u) { return /^(https:\/\/|\/(?!\/))/.test(String(u || '')) ? u : ''; };
 
   // ---------- demo "backend" (mock mode): lives in localStorage, holds no passwords ----------
   var mem = null, KEY = 'rc_demo_user';
@@ -29,12 +56,18 @@
     set: function (u) { mem = u; try { localStorage.setItem(KEY, JSON.stringify(u)); } catch (e) {} },
     clear: function () { mem = null; try { localStorage.removeItem(KEY); } catch (e) {} }
   };
+  var ago = function (months) { var d = new Date(); d.setMonth(d.getMonth() - months); d.setDate(d.getDate() - 9); return d.toISOString().slice(0, 10); };
+  var newDemoUser = function (name, email, fresh) {
+    var y = new Date().getFullYear();
+    return { username: name, name: name, email: email || '', phone: '', club: fresh ? '' : 'DEMO', level: fresh ? 1 : 46, uid: 'RC' + String(Math.floor(100000 + Math.random() * 899999)), joined: fresh ? new Date().toISOString().slice(0, 10) : ago(7),
+      cash: fresh ? 0 : 900, rain: fresh ? 0 : 10780548, point: fresh ? 0 : 608, pointExpire: y + '-11-30' };
+  };
   var DEMO = {
     history: [
       { date: '2026-10-26 21:14', type: 'เข้าสู่ระบบ', detail: 'Android', amount: '' },
-      { date: '2026-10-25 18:02', type: 'เติมเงิน', detail: 'เติม Cash ผ่านพร้อมเพย์', amount: '+1,000 Cash' },
-      { date: '2026-10-25 18:10', type: 'ซื้อไอเทม', detail: 'ชุดสีแต่งรถ Neon Pack', amount: '-300 Cash' },
-      { date: '2026-10-23 09:40', type: 'แลกรหัส', detail: 'โค้ดต้อนรับ', amount: '+50 Point' }
+      { date: '2026-10-25 18:02', type: 'เติมเงิน', detail: 'Truemoney CashCard', amount: '+5,000 ' + NAMES.cash },
+      { date: '2026-10-25 18:10', type: 'ซื้อไอเทม', detail: 'ชุดสีแต่งรถ Neon Pack', amount: '-300 ' + NAMES.cash },
+      { date: '2026-10-23 09:40', type: 'แลกรหัส', detail: 'โค้ดต้อนรับ', amount: '+50 ' + NAMES.point }
     ],
     coupons: [
       { code: 'WELCOME-RC', title: 'ส่วนลด 20% ร้านค้าในเกม', expires: '2026-12-31', status: 'ใช้ได้' },
@@ -43,16 +76,15 @@
     ],
     items: [
       { name: 'Neon Pack', qty: 1, note: 'ชุดสีแต่งรถ' }, { name: 'Nitro Boost', qty: 5, note: 'ไอเทมใช้ครั้งเดียว' }, { name: 'ตั๋วเข้าแข่งพิเศษ', qty: 3, note: 'หมดอายุ 2026-12-31' }
-    ],
-    payments: [{ type: 'พร้อมเพย์', label: 'พร้อมเพย์ ••• 4821', note: 'ตัวอย่าง' }, { type: 'บัตรเครดิต', label: 'Visa ••• 4242', note: 'หมดอายุ 08/28 (ตัวอย่าง)' }]
+    ]
   };
   function mockCall(name, body) {
     var u = demo.get();
     var guard = function () { if (!u) throw Object.assign(new Error('ยังไม่ได้เข้าสู่ระบบ'), { status: 401 }); };
     return delay(250).then(function () {
       switch (name) {
-        case 'login': u = demo.get() || { cash: 5800, point: 608, email: '', phone: '' }; u.username = String(body.username || '').split('@')[0] || 'player'; u.name = u.name || u.username; demo.set(u); return { user: u };
-        case 'register': u = { username: body.username, name: body.username, email: body.email, phone: '', cash: 0, point: 0 }; demo.set(u); return { user: u };
+        case 'login': { var uname = String(body.username || '').split('@')[0] || 'player'; u = demo.get() || newDemoUser(uname, '', false); u.username = uname; u.name = u.name || uname; demo.set(u); return { user: u }; }
+        case 'register': u = newDemoUser(body.username, body.email, true); demo.set(u); return { user: u };
         case 'logout': demo.clear(); return { ok: true };
         case 'forgot': return { ok: true };
         case 'me': guard(); return u;
@@ -61,8 +93,21 @@
         case 'history': guard(); return DEMO.history;
         case 'coupons': guard(); return DEMO.coupons;
         case 'items': guard(); return DEMO.items;
-        case 'payments': guard(); return DEMO.payments;
-        case 'redeem': guard(); if (String(body.code).toUpperCase() !== 'RC-DEMO-1234') throw new Error('ไม่พบรหัสนี้ (ตัวอย่าง: RC-DEMO-1234)'); u.point = (u.point || 0) + 100; demo.set(u); return { message: 'แลกรหัสสำเร็จ ได้รับ 100 Point', user: u };
+        case 'topup': guard(); return { methods: (cfg.topup || {}).methods || [] };
+        case 'topupRedeem': {
+          guard();
+          // demo codes: DEMO-<price> gives that package of the chosen method (e.g. DEMO-150); no real card is ever checked
+          var m = /^DEMO-(\d+)$/.exec(String(body.code || '').toUpperCase());
+          var meth = ((cfg.topup || {}).methods || []).filter(function (x) { return x.id === body.method; })[0];
+          var pk = m && meth && meth.packages.filter(function (x) { return String(x.price).replace(/,/g, '') === m[1]; })[0];
+          if (!pk) throw new Error('ไม่พบรหัสนี้ (ตัวอย่าง: DEMO-' + ((meth && meth.packages[0] && meth.packages[0].price) || '50') + ')');
+          var c = Number(String(pk.cash).replace(/,/g, '')) || 0, p = Number(String(pk.point).replace(/,/g, '')) || 0;
+          u.cash = (u.cash || 0) + c; u.point = (u.point || 0) + p; demo.set(u);
+          DEMO.history.unshift({ date: new Date().toISOString().slice(0, 16).replace('T', ' '), type: 'เติมเงิน', detail: meth.name, amount: '+' + num(c) + ' ' + NAMES.cash });
+          return { message: 'เติมเงินสำเร็จ ได้รับ ' + num(c) + ' ' + NAMES.cash + ' และ ' + num(p) + ' ' + NAMES.point, user: u };
+        }
+        case 'topupCheckout': guard(); return { message: 'ตัวอย่าง: เมื่อเชื่อมต่อระบบชำระเงินจริง ระบบจะพาไปหน้าชำระเงินของ ' + (body.methodName || 'ผู้ให้บริการ') + ' สำหรับแพ็กเกจ ฿' + body.price };
+        case 'redeem': guard(); if (String(body.code).toUpperCase() !== 'RC-DEMO-1234') throw new Error('ไม่พบรหัสนี้ (ตัวอย่าง: RC-DEMO-1234)'); u.point = (u.point || 0) + 100; demo.set(u); return { message: 'แลกรหัสสำเร็จ ได้รับ 100 ' + NAMES.point, user: u };
       }
       throw new Error('unknown call');
     });
@@ -71,7 +116,8 @@
   // ---------- the real API (api mode) ----------
   // method + path for each call. The API is expected to answer JSON and to keep the login in its own cookie (HttpOnly, SameSite, Secure).
   var CALL = { login: ['POST', 'login'], register: ['POST', 'register'], logout: ['POST', 'logout'], forgot: ['POST', 'forgot'], me: ['GET', 'me'], profile: ['PUT', 'me'], password: ['POST', 'password'],
-    history: ['GET', 'history'], coupons: ['GET', 'coupons'], items: ['GET', 'items'], payments: ['GET', 'payments'], redeem: ['POST', 'redeem'] };
+    history: ['GET', 'history'], coupons: ['GET', 'coupons'], items: ['GET', 'items'], redeem: ['POST', 'redeem'],
+    topup: ['GET', 'topup'], topupRedeem: ['POST', 'topupredeem'], topupCheckout: ['POST', 'topupcheckout'] };
   function apiCall(name, body) {
     var c = CALL[name], path = (cfg.ep || {})[c[1]];
     var opt = { method: c[0], credentials: 'include', headers: { Accept: 'application/json' } };
@@ -157,15 +203,68 @@
     t.appendChild(tb); return el('div', { class: 'scroll' }, t);
   }
 
+  // member card + the "tap for QR" window. The picture is a sample pattern: a real QR code comes from the game's API.
+  function qrWindow(uid) {
+    var back = el('div', { class: 'qr-back', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'QR' });
+    var seed = 0; for (var i = 0; i < uid.length; i++) seed = (seed * 31 + uid.charCodeAt(i)) >>> 0;
+    var grid = el('div', { class: 'qr-grid', 'aria-hidden': 'true' });
+    for (var n = 0; n < 169; n++) { seed = (seed * 1664525 + 1013904223) >>> 0; var x = n % 13, y = Math.floor(n / 13), eye = (x < 4 && y < 4) || (x > 8 && y < 4) || (x < 4 && y > 8); grid.appendChild(el('i', { class: eye || seed % 3 === 0 ? 'on' : '' })); }
+    var close = el('button', { class: 'btn', type: 'button', text: 'ปิด' });
+    var shut = function () { back.remove(); document.removeEventListener('keydown', esc); };
+    var esc = function (e) { if (e.key === 'Escape') shut(); };
+    close.addEventListener('click', shut); back.addEventListener('click', function (e) { if (e.target === back) shut(); });
+    document.addEventListener('keydown', esc);
+    back.appendChild(el('div', { class: 'qr-box' }, grid, el('b', { text: uid }), el('small', { text: MOCK ? 'ตัวอย่างลวดลาย (QR จริงจะแสดงเมื่อเชื่อมต่อระบบสมาชิก)' : 'แสดง QR นี้เพื่อยืนยันสมาชิก' }), close));
+    document.body.appendChild(back); close.focus();
+  }
+  function memberCard(u) {
+    var uid = u.uid || ('RC' + String(u.id || '000000')), copy = el('button', { class: 'mc-copy', type: 'button', 'aria-label': 'คัดลอก UID' }, icon(I.copy));
+    copy.addEventListener('click', function () {
+      var done = function () { copy.classList.add('ok'); setTimeout(function () { copy.classList.remove('ok'); }, 1200); };
+      if (navigator.clipboard) navigator.clipboard.writeText(uid).then(done, function () {}); else done();
+    });
+    var qr = el('button', { class: 'mc-qr', type: 'button' }, icon(I.qr), el('span', { text: 'แตะเพื่อดู QR' }));
+    qr.addEventListener('click', function () { qrWindow(uid); });
+    return el('div', { class: 'mcard' }, el('span', { class: 'mc-r', 'aria-hidden': 'true', text: 'R' }), el('span', { class: 'mc-label', text: cfg.memberLabel || 'MEMBER' }),
+      el('img', { class: 'mc-logo', src: '/img/logo.png', alt: '', width: '34', height: '34' }),
+      el('div', { class: 'mc-uid' }, el('small', { text: 'MEMBER UID' }), el('div', {}, el('b', { text: uid }), copy)), qr);
+  }
+
   var VIEWS = {
     overview: function () {
-      var box = el('div');
-      box.appendChild(el('div', { class: 'astats' },
-        el('div', { class: 'astat' }, el('small', { text: 'Cash' }), el('b', { text: num(me.cash) })),
-        el('div', { class: 'astat' }, el('small', { text: 'Point' }), el('b', { text: num(me.point) })),
-        el('div', { class: 'astat' }, el('small', { text: 'ชื่อผู้ใช้' }), el('b', { text: me.username || me.name || '' }))));
-      var hist = el('div'); box.appendChild(el('h2', { text: 'กิจกรรมล่าสุด' })); box.appendChild(hist);
-      call('history').then(function (d) { hist.appendChild(table([['เวลา', 'date'], ['รายการ', 'type'], ['รายละเอียด', 'detail'], ['จำนวน', 'amount']], (d.items || d).slice(0, 5), 'ยังไม่มีกิจกรรม')); }, function () { hist.appendChild(notice('โหลดกิจกรรมไม่ได้')); });
+      var box = el('div', { class: 'ov' });
+      var tabs = el('div', { class: 'ov-tabs', role: 'tablist' }), panes = el('div');
+      var wallet = el('div', { class: 'ov-pane', role: 'tabpanel' }), personal = el('div', { class: 'ov-pane', role: 'tabpanel', hidden: '' });
+      var cashBox = el('div', { class: 'wal-main' }, el('div', {},
+        el('small', { class: 'wal-l' }, icon(I.wallet), el('span', { text: 'ยอด' + NAMES.cash + 'คงเหลือ' })),
+        el('div', { class: 'wal-n' }, el('b', { text: num(me.cash) }), el('span', { text: NAMES.cash })),
+        el('p', { text: NAMES.cash + 'สำหรับใช้จ่ายในเกมและไอเทมพิเศษ' })),
+        (cfg.topup && cfg.topup.on) ? el('a', { class: 'btn sm', href: '/account/topup' }, 'เติมเงิน ', icon(I.arrow)) : null);
+      var pt = me.pointExpire ? num(me.point) + ' ' + NAMES.point + ' หมดอายุ ' + dateTh(me.pointExpire) : 'ใช้ได้ตามเงื่อนไขของแต้ม';
+      wallet.appendChild(el('div', { class: 'wal' }, cashBox, el('div', { class: 'wal-two' },
+        el('div', {}, el('small', { class: 'wal-l' }, icon(I.coin), el('span', { text: NAMES.rain })), el('b', { text: num(me.rain) }), el('p', { text: 'สกุลเงิน ' + NAMES.rain + ' ของตัวละครคุณ' })),
+        el('div', {}, el('small', { class: 'wal-l' }, icon(I.star), el('span', { text: NAMES.point })), el('b', { text: num(me.point) }), el('p', { text: pt })))));
+      personal.appendChild(el('div', { class: 'wal' }, el('dl', { class: 'ov-dl' },
+        el('div', {}, el('dt', { text: 'ชื่อที่แสดง' }), el('dd', { text: me.name || me.username || '' })),
+        el('div', {}, el('dt', { text: 'ชื่อผู้ใช้' }), el('dd', { text: me.username || '' })),
+        el('div', {}, el('dt', { text: 'อีเมล' }), el('dd', { text: me.email || '–' })),
+        el('div', {}, el('dt', { text: 'เบอร์โทร' }), el('dd', { text: me.phone || '–' }))),
+        el('a', { class: 'ghost sm', href: '/account/profile', text: 'แก้ไขข้อมูลส่วนตัว' })));
+      [['กระเป๋าเงิน', wallet], ['ข้อมูลส่วนตัว', personal]].forEach(function (x, i) {
+        var b = el('button', { type: 'button', role: 'tab', 'aria-selected': i ? 'false' : 'true', class: i ? '' : 'on', text: x[0] });
+        b.addEventListener('click', function () { [].forEach.call(tabs.children, function (k) { var on = k === b; k.classList.toggle('on', on); k.setAttribute('aria-selected', on ? 'true' : 'false'); }); wallet.hidden = i !== 0; personal.hidden = i !== 1; });
+        tabs.appendChild(b);
+      });
+      panes.appendChild(wallet); panes.appendChild(personal);
+      box.appendChild(el('div', { class: 'ov-band', 'aria-hidden': 'true' }));
+      box.appendChild(el('div', { class: 'ov-panel' },
+        el('div', { class: 'ov-top' },
+          el('div', { class: 'ov-card' }, memberCard(me), el('dl', { class: 'ov-meta' },
+            el('div', {}, el('dt', { text: 'เป็นสมาชิกเมื่อ' }), el('dd', { text: dateTh(me.joined) || '–' })),
+            el('div', {}, el('dt', { text: 'เป็นสมาชิกมาแล้ว' }), el('dd', { text: since(me.joined) || '–' })))),
+          el('div', { class: 'ov-who' }, me.level ? el('span', { class: 'lv', text: 'LV. ' + me.level }) : null, el('h2', { text: me.name || me.username || 'ผู้เล่น' }),
+            el('p', { text: 'สวัสดี, ' + (me.username || '') + (me.club ? ' · คลับ ' + me.club : '') }))),
+        tabs, panes));
       return box;
     },
     profile: function () {
@@ -186,11 +285,68 @@
       if (cfg.deleteUrl) box.appendChild(el('p', { class: 'aintro' }, 'ต้องการลบบัญชีและข้อมูล? ', el('a', { href: cfg.deleteUrl, text: 'ดูขั้นตอนการลบบัญชี' })));
       return box;
     },
-    payment: function () {
-      var box = el('div'); box.appendChild(notice('วิธีชำระเงินที่บันทึกไว้ (ตัวอย่าง) — เว็บไซต์นี้ไม่เก็บและไม่รับเลขบัตร การเพิ่มวิธีชำระเงินต้องทำผ่านหน้าของผู้ให้บริการชำระเงินโดยตรง'));
-      var list = el('div'); box.appendChild(list);
-      call('payments').then(function (d) { list.appendChild(table([['ประเภท', 'type'], ['วิธีชำระเงิน', 'label'], ['หมายเหตุ', 'note']], d.items || d, 'ยังไม่มีวิธีชำระเงิน')); }, function (e) { list.appendChild(notice(e.message)); });
-      box.appendChild(el('button', { class: 'btn ghost', type: 'button', disabled: '', text: '+ เพิ่มวิธีชำระเงิน (เร็วๆ นี้)' }));
+    topup: function () {
+      var box = el('div', { class: 'tp' });
+      if (!(cfg.topup && cfg.topup.on)) { box.appendChild(notice('ยังไม่เปิดให้เติมเงิน')); return box; }
+      var tiles = el('div', { class: 'tp-tiles', role: 'group', 'aria-label': 'ช่องทางเติมเงิน' }), body = el('div', { class: 'tp-body' }), crumb = $('[data-crumb]');
+      box.appendChild(tiles); box.appendChild(body);
+      var money = function (v) { return Number(String(v).replace(/,/g, '')) || 0; };
+      function pick(m, btn) {
+        [].forEach.call(tiles.children, function (b) { b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); });
+        if (crumb) crumb.textContent = m.title || m.name;
+        var chosen = null, checkout = m.mode === 'checkout';
+        var rows = (m.packages || []).map(function (pk, i) {
+          var tr = el('tr', checkout ? { tabindex: '0', 'data-i': String(i), 'aria-selected': 'false' } : {},
+            el('td', { 'data-l': 'ราคา' }, el('span', { class: 'baht', text: '฿' }), ' ' + num(money(pk.price))),
+            el('td', { 'data-l': NAMES.cash, text: num(money(pk.cash)) + ' ' + NAMES.cash }),
+            el('td', { 'data-l': NAMES.point }, num(money(pk.point)) + ' ', icon(I.coin, 'cn')));
+          if (checkout) {
+            var sel = function () { chosen = pk; [].forEach.call(tr.parentNode.children, function (r) { r.setAttribute('aria-selected', r === tr ? 'true' : 'false'); }); sum.textContent = 'แพ็กเกจที่เลือก: ฿' + num(money(pk.price)) + ' · ' + num(money(pk.cash)) + ' ' + NAMES.cash; };
+            tr.addEventListener('click', sel); tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel(); } });
+          }
+          return tr;
+        });
+        var sum = el('p', { class: 'tp-sum', text: checkout ? 'เลือกแพ็กเกจจากตารางด้านซ้าย' : '' });
+        var left = el('div', { class: 'tp-left' }, el('h2', { text: m.title || m.name }),
+          rows.length ? el('div', { class: 'scroll' }, el('table', { class: 'atable tp-table' }, el('thead', null, el('tr', null, el('th', { text: 'ราคา' }), el('th', { text: NAMES.cash }), el('th', { text: NAMES.point }))), el('tbody', null, rows))) : notice('ยังไม่มีแพ็กเกจ'));
+        var err = el('p', { class: 'aerr', role: 'alert' }), ok = el('p', { class: 'aok', role: 'status' }), btn, right;
+        if (checkout) {
+          btn = el('button', { class: 'btn tp-go', type: 'submit' }, 'ชำระเงิน ', icon(I.arrow));
+          right = el('form', { class: 'tp-right', novalidate: '' }, el('h2', { text: 'ชำระเงิน' }), m.note ? el('p', { class: 'aintro', text: m.note }) : null, sum, err, ok, btn);
+          right.addEventListener('submit', function (e) {
+            e.preventDefault(); err.textContent = ''; ok.textContent = '';
+            if (!chosen) { err.textContent = 'เลือกแพ็กเกจก่อน'; return; }
+            btn.disabled = true;
+            call('topupCheckout', { method: m.id, methodName: m.name, price: money(chosen.price) }).then(function (d) {
+              if (d && typeof d.url === 'string' && /^https:\/\//.test(d.url)) { location.assign(d.url); return; }
+              ok.textContent = (d && d.message) || 'สร้างรายการชำระเงินแล้ว';
+            }, function (x) { err.textContent = x.message; }).then(function () { btn.disabled = false; });
+          });
+        } else {
+          var inp = el('input', { id: 'tcode', name: 'tcode', type: 'text', maxlength: '40', autocomplete: 'off', placeholder: m.codePh || 'กรอกรหัส…' });
+          btn = el('button', { class: 'btn tp-go', type: 'submit' }, 'ใช้งาน ', icon(I.arrow));
+          right = el('form', { class: 'tp-right', novalidate: '' }, el('h2', { text: m.codeLabel || 'กรอกรหัสบัตร' }), inp, MOCK ? el('p', { class: 'aintro', text: 'ตัวอย่าง: พิมพ์ DEMO-' + ((m.packages && m.packages[0] && m.packages[0].price) || '50') + ' เพื่อทดลองเติมแพ็กเกจนั้น (ไม่ใช่บัตรจริง)' }) : (m.note ? el('p', { class: 'aintro', text: m.note }) : null), err, ok, btn);
+          right.addEventListener('submit', function (e) {
+            e.preventDefault(); err.textContent = ''; ok.textContent = '';
+            var code = inp.value.trim();
+            if (!/^[A-Za-z0-9-]{4,40}$/.test(code)) { err.textContent = 'รูปแบบรหัสไม่ถูกต้อง'; return; }
+            btn.disabled = true;
+            call('topupRedeem', { method: m.id, code: code }).then(function (d) { if (d && d.user) { me = d.user; bind(me); } inp.value = ''; ok.textContent = (d && d.message) || 'เติมเงินสำเร็จ'; }, function (x) { err.textContent = x.message; }).then(function () { btn.disabled = false; });
+          });
+        }
+        body.replaceChildren(el('div', { class: 'tp-grid' }, left, right));
+      }
+      call('topup').then(function (d) {
+        var list = (d && d.methods) || d || [];
+        if (!list.length) { body.appendChild(notice('ยังไม่มีช่องทางเติมเงิน')); return; }
+        list.forEach(function (m, i) {
+          var logo = safeSrc(m.logo);
+          var b = el('button', { type: 'button', class: 'tp-tile', 'aria-pressed': 'false', 'aria-label': m.name }, logo ? el('img', { src: logo, alt: m.name, loading: 'lazy' }) : el('span', { class: 'tp-ic' }, icon(m.mode === 'checkout' ? I.wallet : I.card), el('b', { text: m.name })));
+          b.addEventListener('click', function () { pick(m, b); });
+          tiles.appendChild(b);
+          if (i === 0) pick(m, b);
+        });
+      }, function (e) { body.appendChild(notice(e.message)); });
       return box;
     },
     history: function () {

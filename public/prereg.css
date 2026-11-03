@@ -1,7 +1,11 @@
 /* pre-registration rewards: counter, goal track, reward cards, detail */
 .pr{--acc:var(--red);--acc-2:var(--red-2);max-width:1100px;margin:0 auto;text-align:center}
 .pr svg{width:1em;height:1em;flex:none}
-.pr-sec{padding:90px 0;background:var(--bg-2)}
+.pr-sec,.pg:has(>.wrap>.pr){position:relative;isolation:isolate;overflow:hidden;background:#0d0e12}
+.pr-sec{padding:90px 0}
+/* blurred key art behind the section, with red glows and a dark wash so the text stays readable */
+.pr-sec::before,.pg:has(>.wrap>.pr)::before{content:"";position:absolute;inset:-60px;z-index:-2;background:var(--art) center/cover no-repeat;filter:blur(26px) saturate(1.3);opacity:.55;transform:scale(1.08)}
+.pr-sec::after,.pg:has(>.wrap>.pr)::after{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 50% at 18% 8%,rgba(255,42,42,.32),transparent 70%),radial-gradient(55% 45% at 85% 90%,rgba(255,42,42,.22),transparent 70%),linear-gradient(180deg,rgba(13,14,18,.55),rgba(13,14,18,.8))}
 .pg .pr{padding-top:8px}
 .pr-head{display:grid;gap:12px;justify-items:center;margin-bottom:34px}
 .pr-head .eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:13px}
@@ -10,7 +14,7 @@
 .pr-head em{font-style:normal;color:var(--acc-2)}
 .pr-head p{color:var(--mu);max-width:640px}
 /* counter */
-.pr-count{max-width:540px;margin:0 auto 44px;padding:26px 24px 22px;background:var(--bg-3);border:1px solid var(--ln);border-top:3px solid var(--acc);display:grid;gap:8px;justify-items:center}
+.pr-count{max-width:540px;margin:0 auto 44px;padding:26px 24px 22px;background:rgba(24,25,30,.62);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--ln);border-top:3px solid var(--acc);display:grid;gap:8px;justify-items:center}
 .pr-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;font-size:13px;color:var(--sil);background:rgba(255,255,255,.08);border-radius:3px}
 .pr-chip.sm{font-size:12px;padding:2px 10px}
 .pr-lab{display:inline-flex;align-items:center;gap:8px;color:var(--mu);font-size:15px;margin-top:6px}
@@ -26,15 +30,14 @@
 /* goals: a dot on a line above each card */
 .pr-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
 .pr-col{position:relative;display:grid;gap:14px;padding-top:34px}
-.pr-col::before{content:"";position:absolute;left:50%;width:calc(100% + 14px);top:11px;height:3px;background:var(--ln-2)}
+.pr-col::before{content:"";position:absolute;left:50%;width:calc(100% + 14px);top:11px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--acc-2) var(--f,0%),var(--ln-2) var(--f,0%))}
 .pr-col:last-child::before{display:none}
-.pr-col.reached::before{background:linear-gradient(90deg,var(--acc-2),var(--acc))}
 .pr-dot{position:absolute;left:50%;top:0;transform:translateX(-50%);z-index:1;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--bg-3);border:2px solid var(--ln-2);color:var(--dim);font-size:13px}
 .pr-dot .k,.pr-dot .l{display:none}
 .pr-col.reached .pr-dot{background:var(--acc-2);border-color:var(--acc-2);color:#fff}.pr-col.reached .pr-dot .k{display:block}
 .pr-col.next .pr-dot{background:var(--acc);border-color:var(--acc);box-shadow:0 0 0 5px rgba(255,42,42,.28)}
 .pr-col.locked .pr-dot .l{display:block}
-.pr-card{display:grid;gap:8px;justify-items:center;padding:18px 12px 14px;background:var(--bg-3);border:1px solid var(--ln);text-align:center;transition:transform .35s var(--ease),border-color .3s,background .3s}
+.pr-card{display:grid;gap:8px;justify-items:center;padding:18px 12px 14px;background:rgba(24,25,30,.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--ln);text-align:center;transition:transform .35s var(--ease),border-color .3s,background .3s}
 .pr-card:hover{transform:translateY(-4px);border-color:rgba(255,42,42,.6)}
 .pr-card[aria-pressed=true]{border-color:var(--acc-2);box-shadow:0 0 0 1px var(--acc-2) inset;background:#33353c}
 .pr-g{font-size:14px;color:var(--mu)}
@@ -63,9 +66,17 @@
 .pr-cta{margin-top:34px}
 .pr-btn{padding:16px 36px}
 @media(max-width:700px){
-  .pr-grid{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:22px}
-  .pr-col::before{display:none}
-  .pr-col{padding-top:30px}
+  /* goals become a vertical tube: dots on the left, the line fills downward as sign-ups grow */
+  .pr-grid{grid-template-columns:minmax(0,1fr);row-gap:14px}
+  .pr-col{padding:0 0 0 46px}
+  .pr-col::before{display:block;left:10px;top:34px;width:4px;height:calc(100% + 14px);background:linear-gradient(180deg,var(--acc-2) var(--f,0%),var(--ln-2) var(--f,0%))}
+  .pr-col:last-child::before{display:none}
+  .pr-dot{left:0;top:22px;transform:none}
+  .pr-card{grid-template-columns:78px minmax(0,1fr);grid-template-areas:"img g" "img t" "img chip";column-gap:14px;row-gap:4px;justify-items:start;align-items:center;text-align:left;padding:12px 14px}
+  .pr-img{grid-area:img;max-width:78px}.pr-img.ph{font-size:38px}
+  .pr-g{grid-area:g}.pr-t{grid-area:t;font-size:16px}.pr-chip{grid-area:chip}
+  .pr-v{display:none}
+  .pr-card:hover{transform:none}
   .pr-d{flex-wrap:wrap}.pr-ds{width:100%}
   .pr-head .eyebrow::before,.pr-head .eyebrow::after{width:24px}
 }

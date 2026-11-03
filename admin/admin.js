@@ -2,7 +2,7 @@
   const app = document.getElementById('app');
   let csrf = '', C = null, saved = null, cur = 'home';
   const dirty = new Set();
-  let navBtns = {}, menuBtns = {}, barEls = {};
+  let navBtns = {}, menuBtns = {}, subBtns = {}, barEls = {}, subOpen = true;
 
   // ---------- tiny helpers ----------
   const safeLink = value => { const u = String(value || '').trim(); return !/[\\\x00-\x20\x7f]/.test(u) && /^(https?:\/\/[^/]|\/(?!\/)|#|mailto:)/i.test(u) ? u : '#'; };
@@ -56,6 +56,7 @@
   function refreshChrome() {
     for (const s of SECTIONS) if (navBtns[s.id]) navBtns[s.id].classList.toggle('dirty', dirty.has(s.id));
     for (const m of MENUS) if (menuBtns[m.id]) menuBtns[m.id].classList.toggle('dirty', m.tabs.some(t => dirty.has(t.id)));
+    for (const m of MENUS) for (const g of m.groups || []) if (subBtns[g.id]) subBtns[g.id].classList.toggle('dirty', g.tabs.some(t => dirty.has(t.id)));
     if (barEls.one) barEls.one.disabled = !dirty.has(cur);
     if (barEls.all) { barEls.all.style.display = dirty.size > 1 || (dirty.size === 1 && !dirty.has(cur)) ? '' : 'none'; barEls.all.textContent = 'บันทึกทั้งหมด (' + dirty.size + ')'; }
   }
@@ -154,8 +155,9 @@
     o = o || {};
     if (o.type === 'image' || o.type === 'video') return imageField(obj, key, label, o);
     if (o.type === 'select') {
-      const sel = h('select', {}, ...o.options.map(v => h('option', { value: v }, v)));
-      sel.value = o.options.includes(obj[key]) ? obj[key] : o.options[o.options.length - 1];
+      const opts = o.options.map(v => (Array.isArray(v) ? v : [v, v]));
+      const sel = h('select', {}, ...opts.map(([v, l]) => h('option', { value: v }, l)));
+      sel.value = opts.some(([v]) => v === obj[key]) ? obj[key] : opts[opts.length - 1][0];
       obj[key] = sel.value;
       sel.addEventListener('change', () => { obj[key] = sel.value; mark(); if (o.onchange) o.onchange(); });
       return h('label', { class: 'a-f' }, h('span', { class: 'top' }, h('span', {}, label)), sel, o.help ? h('span', { class: 'h' }, o.help) : null);
@@ -1029,28 +1031,93 @@
         }).catch(() => { host.textContent = 'โหลดไม่สำเร็จ'; });
         return host;
       } },
-    { id: 'portal', g: 'ตั้งค่าเว็บ', label: 'ระบบสมาชิก (ล็อกอิน/สมัคร)', desc: 'หน้า /login /register /account และเมนูบัญชีผู้เล่น เตรียมไว้สำหรับต่อ API จริงในอนาคต', paths: ['portal'], url: '/login',
+    { id: 'lr-login', g: 'ตั้งค่าเว็บ', label: 'ระบบล็อกอิน', desc: 'เปิด/ปิดระบบสมาชิกทั้งหมด ปุ่มบนเมนู และข้อความในหน้าเข้าสู่ระบบ /login', paths: ['portal'], url: '/login',
       view: () => {
-        const P = C.portal, modeSel = h('select', { onchange: e => { P.mode = e.target.value; mark(); } }, h('option', { value: 'mock' }, 'Mockup (ข้อมูลตัวอย่าง ยังไม่ต่อ API)'), h('option', { value: 'api' }, 'API จริง'));
-        modeSel.value = P.mode === 'api' ? 'api' : 'mock';
+        const P = C.portal;
         return [
           box('เปิด/ปิดระบบสมาชิก',
-            note('ปิดอยู่ = ไม่มีหน้า /login /register /account และไม่มีปุ่มเข้าสู่ระบบบนเมนู · เว็บไซต์นี้ไม่เก็บรหัสผ่านหรือข้อมูลสมาชิกเอง ทุกอย่างอยู่ที่ API ของคุณ'),
+            note('ปิดอยู่ = ไม่มีหน้า /login /register /account และไม่มีปุ่มเข้าสู่ระบบบนเมนู · เว็บไซต์นี้ไม่เก็บรหัสผ่านหรือข้อมูลส่วนตัวของผู้เล่นเอง ทุกอย่างทำผ่าน API ของระบบเกม (หรือเป็น Mockup ข้อมูลสมมุติ)'),
             check(P, 'enabled', 'เปิดระบบสมาชิก (แสดงปุ่มเข้าสู่ระบบบนเมนูและเปิดหน้าสมาชิก)'),
-            check(P, 'registerOpen', 'เปิดรับสมัครสมาชิกใหม่ (ปิด = ไม่มีหน้าสมัคร)'),
             field(P, 'navLabel', 'ข้อความปุ่มบนเมนู', { ph: 'เข้าสู่ระบบ' }),
-            h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, h('a', { class: 'ghost sm', href: '/login', target: '_blank', rel: 'noopener' }, 'ดูหน้า Login ↗'), h('a', { class: 'ghost sm', href: '/register', target: '_blank', rel: 'noopener' }, 'ดูหน้า สมัคร ↗'), h('a', { class: 'ghost sm', href: '/account', target: '_blank', rel: 'noopener' }, 'ดูหน้าบัญชี ↗'))),
+            h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, h('a', { class: 'ghost sm', href: '/login', target: '_blank', rel: 'noopener' }, 'ดูหน้า Login ↗'), h('a', { class: 'ghost sm', href: '/account', target: '_blank', rel: 'noopener' }, 'ดูหน้าบัญชี ↗'))),
+          box('หน้าเข้าสู่ระบบ',
+            field(P, 'loginTitle', 'หัวข้อหน้า', { ph: 'เข้าสู่ระบบ' }),
+            field(P, 'loginIntro', 'ข้อความใต้หัวข้อ (ไม่บังคับ)', { type: 'textarea' }),
+            check(P, 'forgotOpen', 'แสดงลิงก์ "ลืมรหัสผ่าน?" และเปิดหน้า /forgot-password (ปิด = ไม่มีหน้านี้)'))
+        ];
+      } },
+    { id: 'lr-register', g: 'ตั้งค่าเว็บ', label: 'ระบบสมัครสมาชิก', desc: 'เปิด/ปิดการสมัคร ข้อความในหน้าสมัคร /register และสวิตช์ลงทะเบียนล่วงหน้า', paths: ['portal', 'links', 'prereg'], url: '/register',
+      view: () => {
+        const P = C.portal;
+        return [
+          box('หน้าสมัครสมาชิก',
+            check(P, 'registerOpen', 'เปิดรับสมัครสมาชิกใหม่ (ปิด = ไม่มีหน้า /register และไม่มีลิงก์สมัครในหน้าเข้าสู่ระบบ)'),
+            field(P, 'registerTitle', 'หัวข้อหน้า', { ph: 'สมัครสมาชิก' }),
+            field(P, 'registerIntro', 'ข้อความใต้หัวข้อ (ไม่บังคับ)', { type: 'textarea' }),
+            note('ช่องยอมรับข้อตกลง/นโยบายความเป็นส่วนตัวขึ้นเองเมื่อมีหน้าเหล่านั้น และช่องยืนยันอายุขึ้นเมื่อกรอก "อายุขั้นต่ำ" ที่ สโตร์ & กฎหมาย › Support & ติดต่อ')),
+          box('ลงทะเบียนล่วงหน้า',
+            note('สวิตช์เหล่านี้ควบคุมสิ่งที่ผู้เข้าชมเห็นในช่วงก่อนเปิดเกม ข้อความ ตัวเลข และรายการรางวัลแก้ที่ เนื้อหาเว็บ › ลงทะเบียนล่วงหน้า & รางวัล'),
+            check(C.links.show, 'register', 'แสดงปุ่ม "ลงทะเบียนล่วงหน้า" บนหน้าแรกและหน้า Rewards'),
+            check(C.prereg, 'enabled', 'เปิดส่วนตัวนับผู้ลงทะเบียนและรางวัลตามเป้าหมาย (ปิด = แสดงการ์ดรางวัลธรรมดาที่หน้า /rewards)'),
+            check(C.prereg, 'onHome', 'แสดงส่วนลงทะเบียนล่วงหน้าบนหน้าแรกด้วย'),
+            h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, h('a', { class: 'ghost sm', href: '/register', target: '_blank', rel: 'noopener' }, 'ดูหน้าสมัคร ↗'), h('a', { class: 'ghost sm', href: '/rewards', target: '_blank', rel: 'noopener' }, 'ดูหน้า Rewards ↗')))
+        ];
+      } },
+    { id: 'lr-api', g: 'ตั้งค่าเว็บ', label: 'API (เชื่อมระบบเกม)', desc: 'เลือกโหมด Mockup หรือ API จริง และกำหนดที่อยู่/เส้นทางที่หน้าสมาชิกจะเรียก', paths: ['portal'], url: '/login',
+      view: () => {
+        const P = C.portal, modeSel = h('select', { onchange: e => { P.mode = e.target.value; mark(); } }, h('option', { value: 'mock' }, 'Mockup (ข้อมูลตัวอย่าง ยังไม่ต่อ API)'), h('option', { value: 'api' }, 'API จริง (ใช้ที่อยู่ด้านล่าง)'));
+        modeSel.value = P.mode === 'api' ? 'api' : 'mock';
+        return [
           box('การเชื่อมต่อ',
-            h('label', { class: 'a-f' }, h('span', {}, 'โหมด'), modeSel, h('span', { class: 'h' }, 'Mockup = ใช้ข้อมูลสมมุติในเบราว์เซอร์ของผู้เยี่ยมชมเอง (ไม่ส่งอะไรออกไป) · API จริง = หน้าต่างๆ เรียก API ด้านล่าง')),
-            field(P, 'apiBase', 'ที่อยู่ API (เฉพาะ https://...)', { ph: 'https://api.example.com/v1', help: 'ใช้เมื่อเลือกโหมด API จริง · ระบบอนุญาตให้หน้าเว็บเรียกเฉพาะที่อยู่นี้ (ตั้ง CORS ให้โดเมนเว็บนี้ และ credentials ที่ฝั่ง API) · http ใช้ได้เฉพาะ localhost'}),
-            note('API ควรเก็บการล็อกอินเป็นคุกกี้ HttpOnly + Secure + SameSite และป้องกัน CSRF/จำกัดจำนวนครั้งที่ฝั่งของตัวเอง หน้าเว็บส่งคำขอแบบ credentials: include')),
+            h('label', { class: 'a-f' }, h('span', {}, 'โหมด'), modeSel, h('span', { class: 'h' }, 'Mockup = ใช้ข้อมูลสมมุติในเบราว์เซอร์ของผู้เยี่ยมชมเอง (ไม่ส่งข้อมูลไปที่ใด) · API จริง = หน้าเว็บเรียก API ของคุณโดยตรง ถ้าที่อยู่ไม่ถูกต้องจะกลับไปใช้ Mockup เอง')),
+            field(P, 'apiBase', 'ที่อยู่ API (เฉพาะ https://...)', { ph: 'https://api.example.com/v1', help: 'ใช้เมื่อเลือกโหมด API จริง · ระบบอนุญาตให้หน้าเว็บเชื่อมต่อเฉพาะโดเมนนี้เท่านั้น (ต้องเปิด CORS + credentials ที่ฝั่ง API)' }),
+            note('API ควรเก็บการล็อกอินเป็นคุกกี้ HttpOnly + Secure + SameSite และป้องกัน CSRF/จำกัดจำนวนครั้งที่ฝั่งของตัวเอง รายละเอียดข้อมูลที่ส่ง/รับอยู่ในไฟล์ API_SPEC_TH.md')),
           box('เส้นทาง API (ต่อท้ายที่อยู่ด้านบน)',
             two(field(P, 'epLogin', 'POST เข้าสู่ระบบ', { help: 'ส่ง {username, password} → {user}' }), field(P, 'epRegister', 'POST สมัคร', { help: 'ส่ง {username, email, password}' })),
             two(field(P, 'epLogout', 'POST ออกจากระบบ'), field(P, 'epForgot', 'POST ลืมรหัสผ่าน', { help: 'ส่ง {email}' })),
-            two(field(P, 'epMe', 'GET โปรไฟล์ / PUT แก้ไขโปรไฟล์', { help: 'คืน {name, username, email, phone, cash, point}' }), field(P, 'epPassword', 'POST เปลี่ยนรหัสผ่าน', { help: 'ส่ง {current, next}' })),
+            two(field(P, 'epMe', 'GET โปรไฟล์ / PUT แก้ไขโปรไฟล์', { help: 'คืน {uid, name, username, email, phone, level, club, joined, cash, rain, point, pointExpire}' }), field(P, 'epPassword', 'POST เปลี่ยนรหัสผ่าน', { help: 'ส่ง {current, next}' })),
             two(field(P, 'epHistory', 'GET ประวัติ', { help: 'คืน [{date,type,detail,amount}]' }), field(P, 'epCoupons', 'GET คูปอง', { help: 'คืน [{code,title,expires,status}]' })),
-            two(field(P, 'epItems', 'GET ไอเทมพิเศษ', { help: 'คืน [{name,qty,note}]' }), field(P, 'epPayments', 'GET วิธีชำระเงิน', { help: 'คืน [{type,label,note}] (ห้ามส่งเลขบัตรเต็ม)' })),
-            field(P, 'epRedeem', 'POST แลกรหัส', { help: 'ส่ง {code} → {message, user?}  ถ้าผิดพลาดตอบ 4xx พร้อม {message}' }))
+            two(field(P, 'epItems', 'GET ไอเทมพิเศษ', { help: 'คืน [{name,qty,note}]' }), field(P, 'epRedeem', 'POST แลกรหัสไอเทม', { help: 'ส่ง {code} → {message, user?}  ถ้าผิดพลาดตอบ 4xx พร้อม {message}' }))),
+          box('เส้นทาง API การเติมเงิน',
+            two(field(P, 'epTopup', 'GET ช่องทางเติมเงิน', { help: 'คืน {methods:[{id,name,title,logo,mode,packages:[{price,cash,point}]}]}' }), field(P, 'epTopupRedeem', 'POST เติมด้วยรหัสบัตร', { help: 'ส่ง {method, code} → {message, user}  (เซิร์ฟเวอร์เกมต้องตรวจรหัสเอง)' })),
+            field(P, 'epTopupCheckout', 'POST เริ่มชำระเงิน (PromptPay / Alipay / Wallet)', { help: 'ส่ง {method, methodName, price} → {url} (https เท่านั้น หน้าเว็บจะพาไปที่ url นั้น)' }))
+        ];
+      } },
+    { id: 'lr-member', g: 'ตั้งค่าเว็บ', label: 'บัญชีผู้เล่น & เติมเงิน', desc: 'ข้อความการ์ดสมาชิก ชื่อสกุลเงิน และช่องทาง/ราคาของหน้าเติมเงิน /account/topup', paths: ['portal', 'topup'], url: '/account/topup',
+      view: () => {
+        const P = C.portal;
+        const packagesEditor = m => {
+          const host = h('div', { class: 'a-pk' });
+          const draw = () => host.replaceChildren(
+            h('div', { class: 'a-pk-h' }, h('span', {}, 'ราคา (฿)'), h('span', {}, P.cashName || 'แคช'), h('span', {}, P.pointName || 'แต้มพ้อย'), h('span')),
+            ...m.packages.map((pk, i) => h('div', { class: 'a-pk-r' },
+              ...['price', 'cash', 'point'].map(k => { const inp = h('input', { type: 'text', inputmode: 'numeric', maxlength: 12 }); inp.value = pk[k] || ''; inp.addEventListener('input', () => { pk[k] = inp.value; mark(); }); return inp; }),
+              h('button', { type: 'button', class: 'ghost sm', 'aria-label': 'ลบแถว', onclick: () => { m.packages.splice(i, 1); draw(); mark(); } }, '✕'))),
+            h('button', { type: 'button', class: 'ghost sm', onclick: () => { m.packages.push({ price: '', cash: '', point: '' }); draw(); mark(); } }, '+ เพิ่มแพ็กเกจ'));
+          draw();
+          return h('div', { class: 'a-f' }, h('span', {}, 'ตารางราคา'), host, h('span', { class: 'h' }, 'แถวที่ไม่ใส่ราคาจะถูกลบตอนบันทึก · ตัวเลขล้วน เช่น 5000'));
+        };
+        return [
+          box('การ์ดสมาชิกและชื่อสกุลเงิน',
+            field(P, 'memberLabel', 'ข้อความบนการ์ดสมาชิก', { ph: 'RAYCITY-M MEMBER' }),
+            two(field(P, 'cashName', 'ชื่อสกุลเงินหลัก (เติมเงินได้)', { ph: 'แคช' }), field(P, 'rainName', 'ชื่อสกุลเงินในเกม', { ph: 'เรน' })),
+            field(P, 'pointName', 'ชื่อแต้มสะสม', { ph: 'แต้มพ้อย' })),
+          box('ระบบเติมเงิน',
+            note('เป็น Mockup: ไม่มีการตัดเงินหรือตรวจบัตรจริง ผู้ทดลองพิมพ์ DEMO-<ราคา> เช่น DEMO-150 เพื่อดูการเติมยอด เมื่อเชื่อม API จริง ช่องทางและราคาจะมาจาก API'),
+            check(P, 'topupEnabled', 'เปิดหน้าเติมเงิน (ปิด = ไม่มีเมนูและหน้า /account/topup)'),
+            field(P, 'topupTitle', 'ชื่อเมนู/หัวข้อหน้า', { ph: 'การเติมเงิน' })),
+          h('h2', { class: 'a-sub' }, 'ช่องทางเติมเงิน'),
+          note('โลโก้ของผู้ให้บริการ (TrueMoney, Razer, PromptPay ฯลฯ) เป็นเครื่องหมายการค้าของเจ้าของ ใช้เมื่อได้รับอนุญาตเท่านั้น ถ้าไม่ใส่รูป ระบบแสดงไอคอนทั่วไปพร้อมชื่อ'),
+          ...[].concat(listEditor(C.topup.methods, { title: m => m.name, blank: () => ({ id: '', name: '', title: '', logo: '', enabled: 'true', mode: 'code', codeLabel: 'กรอกรหัสบัตร', codePh: 'กรอกรหัส…', note: '', packages: [{ price: '50', cash: '5000', point: '38' }] }),
+            badge: m => h('span', { class: 'a-bd' + (m.enabled === 'true' || m.enabled === true ? ' on' : '') }, m.mode === 'checkout' ? 'ชำระเงิน' : 'รหัสบัตร'),
+            form: (m, u) => [
+              two(field(m, 'name', 'ชื่อช่องทาง (แสดงบนแผ่น)', { onchange: u }), check(m, 'enabled', 'แสดงช่องทางนี้')),
+              field(m, 'title', 'หัวข้อในหน้า (ชื่อเต็ม)', { ph: () => m.name }),
+              field(m, 'mode', 'รูปแบบการเติม', { type: 'select', options: [['code', 'กรอกรหัสบัตร (CashCard / Razer Gold)'], ['checkout', 'เลือกแพ็กเกจแล้วชำระเงิน (PromptPay / Alipay / Wallet)']] }),
+              field(m, 'logo', 'โลโก้ (ไม่บังคับ)', { type: 'image', help: 'แนะนำ PNG/WebP พื้นหลังโปร่ง กว้างราว 300px' }),
+              two(field(m, 'codeLabel', 'หัวข้อช่องกรอกรหัส (โหมดรหัสบัตร)'), field(m, 'codePh', 'ข้อความในช่องกรอก')),
+              field(m, 'note', 'หมายเหตุใต้ช่อง', { type: 'textarea' }),
+              packagesEditor(m)] }))
         ];
       } },
     { id: 'account', g: 'ตั้งค่าเว็บ', label: 'บัญชีแอดมิน', desc: 'เปลี่ยนรหัสผ่านผู้ดูแลระบบ', paths: [],
@@ -1115,12 +1182,19 @@
     { id: 'store', label: 'สโตร์ & กฎหมาย', hint: 'Privacy Terms Support คุกกี้ URL สโตร์', tabs: [tab('ready', 'ความพร้อมส่งสโตร์'), tab('urls', 'URL สำหรับสโตร์'), tab('p-privacy', 'Privacy'), tab('p-terms', 'Terms'), tab('p-support', 'Support & ติดต่อ'), tab('p-delete', 'ลบบัญชี'), tab('p-odds', 'อัตรากล่องสุ่ม'), tab('cookies', 'คุกกี้')] },
     { id: 'report', label: 'รายงาน & ความเร็ว', hint: 'ผู้เข้าชม PageSpeed', tabs: [tab('stats', 'สถิติผู้เข้าชม'), tab('pagespeed', 'PageSpeed')] },
     { id: 'media', label: 'คลังรูป & วิดีโอ', hint: 'ไฟล์ที่อัปโหลด', tabs: [tab('media', 'คลังรูป & วิดีโอ')] },
-    { id: 'settings', label: 'ตั้งค่า', hint: 'SEO ระบบสมาชิก รหัสผ่าน 2FA ประวัติ', tabs: [tab('general', 'เว็บไซต์ & SEO'), tab('portal', 'ระบบสมาชิก'), tab('account', 'บัญชี & ความปลอดภัย'), tab('history', 'ประวัติการแก้ไข')] }
+    { id: 'settings', label: 'ตั้งค่า', hint: 'SEO Login & Register รหัสผ่าน 2FA ประวัติ', groups: [
+      { id: 'site', label: 'เว็บไซต์ & SEO', tabs: [tab('general', 'เว็บไซต์ & SEO')] },
+      { id: 'lr', label: 'Login & Register', tabs: [tab('lr-login', 'ระบบล็อกอิน'), tab('lr-register', 'ระบบสมัครสมาชิก'), tab('lr-api', 'API'), tab('lr-member', 'บัญชีผู้เล่น & เติมเงิน')] },
+      { id: 'acct', label: 'บัญชี & ความปลอดภัย', tabs: [tab('account', 'บัญชี & ความปลอดภัย')] },
+      { id: 'hist', label: 'ประวัติการแก้ไข', tabs: [tab('history', 'ประวัติการแก้ไข')] }] }
   ];
+  // a menu with sub-menus (a dropdown) lists all of its tabs too, so saving and the "go fix it" buttons treat it like any other
+  for (const m of MENUS) if (m.groups) m.tabs = m.groups.flatMap(g => g.tabs);
   const SECTIONS = MENUS.flatMap(m => m.tabs.map(t => Object.assign(t, { g: m.label, menu: m.id })));
   const sec = id => SECTIONS.find(s => s.id === id);
   const tabOf = id => SECTIONS.find(s => s.parts.includes(id));
   const menuOf = id => MENUS.find(m => m.tabs.some(t => t.id === id));
+  const groupOf = (m, id) => (m.groups || []).find(g => g.tabs.some(t => t.id === id));
   const lastTab = {};
   const open = id => { const t = tabOf(id) || SECTIONS[0]; cur = t.id; render(); window.scrollTo(0, 0); };
   for (const x of PARTS) if (!tabOf(x.id)) console.error('admin: part not in any menu: ' + x.id);
@@ -1137,16 +1211,27 @@
   }
 
   function render() {
-    const s = sec(cur), menu = menuOf(cur);
-    lastTab[menu.id] = cur;
-    navBtns = {}; menuBtns = {};
+    const s = sec(cur), menu = menuOf(cur), group = groupOf(menu, cur);
+    lastTab[menu.id] = cur; if (group) lastTab[group.id] = cur;
+    navBtns = {}; menuBtns = {}; subBtns = {};
     const side = h('aside', { class: 'a-side' },
       h('div', { class: 'a-brand' }, h('img', { src: C.site.logo || '/img/logo.png', alt: '' }), h('div', {}, h('b', {}, C.site.name || 'Admin'), h('small', {}, 'ADMIN'))),
-      h('nav', { 'aria-label': 'เมนูหลังบ้าน', class: 'a-menus' }, ...MENUS.map(m => {
-        const b = h('button', { class: 'a-nav' + (m.id === menu.id ? ' on' : '') + (m.tabs.some(t => dirty.has(t.id)) ? ' dirty' : ''), 'aria-current': m.id === menu.id ? 'page' : null,
-          onclick: () => { cur = lastTab[m.id] || m.tabs[0].id; render(); if (innerWidth <= 900) document.querySelector('.a-main').scrollIntoView(); else window.scrollTo(0, 0); } },
-          h('span', {}, m.label, h('small', {}, m.hint)), h('i'));
-        menuBtns[m.id] = b; return b;
+      h('nav', { 'aria-label': 'เมนูหลังบ้าน', class: 'a-menus' }, ...MENUS.flatMap(m => {
+        const here = m.id === menu.id;
+        const b = h('button', { class: 'a-nav' + (here ? ' on' : '') + (m.tabs.some(t => dirty.has(t.id)) ? ' dirty' : ''), 'aria-current': here ? 'page' : null, 'aria-expanded': m.groups ? String(here && subOpen) : null,
+          onclick: () => {
+            // a dropdown menu: a second click on the open one folds it, a click on another one opens it
+            if (m.groups && here) { subOpen = !subOpen; render(); return; }
+            subOpen = true; cur = lastTab[m.id] || m.tabs[0].id; render(); if (innerWidth <= 900) document.querySelector('.a-main').scrollIntoView(); else window.scrollTo(0, 0);
+          } },
+          h('span', {}, m.label, h('small', {}, m.hint)), h('i'), m.groups ? h('b', { class: 'a-chev', 'aria-hidden': 'true' }, here && subOpen ? '▾' : '▸') : null);
+        menuBtns[m.id] = b;
+        const subs = m.groups && here && subOpen ? [h('div', { class: 'a-subnav', role: 'group', 'aria-label': m.label }, ...m.groups.map(g => {
+          const sb = h('button', { class: 'a-sn' + (group && g.id === group.id ? ' on' : '') + (g.tabs.some(t => dirty.has(t.id)) ? ' dirty' : ''), 'aria-current': group && g.id === group.id ? 'page' : null,
+            onclick: () => { cur = lastTab[g.id] || g.tabs[0].id; render(); if (innerWidth <= 900) document.querySelector('.a-main').scrollIntoView(); else window.scrollTo(0, 0); } }, h('span', {}, g.label), h('i'));
+          subBtns[g.id] = sb; return sb;
+        }))] : [];
+        return [b].concat(subs);
       })),
       h('div', { class: 'a-grow' }),
       h('div', { class: 'a-foot-nav' },
@@ -1154,9 +1239,10 @@
         h('button', { class: 'a-nav', onclick: async () => { if (dirty.size && !confirm('มีการแก้ไขที่ยังไม่บันทึก ออกจากระบบ?')) return; try { await api('logout', 'POST'); } catch (e) {} csrf = ''; dirty.clear(); loginScreen(); } }, h('span', {}, 'ออกจากระบบ'))));
 
     const head = h('div', { class: 'a-head' },
-      h('div', {}, h('span', { class: 'eyebrow' }, menu.label), h('h1', { class: 'disp' }, s.title), h('p', {}, s.desc)),
+      h('div', {}, h('span', { class: 'eyebrow' }, menu.label + (group && menu.groups.length > 1 ? ' › ' + group.label : '')), h('h1', { class: 'disp' }, s.title), h('p', {}, s.desc)),
       s.url ? h('div', { class: 'acts' }, h('a', { class: 'ghost sm', href: s.url, target: '_blank', rel: 'noopener' }, 'ดูหน้านี้ ↗')) : null);
-    const tabs = menu.tabs.length > 1 ? h('div', { class: 'a-tabs', role: 'tablist', 'aria-label': menu.label }, ...menu.tabs.map(t => {
+    const tabSet = group ? group.tabs : menu.tabs;
+    const tabs = tabSet.length > 1 ? h('div', { class: 'a-tabs', role: 'tablist', 'aria-label': group ? group.label : menu.label }, ...tabSet.map(t => {
       const b = h('button', { type: 'button', role: 'tab', 'aria-selected': t.id === cur ? 'true' : 'false', class: 'a-tab' + (t.id === cur ? ' on' : '') + (dirty.has(t.id) ? ' dirty' : ''),
         onclick: () => open(t.id) }, h('span', {}, t.label), t.count ? h('em', { class: 'n' }, String(t.count())) : null, h('i'));
       navBtns[t.id] = b; return b;

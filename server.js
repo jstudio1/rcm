@@ -585,7 +585,7 @@ const server = http.createServer(async (req, res) => {
     // member portal: only exists while it is switched on in the admin (and registration only while it is open)
     if (portal.PATHS[p]) {
       const key = portal.PATHS[p];
-      return portal.enabled(c) && (key !== 'register' || portal.registerOpen(c)) ? page(render.account(c, base, key)) : page(render.notFound(c, base), 404);
+      return portal.enabled(c) && (key !== 'register' || portal.registerOpen(c)) && (key !== 'forgot' || portal.forgotOpen(c)) && (key !== 'topup' || portal.topupOn(c)) ? page(render.account(c, base, key)) : page(render.notFound(c, base), 404);
     }
     // the English site: same pages and data, English twin fields where they are filled in
     if (p === '/en' || /^\/en\/(rewards|gameplay|drivers|news)$/.test(p)) {

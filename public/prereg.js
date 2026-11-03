@@ -31,6 +31,7 @@
       col.className = 'pr-col ' + s;
       col.querySelector('[data-chip]').textContent = s === 'reached' ? T.reached : s === 'next' ? T.nextLabel : T.locked;
       if (details[i]) details[i].classList.toggle('ok', s === 'reached');
+      col.style.setProperty('--f', (i >= goals.length - 1 ? 0 : Math.max(0, Math.min(100, (count - goals[i]) / (goals[i + 1] - goals[i]) * 100))) + '%');
     });
     if (doneEl) doneEl.textContent = String(reached);
     nextText(nextIdx < 0 ? 0 : goals[nextIdx] - count);

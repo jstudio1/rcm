@@ -6,8 +6,12 @@ const src = fs.readFileSync(path.resolve(__dirname, '../admin/admin.js'), 'utf8'
 
 test('admin menus: six menus, every screen placed once, nothing orphaned', () => {
   const block = /const MENUS = \[([\s\S]*?)\n  \];/.exec(src)[1];
-  const menus = [...block.matchAll(/\{ id: '([\w-]+)', label: '([^']+)'/g)].map(m => m[1]);
+  const menus = [...block.matchAll(/^    \{ id: '([\w-]+)', label: '([^']+)'/gm)].map(m => m[1]);
   assert.deepEqual(menus, ['home', 'content', 'store', 'report', 'media', 'settings']);
+  // Settings is a dropdown: Login & Register holds the login, register, API and account/top-up screens as its own tabs
+  const groups = [...block.matchAll(/^      \{ id: '([\w-]+)', label: '([^']+)', tabs: \[(.*)\] \}/gm)].map(m => [m[1], m[2], [...m[3].matchAll(/tab\('([\w-]+)'/g)].map(x => x[1])]);
+  assert.deepEqual(groups.map(g => g[0]), ['site', 'lr', 'acct', 'hist']);
+  assert.deepEqual(groups.find(g => g[0] === 'lr'), ['lr', 'Login & Register', ['lr-login', 'lr-register', 'lr-api', 'lr-member']]);
   const parts = [];
   for (const m of block.matchAll(/tab\('([\w-]+)',\s*'[^']+'(?:,\s*\[([^\]]*)\])?\)/g)) { parts.push(m[1]); if (m[2]) parts.push(...[...m[2].matchAll(/'([\w-]+)'/g)].map(x => x[1])); }
   assert.equal(new Set(parts).size, parts.length, 'a screen appears in two tabs');

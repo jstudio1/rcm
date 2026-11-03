@@ -109,11 +109,11 @@ $env:ADMIN_USER="admin"; $env:ADMIN_PASSWORD="รหัสผ่านของ�
 - **สโตร์ & กฎหมาย → URL สำหรับสโตร์**: รวม URL ที่ต้องกรอกในสโตร์พร้อมปุ่มคัดลอก และปุ่ม "ตรวจทุกลิงก์" (ต้องตั้ง URL เว็บเป็น https ก่อน; ตัวตรวจถูกกันไม่ให้เรียกที่อยู่ภายใน/ SSRF)
 
 ## ระบบสมาชิก (ล็อกอิน/สมัคร) — Mockup พร้อมต่อ API
-- เปิดที่หลังบ้าน **ตั้งค่า → ระบบสมาชิก** (ปิดอยู่เป็นค่าเริ่มต้น = ไม่มีหน้าและไม่มีปุ่มบนเมนู) หน้า: `/login`, `/register`, `/forgot-password`, `/account` (ภาพรวม), `/account/profile`, `/security`, `/payment`, `/history`, `/coupon`, `/items`, `/redeem` ทุกหน้า noindex และไม่อยู่ใน sitemap
+- เปิดที่หลังบ้าน **ตั้งค่า → Login & Register** (ปิดอยู่เป็นค่าเริ่มต้น = ไม่มีหน้าและไม่มีปุ่มบนเมนู) หน้า: `/login`, `/register`, `/forgot-password`, `/account` (ภาพรวม), `/account/profile`, `/security`, `/topup` (เติมเงิน), `/history`, `/coupon`, `/items`, `/redeem` ทุกหน้า noindex และไม่อยู่ใน sitemap
 - โหมด **Mockup**: ข้อมูลสมมุติเก็บในเบราว์เซอร์ของผู้เข้าชมเอง ไม่ส่งอะไรออกไป ไม่เก็บรหัสผ่าน (มีแถบ MOCKUP แจ้งบนหน้า)
 - โหมด **API จริง**: ใส่ที่อยู่ API (https เท่านั้น, http ได้เฉพาะ localhost) ระบบเพิ่มเฉพาะ origin นั้นใน CSP `connect-src` หน้าเว็บเรียกด้วย `credentials: 'include'` ให้ API เก็บล็อกอินเป็นคุกกี้ HttpOnly/Secure/SameSite และตั้ง CORS ให้โดเมนเว็บนี้ ไม่มีรหัสผ่าน/โทเคนเก็บใน localStorage
 - เส้นทางที่เรียก (แก้ได้ในหลังบ้าน): `POST /auth/login {username,password}`, `POST /auth/register {username,email,password}`, `POST /auth/logout`, `POST /auth/forgot-password {email}`, `GET|PUT /me` (`{name,username,email,phone,cash,point}`), `POST /me/password {current,next}`, `GET /me/history` (`[{date,type,detail,amount}]`), `GET /me/coupons` (`[{code,title,expires,status}]`), `GET /me/items` (`[{name,qty,note}]`), `GET /me/payment-methods` (`[{type,label,note}]` ห้ามส่งเลขบัตรเต็ม), `POST /me/redeem {code}` → `{message,user?}` ตอบ 401 เมื่อยังไม่ล็อกอิน และ 4xx พร้อม `{message}` เมื่อผิดพลาด
-- ไฟล์: `lib/portal.js` (หน้า), `public/account.js` (ตัวเชื่อม mock/API), `public/account.css`
+- ไฟล์: `lib/portal.js` (หน้า), `public/account.js` (ตัวเชื่อม mock/API), `public/account.css` · สเปก API สำหรับทีมเกม: `API_SPEC_TH.md`
 - **ปุ่มหน้าแรก**: ที่ หน้าแรก → ปุ่มดาวน์โหลด & โซเชียล มีช่อง "แสดงปุ่มนี้" ของ Windows/App Store/Google Play/Facebook/TikTok/Discord/YouTube และปุ่มลงทะเบียน (ที่หน้าแรก) ปิด = ซ่อนปุ่ม
 
 ## ลงทะเบียนล่วงหน้า & รางวัล (Mockup พร้อมต่อระบบเกม)

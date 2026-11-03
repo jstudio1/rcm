@@ -43,6 +43,7 @@ test('pre-registration rewards', async t => {
       const { status, html } = await get(p); assert.equal(status, 200, p);
       assert.match(html, /<b data-count data-n="13002">13,002<\/b>/, p); assert.ok(html.includes('/prereg.js') && html.includes('/prereg.css'), p);
       assert.deepEqual(states(html), ['reached:1000', 'reached:3000', 'reached:5000', 'reached:10000', 'next:20000', 'locked:30000'], p);
+      assert.deepEqual([...html.matchAll(/<li class="pr-col \w+" data-goal="\d+" style="--f:([\d.]+)%"/g)].map(m => Number(m[1])), [100, 100, 100, 30, 0, 0], 'the line between two goals is filled as far as the count has come: ' + p);
       assert.match(html, /อีกเพียง <b data-left>6,998<\/b> คน/); assert.match(html, /<b data-reached>4<\/b> \/ 6/);
       assert.ok(html.includes('ถึงเป้าหมายแล้ว') && html.includes('เป้าหมายถัดไป') && html.includes('ยังไม่ถึงเป้า'));
     }
@@ -118,6 +119,7 @@ test('pre-registration rewards', async t => {
 
   await t.test('script is text-only and fetches the count without cookies', () => {
     const js = fs.readFileSync(path.join(source, 'public/prereg.js'), 'utf8');
+    assert.ok(js.includes("setProperty('--f'"), 'the live count moves the fill too');
     for (const bad of ['innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write', 'eval(', 'new Function']) assert.equal(js.includes(bad), false, bad);
     assert.ok(js.includes("credentials: 'omit'"));
   });
