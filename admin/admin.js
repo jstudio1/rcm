@@ -2,7 +2,7 @@
   const app = document.getElementById('app');
   let csrf = '', C = null, saved = null, cur = 'home';
   const dirty = new Set();
-  let navBtns = {}, menuBtns = {}, subBtns = {}, barEls = {}, subOpen = true;
+  let navBtns = {}, menuBtns = {}, subBtns = {}, barEls = {}, subOpen = true, drawerOpen = false;
 
   // ---------- tiny helpers ----------
   const safeLink = value => { const u = String(value || '').trim(); return !/[\\\x00-\x20\x7f]/.test(u) && /^(https?:\/\/[^/]|\/(?!\/)|#|mailto:)/i.test(u) ? u : '#'; };
@@ -226,8 +226,81 @@
         h('div', { class: 'a-g' }, h('small', {}, 'ตัวอย่างบน Google'), g.u, g.t, g.d)));
   }
 
+  // ---------- card list + side editor (news, gameplay, drivers, rewards) ----------
+  // Cards with a picture, filters on top; the chosen card opens in a panel beside the list (a full-screen sheet on small screens)
+  // spec: title, thumb, meta, badge, quick, en (all take the item), filters [[id, label, [[value, label]...], (item, value) => bool]], stats(list) -> text
+  function cardEditor(arr, spec) {
+    const grid = h('div', { class: 'a-cards' });
+    const panel = h('aside', { class: 'a-panel', 'aria-label': 'แก้ไขรายการ' });
+    const wrap = h('div', { class: 'a-split' }, h('div', { class: 'a-cl' }, grid), panel);
+    const q = h('input', { type: 'search', placeholder: 'ค้นหา…', 'aria-label': 'ค้นหา' });
+    const fvals = {}, fsel = (spec.filters || []).map(([id, label, opts]) => {
+      fvals[id] = '';
+      const s = h('select', { 'aria-label': label }, h('option', { value: '' }, label + ': ทั้งหมด'), ...opts.map(([v, l]) => h('option', { value: v }, l)));
+      s.addEventListener('change', () => { fvals[id] = s.value; draw(); });
+      return s;
+    });
+    const stat = h('div', { class: 'a-stat' });
+    let selIt = null, dragFrom = -1;
+    const shown = () => {
+      const s = q.value.trim().toLowerCase();
+      return arr.filter(it => (!s || JSON.stringify(it).toLowerCase().includes(s)) && (spec.filters || []).every(([id, , , test]) => !fvals[id] || test(it, fvals[id])));
+    };
+    const filtered = () => !!q.value.trim() || Object.values(fvals).some(Boolean);
+    function select(it) {
+      selIt = it; wrap.classList.toggle('has-sel', !!it);
+      document.body.classList.toggle('a-sheet', !!it);
+      if (!it) { panel.replaceChildren(); [...grid.children].forEach(c => c.classList.remove('on')); return; }
+      const i = arr.indexOf(it);
+      const ttl = h('b', {}, spec.title(it) || '(ยังไม่ตั้งชื่อ)');
+      const upd = () => { ttl.textContent = spec.title(it) || '(ยังไม่ตั้งชื่อ)'; const c = grid.querySelector('.a-card.on .t'); if (c) c.textContent = ttl.textContent; };
+      const move = d => () => { const j = arr.indexOf(it) + d; if (j < 0 || j >= arr.length) return; const k = arr.indexOf(it); [arr[k], arr[j]] = [arr[j], arr[k]]; mark(); draw(); };
+      panel.replaceChildren(
+        h('div', { class: 'a-ph' }, h('span', { class: 'no' }, String(i + 1).padStart(2, '0')), ttl,
+          h('button', { type: 'button', class: 'ghost sm', title: 'เลื่อนขึ้น', 'aria-label': 'เลื่อนขึ้น', onclick: move(-1) }, '↑'),
+          h('button', { type: 'button', class: 'ghost sm', title: 'เลื่อนลง', 'aria-label': 'เลื่อนลง', onclick: move(1) }, '↓'),
+          h('button', { type: 'button', class: 'ghost sm', onclick: () => { if (confirm('ลบรายการนี้?')) { arr.splice(arr.indexOf(it), 1); mark(); select(null); draw(); } } }, 'ลบ'),
+          h('button', { type: 'button', class: 'btn sm', onclick: () => select(null) }, 'เสร็จ')),
+        h('div', { class: 'a-pb' }, ...spec.form(it, upd)));
+      [...grid.children].forEach(c => c.classList.toggle('on', c._it === it));
+    }
+    function draw() {
+      const list = shown();
+      grid.replaceChildren();
+      if (!arr.length) grid.append(h('div', { class: 'a-empty' }, 'ยังไม่มีรายการ กด "+ เพิ่มรายการ" เพื่อเริ่ม'));
+      else if (!list.length) grid.append(h('div', { class: 'a-empty' }, 'ไม่พบรายการตามตัวกรอง'));
+      list.forEach(it => {
+        const url = spec.thumb(it), th = h('div', { class: 'th' });
+        if (url) { const img = h('img', { src: url, alt: '', loading: 'lazy' }); img.addEventListener('error', () => img.remove()); th.append(img); } else th.append(h('span', {}, 'ไม่มีรูป'));
+        if (spec.badge) th.append(h('div', { class: 'bd' }, spec.badge(it)));
+        const hasEn = spec.en ? spec.en(it) : null;
+        const card = h('div', { class: 'a-card' + (it === selIt ? ' on' : ''), tabindex: '0', role: 'button', 'aria-label': 'แก้ไข ' + (spec.title(it) || ''), draggable: filtered() ? null : 'true' },
+          th, h('div', { class: 'cb' }, h('b', { class: 't' }, spec.title(it) || '(ยังไม่ตั้งชื่อ)'),
+            h('small', {}, spec.meta ? spec.meta(it) : ''),
+            h('div', { class: 'cf' }, hasEn === null ? null : h('span', { class: 'en' + (hasEn ? ' ok' : '') }, hasEn ? 'EN' : 'ไม่มี EN'), spec.quick ? spec.quick(it) : null)));
+        card._it = it;
+        card.addEventListener('click', e => { if (e.target.closest('label,input,button')) return; select(it); });
+        card.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); select(it); } });
+        card.addEventListener('dragstart', e => { dragFrom = arr.indexOf(it); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); setTimeout(() => card.classList.add('drag'), 0); });
+        card.addEventListener('dragend', () => { card.classList.remove('drag'); dragFrom = -1; });
+        card.addEventListener('dragover', e => { if (dragFrom < 0) return; e.preventDefault(); card.classList.add('over'); });
+        card.addEventListener('dragleave', () => card.classList.remove('over'));
+        card.addEventListener('drop', e => { e.preventDefault(); const to = arr.indexOf(it); if (dragFrom < 0 || dragFrom === to) return; const [m] = arr.splice(dragFrom, 1); arr.splice(to, 0, m); dragFrom = -1; mark(); draw(); });
+        grid.append(card);
+      });
+      stat.textContent = (spec.stats ? spec.stats(arr) : arr.length + ' รายการ') + (filtered() ? ' · แสดง ' + list.length : '');
+    }
+    q.addEventListener('input', draw);
+    const add = () => { const n = Object.assign({ id: uid() }, spec.blank()); spec.addTop ? arr.unshift(n) : arr.push(n); q.value = ''; for (const k in fvals) fvals[k] = ''; fsel.forEach(s => { s.value = ''; }); mark(); draw(); select(n); };
+    document.addEventListener('keydown', function esc(e) { if (!document.body.contains(wrap)) { document.removeEventListener('keydown', esc); return; } if (e.key === 'Escape' && selIt) select(null); });
+    const tools = h('div', { class: 'a-tools' }, q, ...fsel, h('button', { type: 'button', class: 'btn sm', onclick: add }, '+ เพิ่มรายการ'));
+    draw();
+    return [stat, tools, wrap];
+  }
+
   // ---------- list editor: drag to reorder, search, collapse all ----------
   function listEditor(arr, spec) {
+    if (spec.thumb) return cardEditor(arr, spec);
     const list = h('div', { class: 'a-list' });
     const items = [];
     let dragFrom = -1;
@@ -781,7 +854,11 @@
   const PARTS = [
     { id: 'news', g: 'เนื้อหา', label: 'ข่าวสาร', desc: 'เพิ่ม/แก้ไขข่าว กดติ๊ก "เผยแพร่" เมื่อพร้อมขึ้นเว็บ ลากที่ ⋮⋮ เพื่อเรียงลำดับ', paths: ['news'], url: '/news', count: () => C.news.length,
       view: () => listEditor(C.news, {
-        addTop: true, title: n => n.title, badge: n => h('span', { class: 'a-bd' + (n.published ? ' on' : '') }, n.published ? 'เผยแพร่' : 'ฉบับร่าง'),
+        addTop: true, title: n => n.title, thumb: n => n.image, meta: n => (n.tag || '') + ' · ' + (n.date || ''), en: n => !!String(n.titleEn || '').trim(),
+        badge: n => h('span', { class: 'a-bd' + (n.published ? ' on' : '') }, n.published ? 'เผยแพร่' : 'ฉบับร่าง'),
+        quick: n => check(n, 'published', 'เผยแพร่'),
+        stats: l => l.length + ' ข่าว · เผยแพร่ ' + l.filter(n => n.published === true || n.published === 'true').length + ' · ฉบับร่าง ' + l.filter(n => !(n.published === true || n.published === 'true')).length + ' · แปลอังกฤษแล้ว ' + l.filter(n => String(n.titleEn || '').trim()).length,
+        filters: [['tag', 'หมวด', NEWS_TAGS.map(t => [t, t]), (n, v) => n.tag === v], ['st', 'สถานะ', [['pub', 'เผยแพร่'], ['draft', 'ฉบับร่าง']], (n, v) => (n.published === true || n.published === 'true') === (v === 'pub')], ['en', 'English', [['no', 'ยังไม่มี EN'], ['yes', 'มี EN แล้ว']], (n, v) => !!String(n.titleEn || '').trim() === (v === 'yes')]],
         blank: () => ({ title: '', slug: '', date: new Date().toISOString().slice(0, 10), tag: 'NEWS', published: false, image: '', excerpt: '', body: '', seoTitle: '', seoDescription: '', titleEn: '', excerptEn: '', bodyEn: '' }),
         form: (n, u) => [
           field(n, 'title', 'หัวข้อข่าว (H1)', { onchange: u }),
@@ -795,7 +872,7 @@
           seoBox(n, 'seoTitle', 'seoDescription', { url: () => '/news/' + (n.slug || '…'), fbT: () => (n.title || '') + ' | ' + C.site.name, fbD: () => n.excerpt })]
       }) },
     { id: 'gameplay', g: 'เนื้อหา', label: 'Gameplay', desc: 'การ์ดอธิบายระบบเกม แต่ละใบมีรูปและข้อความ', paths: ['gameplay'], url: '/gameplay', count: () => C.gameplay.length,
-      view: () => listEditor(C.gameplay, { title: g => g.title, blank: () => ({ title: '', desc: '', image: '', alt: '', titleEn: '', descEn: '', altEn: '' }),
+      view: () => listEditor(C.gameplay, { title: g => g.title, thumb: g => g.image, meta: g => g.desc, en: g => !!String(g.titleEn || '').trim(), stats: l => l.length + ' การ์ด · แปลอังกฤษแล้ว ' + l.filter(g => String(g.titleEn || '').trim()).length, filters: [['en', 'English', [['no', 'ยังไม่มี EN'], ['yes', 'มี EN แล้ว']], (g, v) => !!String(g.titleEn || '').trim() === (v === 'yes')]], blank: () => ({ title: '', desc: '', image: '', alt: '', titleEn: '', descEn: '', altEn: '' }),
         form: (g, u) => [field(g, 'title', 'หัวข้อ (H3)', { onchange: u }), field(g, 'desc', 'รายละเอียด', { type: 'textarea' }), field(g, 'image', 'รูปภาพ', { type: 'image', help: 'แนะนำ 1200×900 (4:3) JPG/WebP ไม่เกิน ~300KB · รูปถูกครอบให้เต็มการ์ด วางจุดเด่นไว้ครึ่งบน' }), field(g, 'alt', 'ข้อความอธิบายรูป (alt)', { help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น' }), enBox(enField(g, 'title', 'หัวข้อ'), enField(g, 'desc', 'รายละเอียด', { type: 'textarea' }), enField(g, 'alt', 'alt'))] }) },
     { id: 'prereg', g: 'เนื้อหา', label: 'ลงทะเบียนล่วงหน้า & รางวัล', desc: 'ตัวนับผู้ลงทะเบียนล่วงหน้าและรางวัลตามเป้าหมาย แสดงที่หน้าแรกและหน้า /rewards เตรียมไว้เชื่อมกับระบบเกม', paths: ['prereg'], url: '/rewards', count: () => C.rewards.length,
       view: () => {
@@ -825,10 +902,10 @@
       } },
     { id: 'rewards', g: 'เนื้อหา', label: 'รายการรางวัล (เป้าหมาย)', desc: 'รางวัลที่ปลดล็อกเมื่อยอดลงทะเบียนถึงเป้าหมาย เรียงตามเป้าหมายให้อัตโนมัติ', paths: ['rewards'], url: '/rewards', count: () => C.rewards.length,
       view: () => [note('ใส่ "เป้าหมาย (ตัวเลข)" เช่น 5000 ระบบเทียบกับจำนวนผู้ลงทะเบียนเพื่อบอกว่าถึงเป้าหรือยัง ถ้าเว้นว่างจะอ่านจากป้ายเป้าหมาย เช่น 50K = 50,000 · รายการที่ไม่มีตัวเลขเป้าหมายจะไม่แสดงในแถบรางวัล'),
-        listEditor(C.rewards, { title: r => (r.milestone || r.target ? (r.milestone || r.target) + ' · ' : '') + r.title, blank: () => ({ milestone: '', target: '', title: '', desc: '', image: '', alt: '', status: '', titleEn: '', descEn: '', altEn: '' }),
+        listEditor(C.rewards, { title: r => (r.milestone || r.target ? (r.milestone || r.target) + ' · ' : '') + r.title, thumb: r => r.image, meta: r => r.desc, en: r => !!String(r.titleEn || '').trim(), blank: () => ({ milestone: '', target: '', title: '', desc: '', image: '', alt: '', status: '', titleEn: '', descEn: '', altEn: '' }),
         form: (r, u) => [two(field(r, 'target', 'เป้าหมาย (ตัวเลขผู้ลงทะเบียน)', { ph: '5000', onchange: u }), field(r, 'milestone', 'ป้ายเป้าหมาย (ไม่บังคับ)', { ph: '5,000', help: 'ใช้แสดงในการ์ดรายการ/หน้าเก่า' })), field(r, 'title', 'ชื่อรางวัล', { onchange: u }), field(r, 'desc', 'รายละเอียดรางวัล', { type: 'textarea' }), field(r, 'image', 'รูปรางวัล (ไม่บังคับ)', { type: 'image', ph: '/img/...' }), field(r, 'alt', 'คำอธิบายรูป (alt)'), enBox(enField(r, 'title', 'ชื่อรางวัล'), enField(r, 'desc', 'รายละเอียดรางวัล', { type: 'textarea' }), enField(r, 'alt', 'alt'))] })] },
     { id: 'drivers', g: 'เนื้อหา', label: 'Drivers', desc: 'การ์ดนักซิ่ง/รถ แต่ละใบมีรูป ป้ายมุม และชื่อ', paths: ['drivers'], url: '/drivers', count: () => C.drivers.length,
-      view: () => listEditor(C.drivers, { title: d => d.title, blank: () => ({ title: '', desc: '', image: '', pos: 'center', badge: '', titleEn: '', descEn: '', altEn: '', badgeEn: '' }),
+      view: () => listEditor(C.drivers, { title: d => d.title, thumb: d => d.image, meta: d => [d.badge, d.desc].filter(Boolean).join(' · '), en: d => !!String(d.titleEn || '').trim(), stats: l => l.length + ' นักซิ่ง · แปลอังกฤษแล้ว ' + l.filter(d => String(d.titleEn || '').trim()).length, filters: [['en', 'English', [['no', 'ยังไม่มี EN'], ['yes', 'มี EN แล้ว']], (d, v) => !!String(d.titleEn || '').trim() === (v === 'yes')]], blank: () => ({ title: '', desc: '', image: '', pos: 'center', badge: '', titleEn: '', descEn: '', altEn: '', badgeEn: '' }),
         form: (d, u) => [field(d, 'title', 'ชื่อ (H3)', { onchange: u }), field(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), field(d, 'image', 'รูปภาพ', { type: 'image', help: 'แนะนำ 1000×1250 (4:5) หรือ 1000×1000 JPG/WebP ไม่เกิน ~300KB · ถ้าหน้าคนโดนตัด ตั้ง "ตำแหน่งรูป" เป็น center top' }), field(d, 'alt', 'ข้อความอธิบายรูป (alt)', { ph: () => d.title, help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น · เว้นว่าง = ใช้ชื่อ' }), enBox(enField(d, 'title', 'ชื่อ'), enField(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), enField(d, 'badge', 'ป้ายมุมการ์ด'), enField(d, 'alt', 'alt')),
           two(field(d, 'pos', 'ตำแหน่งรูป (CSS)', { help: 'เช่น center, 30% center' }), field(d, 'badge', 'ป้ายมุมการ์ด', { help: 'เช่น COMING SOON' }))] }) },
     { id: 'faq', g: 'เนื้อหา', label: 'FAQ', desc: 'คำถามที่พบบ่อย ระบบส่งข้อมูลให้ Google แสดงเป็นคำถาม-คำตอบอัตโนมัติ', paths: ['faq'], url: '/faq', count: () => C.faq.length,
@@ -1192,6 +1269,8 @@
   for (const m of MENUS) if (m.groups) m.tabs = m.groups.flatMap(g => g.tabs);
   const SECTIONS = MENUS.flatMap(m => m.tabs.map(t => Object.assign(t, { g: m.label, menu: m.id })));
   const sec = id => SECTIONS.find(s => s.id === id);
+  // Esc closes the slide-in menu
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && drawerOpen) { drawerOpen = false; for (const [q, c] of [['.a-side', 'open'], ['.a-back', 'on']]) { const n = document.querySelector(q); if (n) n.classList.remove(c); } document.body.classList.remove('a-lock'); } });
   const tabOf = id => SECTIONS.find(s => s.parts.includes(id));
   const menuOf = id => MENUS.find(m => m.tabs.some(t => t.id === id));
   const groupOf = (m, id) => (m.groups || []).find(g => g.tabs.some(t => t.id === id));
@@ -1211,24 +1290,26 @@
   }
 
   function render() {
+    document.body.classList.remove('a-sheet');
     const s = sec(cur), menu = menuOf(cur), group = groupOf(menu, cur);
     lastTab[menu.id] = cur; if (group) lastTab[group.id] = cur;
     navBtns = {}; menuBtns = {}; subBtns = {};
-    const side = h('aside', { class: 'a-side' },
-      h('div', { class: 'a-brand' }, h('img', { src: C.site.logo || '/img/logo.png', alt: '' }), h('div', {}, h('b', {}, C.site.name || 'Admin'), h('small', {}, 'ADMIN'))),
+    const closeDrawer = () => { drawerOpen = false; applyDrawer(); };
+    const side = h('aside', { class: 'a-side' + (drawerOpen ? ' open' : ''), id: 'a-side' },
+      h('div', { class: 'a-brand' }, h('img', { src: C.site.logo || '/img/logo.png', alt: '' }), h('div', {}, h('b', {}, C.site.name || 'Admin'), h('small', {}, 'ADMIN')), h('button', { type: 'button', class: 'a-close', 'aria-label': 'ปิดเมนู', onclick: closeDrawer }, '✕')),
       h('nav', { 'aria-label': 'เมนูหลังบ้าน', class: 'a-menus' }, ...MENUS.flatMap(m => {
         const here = m.id === menu.id;
         const b = h('button', { class: 'a-nav' + (here ? ' on' : '') + (m.tabs.some(t => dirty.has(t.id)) ? ' dirty' : ''), 'aria-current': here ? 'page' : null, 'aria-expanded': m.groups ? String(here && subOpen) : null,
           onclick: () => {
             // a dropdown menu: a second click on the open one folds it, a click on another one opens it
             if (m.groups && here) { subOpen = !subOpen; render(); return; }
-            subOpen = true; cur = lastTab[m.id] || m.tabs[0].id; render(); if (innerWidth <= 900) document.querySelector('.a-main').scrollIntoView(); else window.scrollTo(0, 0);
+            subOpen = true; drawerOpen = !!m.groups && innerWidth <= 900; cur = lastTab[m.id] || m.tabs[0].id; render(); window.scrollTo(0, 0);
           } },
           h('span', {}, m.label, h('small', {}, m.hint)), h('i'), m.groups ? h('b', { class: 'a-chev', 'aria-hidden': 'true' }, here && subOpen ? '▾' : '▸') : null);
         menuBtns[m.id] = b;
         const subs = m.groups && here && subOpen ? [h('div', { class: 'a-subnav', role: 'group', 'aria-label': m.label }, ...m.groups.map(g => {
           const sb = h('button', { class: 'a-sn' + (group && g.id === group.id ? ' on' : '') + (g.tabs.some(t => dirty.has(t.id)) ? ' dirty' : ''), 'aria-current': group && g.id === group.id ? 'page' : null,
-            onclick: () => { cur = lastTab[g.id] || g.tabs[0].id; render(); if (innerWidth <= 900) document.querySelector('.a-main').scrollIntoView(); else window.scrollTo(0, 0); } }, h('span', {}, g.label), h('i'));
+            onclick: () => { drawerOpen = false; cur = lastTab[g.id] || g.tabs[0].id; render(); window.scrollTo(0, 0); } }, h('span', {}, g.label), h('i'));
           subBtns[g.id] = sb; return sb;
         }))] : [];
         return [b].concat(subs);
@@ -1247,14 +1328,25 @@
         onclick: () => open(t.id) }, h('span', {}, t.label), t.count ? h('em', { class: 'n' }, String(t.count())) : null, h('i'));
       navBtns[t.id] = b; return b;
     })) : null;
-    const view = [].concat(s.view());
+    // on wide screens neighbouring settings boxes sit side by side instead of leaving the right half of the page empty
+    const view = [].concat(s.view()).flat(Infinity).reduce((out, e) => {
+      if (e && e.classList && e.classList.contains('a-box') && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
+      return out;
+    }, []);
     const main = h('main', { class: 'a-main' }, head, tabs, ...view);
 
     barEls = { st: h('span', { class: 'st' }) };
     const bar = s.paths.length ? h('div', { class: 'a-bar' }, barEls.st,
       (barEls.all = h('button', { class: 'ghost sm', type: 'button', style: 'display:none', onclick: () => save([...dirty]) }, '')),
       (barEls.one = h('button', { class: 'btn sm', type: 'button', onclick: () => save([cur]) }, 'บันทึก (Ctrl+S)'))) : null;
-    app.replaceChildren(h('div', { class: 'a-shell' }, side, main, bar));
+    // small screens: a top bar with the menu button; the side menu slides in over the page
+    const burger = h('button', { type: 'button', class: 'a-burger', 'aria-label': 'เปิดเมนู', 'aria-controls': 'a-side', 'aria-expanded': String(drawerOpen), onclick: () => { drawerOpen = !drawerOpen; applyDrawer(); } }, h('span'), h('span'), h('span'));
+    const back = h('div', { class: 'a-back' + (drawerOpen ? ' on' : ''), onclick: closeDrawer });
+    const top = h('div', { class: 'a-top' }, burger, h('img', { src: C.site.logo || '/img/logo.png', alt: '' }),
+      h('div', { class: 'ttl' }, h('b', {}, menu.label + (group && menu.groups.length > 1 ? ' › ' + group.label : '')), h('small', {}, s.title)), h('i', { class: 'dot' + (dirty.size ? ' on' : '') }));
+    function applyDrawer() { side.classList.toggle('open', drawerOpen); back.classList.toggle('on', drawerOpen); burger.setAttribute('aria-expanded', String(drawerOpen)); document.body.classList.toggle('a-lock', drawerOpen); }
+    app.replaceChildren(h('div', { class: 'a-shell' }, top, back, side, main, bar));
+    document.body.classList.toggle('a-lock', drawerOpen);
     if (bar) { setStatus(dirty.has(cur) ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ไม่มีการเปลี่ยนแปลง', dirty.has(cur) ? 'warn' : ''); refreshChrome(); }
   }
 
