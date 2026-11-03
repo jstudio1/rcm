@@ -36,7 +36,7 @@ test('content lists use cards with filters and a side editor; wide screens use t
   assert.ok(/\.a-split\.has-sel\{grid-template-columns:minmax\(0,1fr\) minmax\(460px,40%\)\}/.test(css), 'side editor beside the list on wide screens');
   assert.ok(/body\.a-sheet\{overflow:hidden\}/.test(css) && /\.a-split\.has-sel \.a-panel\{position:fixed;inset:0/.test(css), 'full-screen sheet on small screens');
   assert.ok(/\.a-main\{[^}]*max-width:1[5-9]\d\dpx/.test(css), 'the page is no longer capped at 1000px');
-  assert.ok(/@media\(min-width:1280px\)\{\s*\.a-cols\{grid-template-columns:repeat\(2/.test(css), 'settings boxes sit side by side on wide screens');
+  assert.ok(/@media\(min-width:1280px\)\{\s*\.a-cols\{columns:2/.test(css) && /\.a-cols \.a-box,\.a-cols \.a-seo\{[^}]*break-inside:avoid/.test(css), 'settings boxes pack into two columns on wide screens, with no holes under a short box');
 });
 
 test('small screens: top bar with a menu button and a slide-in menu; desktop keeps the side menu', () => {
@@ -57,4 +57,10 @@ test('responsive audit: nothing can widen a page, phones get compact controls, l
   assert.ok(/\.a-chk input\{flex:none\}/.test(css), 'checkboxes keep one size');
   assert.ok(src.includes('shownN') && src.includes('a-more'), 'media library shows 36 files at a time');
   assert.ok(src.includes('tabs.scrollLeft'), 'the open tab is scrolled into view on small screens');
+});
+
+test('a wrapper that only redraws a box joins the columns like the box (admin account page)', () => {
+  const css = fs.readFileSync(path.resolve(__dirname, '../admin/admin.css'), 'utf8');
+  assert.ok(src.includes("const host = h('div', { class: 'a-host' })") && src.includes("e.classList.contains('a-host')"), 'the 2-step box is grouped with the password box');
+  assert.ok(/\.a-host\{display:contents\}/.test(css));
 });

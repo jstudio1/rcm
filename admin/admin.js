@@ -1041,10 +1041,18 @@
       view: () => [
         box('ข้อมูลเว็บไซต์', field(C.site, 'name', 'ชื่อเว็บไซต์', { help: 'แสดงที่โลโก้ ฟุตเตอร์ และต่อท้าย title' }),
           field(C.site, 'url', 'โดเมนหลัก (Canonical)', { help: 'เช่น https://raycitym.com — ใช้ใน canonical, sitemap, og:url ถ้าเว้นว่างจะใช้โดเมนที่เปิดอยู่' }),
+          field(C.site, 'footer', 'ข้อความท้ายเว็บ (Copyright)')),
+        box('โลโก้ ไอคอน และรูปแชร์',
           field(C.site, 'logo', 'โลโก้เว็บ', { type: 'image', ph: '/img/logo.png', help: 'แสดงที่เมนูบน ฟุตเตอร์ และหลังบ้าน แนะนำรูปจัตุรัส PNG พื้นหลังโปร่ง อย่างน้อย 256×256 · เว้นว่าง = ใช้โลโก้เริ่มต้น' }),
           field(C.site, 'favicon', 'ไอคอนเว็บ (Favicon)', { type: 'image', ph: '/img/favicon.png', help: 'ไอคอนที่แท็บเบราว์เซอร์/ผลค้นหา Google/หน้าจอมือถือ แนะนำ PNG จัตุรัส 192×192 ขึ้นไป · เว้นว่าง = ใช้ไอคอนเริ่มต้น' }),
-          field(C.site, 'ogImage', 'รูปแชร์ (Open Graph)', { type: 'image', help: 'แนะนำ 1200×630' }), field(C.site, 'footer', 'ข้อความท้ายเว็บ (Copyright)')),
+          field(C.site, 'ogImage', 'รูปแชร์ (Open Graph)', { type: 'image', help: 'แนะนำ 1200×630' })),
         seoBox(C.site, 'defaultTitle', 'description', { open: true, label: 'SEO เริ่มต้น (หน้าแรก)', url: '/' }),
+        box('เครื่องมือ SEO & สถิติ',
+          note('ใส่แล้วกดบันทึก ระบบใส่โค้ดให้ทุกหน้าอัตโนมัติ ไม่ต้องแก้ไฟล์'),
+          field(C.site, 'googleVerify', 'Google Search Console: รหัสยืนยันเว็บไซต์', { ph: 'เช่น AbCdEf123...', help: 'Search Console > เพิ่มพร็อพเพอร์ตี้ > วิธี "แท็ก HTML" > คัดลอกเฉพาะค่าใน content="..."' }),
+          field(C.site, 'bingVerify', 'Bing Webmaster: รหัสยืนยัน (msvalidate.01)', { ph: 'ไม่บังคับ' }),
+          two(field(C.site, 'ga4', 'Google Analytics 4: Measurement ID', { ph: 'G-XXXXXXXXXX', help: 'ขึ้นต้นด้วย G- · เว้นว่าง = ไม่ติดตามสถิติ' }),
+            field(C.site, 'twitter', 'บัญชี X / Twitter ของเกม', { ph: '@raycitym', help: 'ใช้ในการ์ดแชร์บน X' }))),
         box('หน้า Loading (ก่อนเข้าเว็บ)',
           check(C.site, 'loader', 'เปิดใช้หน้า Loading'),
           // design picker: one card per design, each with its own preview (works even before saving / while switched off)
@@ -1078,13 +1086,7 @@
             sel.value = C.site.loaderScope === 'all' ? 'all' : 'home';
             return sel;
           })(), h('span', { class: 'h' }, 'หมายเหตุ: หน้า Loading ทำให้คะแนน PageSpeed ลดลงเล็กน้อย เพราะเนื้อหาจริงแสดงช้าลง ~1 วินาที')),
-          note('แสดงอย่างน้อยราว 2 วินาที และไม่เกิน 4 วินาที แม้เน็ตช้า · ผู้ใช้ที่ตั้งค่าลดการเคลื่อนไหวจะเห็นแบบสั้นและเรียบ')),
-        box('เครื่องมือ SEO & สถิติ',
-          note('ใส่แล้วกดบันทึก ระบบใส่โค้ดให้ทุกหน้าอัตโนมัติ ไม่ต้องแก้ไฟล์'),
-          field(C.site, 'googleVerify', 'Google Search Console: รหัสยืนยันเว็บไซต์', { ph: 'เช่น AbCdEf123...', help: 'Search Console > เพิ่มพร็อพเพอร์ตี้ > วิธี "แท็ก HTML" > คัดลอกเฉพาะค่าใน content="..."' }),
-          field(C.site, 'bingVerify', 'Bing Webmaster: รหัสยืนยัน (msvalidate.01)', { ph: 'ไม่บังคับ' }),
-          two(field(C.site, 'ga4', 'Google Analytics 4: Measurement ID', { ph: 'G-XXXXXXXXXX', help: 'ขึ้นต้นด้วย G- · เว้นว่าง = ไม่ติดตามสถิติ' }),
-            field(C.site, 'twitter', 'บัญชี X / Twitter ของเกม', { ph: '@raycitym', help: 'ใช้ในการ์ดแชร์บน X' })))] },
+          note('แสดงอย่างน้อยราว 2 วินาที และไม่เกิน 4 วินาที แม้เน็ตช้า · ผู้ใช้ที่ตั้งค่าลดการเคลื่อนไหวจะเห็นแบบสั้นและเรียบ'))] },
     { id: 'links', g: 'ตั้งค่าเว็บ', label: 'ลิงก์โซเชียล & ดาวน์โหลด', desc: 'ใส่ลิงก์แล้วปุ่มบนหน้าแรกกดไปลิงก์นั้นทันที เว้นว่าง = แสดง "เร็วๆ นี้"', paths: ['links'], url: '/',
       view: () => [
         box('ลิงก์ดาวน์โหลด', note('ใส่ลิงก์แล้วป้าย SOON จะหายไปจากปุ่มนั้น'),
@@ -1149,15 +1151,15 @@
             h('label', { class: 'a-f' }, h('span', {}, 'โหมด'), modeSel, h('span', { class: 'h' }, 'Mockup = ใช้ข้อมูลสมมุติในเบราว์เซอร์ของผู้เยี่ยมชมเอง (ไม่ส่งข้อมูลไปที่ใด) · API จริง = หน้าเว็บเรียก API ของคุณโดยตรง ถ้าที่อยู่ไม่ถูกต้องจะกลับไปใช้ Mockup เอง')),
             field(P, 'apiBase', 'ที่อยู่ API (เฉพาะ https://...)', { ph: 'https://api.example.com/v1', help: 'ใช้เมื่อเลือกโหมด API จริง · ระบบอนุญาตให้หน้าเว็บเชื่อมต่อเฉพาะโดเมนนี้เท่านั้น (ต้องเปิด CORS + credentials ที่ฝั่ง API)' }),
             note('API ควรเก็บการล็อกอินเป็นคุกกี้ HttpOnly + Secure + SameSite และป้องกัน CSRF/จำกัดจำนวนครั้งที่ฝั่งของตัวเอง รายละเอียดข้อมูลที่ส่ง/รับอยู่ในไฟล์ API_SPEC_TH.md')),
+          box('เส้นทาง API การเติมเงิน',
+            two(field(P, 'epTopup', 'GET ช่องทางเติมเงิน', { help: 'คืน {methods:[{id,name,title,logo,mode,packages:[{price,cash,point}]}]}' }), field(P, 'epTopupRedeem', 'POST เติมด้วยรหัสบัตร', { help: 'ส่ง {method, code} → {message, user}  (เซิร์ฟเวอร์เกมต้องตรวจรหัสเอง)' })),
+            field(P, 'epTopupCheckout', 'POST เริ่มชำระเงิน (PromptPay / Alipay / Wallet)', { help: 'ส่ง {method, methodName, price} → {url} (https เท่านั้น หน้าเว็บจะพาไปที่ url นั้น)' })),
           box('เส้นทาง API (ต่อท้ายที่อยู่ด้านบน)',
             two(field(P, 'epLogin', 'POST เข้าสู่ระบบ', { help: 'ส่ง {username, password} → {user}' }), field(P, 'epRegister', 'POST สมัคร', { help: 'ส่ง {username, email, password}' })),
             two(field(P, 'epLogout', 'POST ออกจากระบบ'), field(P, 'epForgot', 'POST ลืมรหัสผ่าน', { help: 'ส่ง {email}' })),
             two(field(P, 'epMe', 'GET โปรไฟล์ / PUT แก้ไขโปรไฟล์', { help: 'คืน {uid, name, username, email, phone, level, club, joined, cash, rain, point, pointExpire}' }), field(P, 'epPassword', 'POST เปลี่ยนรหัสผ่าน', { help: 'ส่ง {current, next}' })),
             two(field(P, 'epHistory', 'GET ประวัติ', { help: 'คืน [{date,type,detail,amount}]' }), field(P, 'epCoupons', 'GET คูปอง', { help: 'คืน [{code,title,expires,status}]' })),
-            two(field(P, 'epItems', 'GET ไอเทมพิเศษ', { help: 'คืน [{name,qty,note}]' }), field(P, 'epRedeem', 'POST แลกรหัสไอเทม', { help: 'ส่ง {code} → {message, user?}  ถ้าผิดพลาดตอบ 4xx พร้อม {message}' }))),
-          box('เส้นทาง API การเติมเงิน',
-            two(field(P, 'epTopup', 'GET ช่องทางเติมเงิน', { help: 'คืน {methods:[{id,name,title,logo,mode,packages:[{price,cash,point}]}]}' }), field(P, 'epTopupRedeem', 'POST เติมด้วยรหัสบัตร', { help: 'ส่ง {method, code} → {message, user}  (เซิร์ฟเวอร์เกมต้องตรวจรหัสเอง)' })),
-            field(P, 'epTopupCheckout', 'POST เริ่มชำระเงิน (PromptPay / Alipay / Wallet)', { help: 'ส่ง {method, methodName, price} → {url} (https เท่านั้น หน้าเว็บจะพาไปที่ url นั้น)' }))
+            two(field(P, 'epItems', 'GET ไอเทมพิเศษ', { help: 'คืน [{name,qty,note}]' }), field(P, 'epRedeem', 'POST แลกรหัสไอเทม', { help: 'ส่ง {code} → {message, user?}  ถ้าผิดพลาดตอบ 4xx พร้อม {message}' })))
         ];
       } },
     { id: 'lr-member', g: 'ตั้งค่าเว็บ', label: 'บัญชีผู้เล่น & เติมเงิน', desc: 'ข้อความการ์ดสมาชิก ชื่อสกุลเงิน และช่องทาง/ราคาของหน้าเติมเงิน /account/topup', paths: ['portal', 'topup'], url: '/account/topup',
@@ -1207,7 +1209,7 @@
             try { await api('password', 'POST', { current: cur0.value, next: n1.value }); msg.textContent = ''; cur0.value = n1.value = n2.value = ''; toast('เปลี่ยนรหัสผ่านแล้ว'); } catch (e) { msg.textContent = e.message; }
           } }, 'บันทึกรหัสผ่าน')));
         // two-step login with an authenticator app
-        const host = h('div', {});
+        const host = h('div', { class: 'a-host' });
         const paint = async () => {
           let on = false; try { on = (await api('2fa')).enabled; } catch (e) {}
           const m2 = h('div', { class: 'a-err' }), cur = h('input', { type: 'password', autocomplete: 'current-password' });
@@ -1331,7 +1333,7 @@
     // on wide screens neighbouring settings boxes sit side by side instead of leaving the right half of the page empty
     if (tabs) requestAnimationFrame(() => { const on = tabs.querySelector('.on'); if (on) tabs.scrollLeft = Math.max(0, on.offsetLeft - (tabs.clientWidth - on.offsetWidth) / 2); });
     const view = [].concat(s.view()).flat(Infinity).reduce((out, e) => {
-      if (e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo')) && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
+      if (e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo') || e.classList.contains('a-host')) && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
       return out;
     }, []);
     const main = h('main', { class: 'a-main' }, head, tabs, ...view);

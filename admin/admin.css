@@ -332,16 +332,16 @@ textarea.big{min-height:300px}
 .a-pk>.ghost{justify-self:start}
 
 /* ---- wide screens: use the space ---- */
-.a-cols{display:grid;gap:18px;align-items:start;margin-bottom:18px}
-.a-cols>.a-box,.a-cols>.a-seo{margin-bottom:0}
-/* a lone box (or a very wide one) takes the full row instead of leaving half of it empty */
-.a-cols>.a-box:only-child,.a-cols>.a-seo:only-child{grid-column:1/-1;max-width:960px}
-.a-cols>.a-box:has(.ldr-pick){grid-column:1/-1}
+.a-cols{margin-bottom:18px}
+.a-cols .a-box,.a-cols .a-seo{margin:0 0 18px;break-inside:avoid}
 @media(min-width:1280px){
-  .a-cols{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .a-cols{columns:2;column-gap:18px}
   .a-head p{max-width:720px}
+  /* a lone box, or one that needs the whole row, spans every column */
+  .a-cols>:only-child,.a-cols>.a-box:has(.ldr-pick){column-span:all}
+  .a-cols>:only-child{max-width:960px}
 }
-@media(min-width:1700px){.a-cols{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:1700px){.a-cols{columns:3}}
 
 /* ---- card list + side editor ---- */
 .a-stat{margin:-8px 0 14px;font-size:14px;color:var(--mu)}
@@ -458,3 +458,5 @@ textarea.big{min-height:300px}
 .a-list{grid-template-columns:minmax(0,1fr)}
 .a-item{min-width:0}
 .a-imgf .pv img{object-fit:contain}
+/* a wrapper that only holds a box (it is redrawn in place) takes part in the columns like the box itself */
+.a-host{display:contents}
