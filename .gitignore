@@ -4,7 +4,8 @@ data/sessions.json
 data/limits.json
 data/pagespeed.json
 data/pagespeed-auto-*.lock
-public/uploads/
+public/uploads/*
+!public/uploads/demo-*.jpg
 .claude/
 node_modules/
 *.log
