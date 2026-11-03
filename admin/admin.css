@@ -140,8 +140,11 @@ textarea.big{min-height:300px}
   .a-side{position:static;height:auto;padding:14px}
   .a-bar{left:0}
   .a-grid2{grid-template-columns:1fr}
+}
+/* picture/video fields: small preview beside the address on tablets, stacked only on phones */
+@media(max-width:560px){
   .a-imgf{flex-direction:column}
-  .a-imgf .pv,.a-imgf.a-isvid .pv{width:100%;max-width:320px}
+  .a-imgf .pv,.a-imgf.a-isvid .pv{width:100%;max-width:240px;aspect-ratio:16/9}
 }
 .a-relog{width:min(420px,100%);display:grid;gap:14px}
 
@@ -330,7 +333,10 @@ textarea.big{min-height:300px}
 
 /* ---- wide screens: use the space ---- */
 .a-cols{display:grid;gap:18px;align-items:start;margin-bottom:18px}
-.a-cols>.a-box{margin-bottom:0}
+.a-cols>.a-box,.a-cols>.a-seo{margin-bottom:0}
+/* a lone box (or a very wide one) takes the full row instead of leaving half of it empty */
+.a-cols>.a-box:only-child,.a-cols>.a-seo:only-child{grid-column:1/-1;max-width:960px}
+.a-cols>.a-box:has(.ldr-pick){grid-column:1/-1}
 @media(min-width:1280px){
   .a-cols{grid-template-columns:repeat(2,minmax(0,1fr))}
   .a-head p{max-width:720px}

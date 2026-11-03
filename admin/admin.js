@@ -1330,7 +1330,7 @@
     })) : null;
     // on wide screens neighbouring settings boxes sit side by side instead of leaving the right half of the page empty
     const view = [].concat(s.view()).flat(Infinity).reduce((out, e) => {
-      if (e && e.classList && e.classList.contains('a-box') && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
+      if (e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo')) && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
       return out;
     }, []);
     const main = h('main', { class: 'a-main' }, head, tabs, ...view);
