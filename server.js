@@ -587,6 +587,16 @@ const server = http.createServer(async (req, res) => {
       const key = portal.PATHS[p];
       return portal.enabled(c) && (key !== 'register' || portal.registerOpen(c)) ? page(render.account(c, base, key)) : page(render.notFound(c, base), 404);
     }
+    // the English site: same pages and data, English twin fields where they are filled in
+    if (p === '/en' || /^\/en\/(rewards|gameplay|drivers|news)$/.test(p)) {
+      const lc = render.localize(c);
+      return page(p === '/en' ? render.home(lc, base, {}) : render[p.slice(4)](lc, base));
+    }
+    if (p.startsWith('/en/news/')) {
+      let slug; try { slug = decodeURIComponent(p.slice(9)).replace(/\/$/, ''); } catch (e) { return page(render.notFound(c, base), 404); }
+      const lc = render.localize(c), n = lc.news.find(x => x.published && x.slug === slug);
+      return n ? page(render.article(lc, base, n)) : page(render.notFound(c, base), 404);
+    }
     // English versions of the legal pages (same content, lang="en", linked with hreflang)
     if (p === '/en/privacy' || p === '/en/terms' || p === '/en/support' || p === '/en/faq' || p === '/en/delete-account' || p === '/en/odds') {
       const key = p === '/en/delete-account' ? 'delete' : p.slice(4);

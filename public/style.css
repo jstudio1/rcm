@@ -269,7 +269,7 @@ body{overflow-x:hidden}
   .hero .htitle{white-space:normal;font-size:clamp(48px,14vw,68px)}
   .hero .htitle .ln.sub{font-size:.46em}
   .plat-h{margin-top:28px}
-  .hero .stores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .hero .stores{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px}
   .store{flex-direction:column;justify-content:center;gap:6px;padding:16px 4px 10px;border-radius:8px;text-align:center}
   .store svg{width:20px;height:20px}
   .store small{display:none}
@@ -410,7 +410,7 @@ html{scroll-padding-top:70px}
 .lx-h{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
 .lx-h h2{font-family:var(--f-ui);font-weight:700;font-size:clamp(22px,2.4vw,28px)}
 .lx-h .more{font-size:14px;color:var(--sil);padding:6px 16px;border-radius:999px;border:1px solid var(--edge);background:rgba(255,255,255,.05);transition:color .3s,border-color .3s,background .3s}
-.lx-h .more:hover{color:#fff;border-color:rgba(255,196,20,.6);background:rgba(255,255,255,.08)}
+.lx-h .more:hover{color:#fff;border-color:rgba(255,255,255,.45);background:rgba(255,255,255,.08)}
 .wn{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:14px;padding:14px;border-radius:22px;background:var(--panel);border:1px solid var(--edge);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 30px 60px -30px rgba(0,0,0,.85)}
 .wn.solo{grid-template-columns:minmax(0,1fr)}
 .wn-feat{position:relative;display:flex;align-items:flex-end;min-height:clamp(260px,28vw,380px);border-radius:var(--r);overflow:hidden;background:#111216;isolation:isolate}
@@ -424,7 +424,7 @@ html{scroll-padding-top:70px}
 .wn time,.mcard time{display:block;margin-top:10px;font-size:13px;color:var(--mu)}
 .wn-list{display:flex;flex-direction:column;gap:10px}
 .wn-item{display:flex;gap:14px;align-items:center;flex:1;padding:12px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--edge);box-shadow:inset 0 -2px 0 transparent;transition:background .3s,box-shadow .3s,transform .3s var(--ease)}
-.wn-item:hover,.wn-item:focus-visible{background:rgba(255,255,255,.075);box-shadow:inset 0 -2px 0 var(--gold);transform:translateX(3px)}
+.wn-item:hover,.wn-item:focus-visible{background:rgba(255,255,255,.075);border-color:rgba(255,255,255,.2);transform:translateX(3px)}
 .wn-item .th{flex:none;width:118px;aspect-ratio:16/9;border-radius:10px;background:#1b1c21 center/cover no-repeat;box-shadow:0 6px 16px -8px #000}
 .wn-item .c{min-width:0}
 .wn-item h4{font-family:var(--f-ui);font-weight:700;font-size:15px;line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -432,7 +432,7 @@ html{scroll-padding-top:70px}
 .lx-sub{font-family:var(--f-ui);font-weight:700;font-size:20px;margin:34px 0 14px}
 .wn-more{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:14px;border-radius:22px;background:var(--panel);border:1px solid var(--edge);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .mcard{position:relative;display:block;border-radius:14px;overflow:hidden;background:#141519;border:1px solid var(--edge);transition:transform .4s var(--ease),border-color .3s,box-shadow .4s}
-.mcard:hover{transform:translateY(-4px);border-color:rgba(255,196,20,.55);box-shadow:0 18px 40px -20px rgba(0,0,0,.9)}
+.mcard:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.22)}
 .mcard .im{aspect-ratio:16/9;background:#1b1c21 center/cover no-repeat}
 .mcard>.pill{position:absolute;top:12px;left:12px}
 .mcard .c{padding:12px 14px 14px}
@@ -451,11 +451,11 @@ html{scroll-padding-top:70px}
 }
 /* image cards (gameplay, drivers): rounded, yellow corner tag */
 .feat{border-radius:var(--r);border-color:var(--edge);isolation:isolate;transition:transform .5s var(--ease),border-color .4s,box-shadow .5s}
-.feat:hover{transform:translateY(-4px);border-color:rgba(255,196,20,.45);box-shadow:0 24px 50px -26px rgba(0,0,0,.9)}
+.feat:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.22)}
 .feat .st{border-radius:999px;background:var(--gold);color:var(--gold-ink);font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;padding:3px 10px}
 /* text cards (rewards): glass, gold milestone, pill status */
 .card{border-radius:var(--r);border-color:var(--edge);background:linear-gradient(180deg,rgba(44,46,53,.75),rgba(26,27,31,.75))}
-.card:hover{border-color:rgba(255,196,20,.45)}
+.card:hover{border-color:rgba(255,255,255,.22)}
 .card .num{color:var(--gold)}
 .card .tag{border-radius:999px;padding:3px 10px;font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;background:rgba(255,255,255,.12)}
 .card .tag.on{background:var(--gold);color:var(--gold-ink)}
@@ -1158,3 +1158,11 @@ html{scrollbar-gutter:stable}
 .lang-switch{margin:0 0 14px;font-size:14px}
 .lang-switch a{display:inline-block;padding:4px 12px;border:1px solid var(--ln-2);color:var(--sil)}
 .lang-switch a:hover{color:#fff;border-color:#fff}
+
+/* language switch: TH | EN */
+.lang{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.3);border-radius:999px;overflow:hidden;background:rgba(14,15,18,.35);font-family:var(--f-ui);font-weight:700;font-size:12px;line-height:1;letter-spacing:.06em}
+.lang a{padding:8px 11px;color:var(--sil);transition:background .25s,color .25s}
+.lang a:hover{color:#fff;background:rgba(255,255,255,.12)}
+.lang a.on{background:#fff;color:#0b0c10}
+.drawer .lang{align-self:flex-start;margin-top:18px}
+.drawer .lang a{font-family:var(--f-ui);font-weight:700;font-size:14px;text-transform:none;letter-spacing:.06em;padding:10px 16px;opacity:1;transform:none}

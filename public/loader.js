@@ -26,7 +26,8 @@
   var $ = function (s) { return el.querySelector(s); }, $$ = function (s) { return el.querySelectorAll(s); };
   var fill = $('.ldr-fill'), pct = $('.ldr-pct'), tip = $('.ldr-tip'), btn = $('.ldr-go');
   var steps = $$('[data-steps]'), litSets = $$('[data-lit]');
-  var TIPS = ['กำลังเตรียมสนามแข่ง…', 'เช็กลมยาง…', 'เติมน้ำมันให้เต็มถัง…', 'จูนเครื่องยนต์…', 'อุ่นยางให้พร้อม…', 'รอสัญญาณไฟเขียว…'];
+  var EN = document.documentElement.lang === 'en';
+  var TIPS = EN ? ['Preparing the track…', 'Checking tyre pressure…', 'Filling the tank…', 'Tuning the engine…', 'Warming up the tyres…', 'Waiting for the green light…'] : ['กำลังเตรียมสนามแข่ง…', 'เช็กลมยาง…', 'เติมน้ำมันให้เต็มถัง…', 'จูนเครื่องยนต์…', 'อุ่นยางให้พร้อม…', 'รอสัญญาณไฟเขียว…'];
   var p = 0, loaded = false, ready = false, done = false, ti = 0;
 
   var tipTimer = tip ? setInterval(function () {
@@ -68,7 +69,7 @@
     if (tipTimer) clearInterval(tipTimer);
     el.classList.add('ready');
     relabel('.ldr-st'); relabel('.ldr-wait');
-    if (tip) tip.textContent = 'พร้อมออกสตาร์ทแล้ว!';
+    if (tip) tip.textContent = EN ? 'Ready to start!' : 'พร้อมออกสตาร์ทแล้ว!';
     if (btn) btn.disabled = false;
     setTimeout(go, DWELL);
   }

@@ -132,7 +132,10 @@ test('privacy, terms and support', async t => {
   await t.test('English page disappears when its text is emptied; trailing slash redirects', async () => {
     await edit(c => { c.pages.terms.bodyEn = ''; });
     assert.equal((await get('/en/terms')).status, 404);
-    assert.equal((await get('/terms')).html.includes('hreflang="en"'), false, 'no language switch without an English version');
+    const th = (await get('/terms')).html;
+    assert.equal(th.includes('/en/terms'), false, 'no link to an English version that does not exist');
+    assert.equal(th.includes('class="lang-switch"'), false, 'no in-page language switch without an English version');
+    assert.match(th, /<div class="lang"[^>]*><a href="\/terms"[^>]*>TH<\/a><a href="\/en"[^>]*>EN<\/a>/, 'the menu switch falls back to the English home');
     assert.equal((await fetch(base + '/privacy/', { redirect: 'manual' })).status, 301);
     assert.equal((await fetch(base + '/en/nothing', { redirect: 'manual' })).status, 404);
   });

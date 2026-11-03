@@ -153,6 +153,13 @@
   function field(obj, key, label, o) {
     o = o || {};
     if (o.type === 'image' || o.type === 'video') return imageField(obj, key, label, o);
+    if (o.type === 'select') {
+      const sel = h('select', {}, ...o.options.map(v => h('option', { value: v }, v)));
+      sel.value = o.options.includes(obj[key]) ? obj[key] : o.options[o.options.length - 1];
+      obj[key] = sel.value;
+      sel.addEventListener('change', () => { obj[key] = sel.value; mark(); if (o.onchange) o.onchange(); });
+      return h('label', { class: 'a-f' }, h('span', { class: 'top' }, h('span', {}, label)), sel, o.help ? h('span', { class: 'h' }, o.help) : null);
+    }
     const input = o.type === 'textarea' ? h('textarea', { class: o.big ? 'big' : '' }) : h('input', { type: o.type || 'text' });
     if (o.ph) input.placeholder = typeof o.ph === 'function' ? o.ph() : o.ph;
     input.value = obj[key] || '';
@@ -193,6 +200,10 @@
   const box = (title, ...kids) => h('div', { class: 'a-box' }, title ? h('h3', {}, title) : null, ...kids);
   const two = (...k) => h('div', { class: 'a-grid2' }, ...k);
   const note = t => h('div', { class: 'a-note' }, t);
+  // English twins of Thai fields: an empty one means the English page shows the Thai text
+  const NEWS_TAGS = ['PATCH NOTE', 'EVENT', 'TOURNAMENT', 'UPDATE', 'PROMOTION', 'NEWS'];
+  const enField = (obj, key, label, o) => field(obj, key + 'En', label + ' (EN)', Object.assign({ ph: () => obj[key] || '' }, o));
+  const enBox = (...kids) => h('details', { class: 'a-seo' }, h('summary', {}, 'English version (EN) · เว้นว่าง = แสดงภาษาไทยในหน้า /en'), h('div', { class: 'a-in' }, ...kids));
 
   // SEO block: collapsible, character counters, live Google preview
   function seoBox(obj, tk, dk, o) {
@@ -769,20 +780,21 @@
     { id: 'news', g: 'เนื้อหา', label: 'ข่าวสาร', desc: 'เพิ่ม/แก้ไขข่าว กดติ๊ก "เผยแพร่" เมื่อพร้อมขึ้นเว็บ ลากที่ ⋮⋮ เพื่อเรียงลำดับ', paths: ['news'], url: '/news', count: () => C.news.length,
       view: () => listEditor(C.news, {
         addTop: true, title: n => n.title, badge: n => h('span', { class: 'a-bd' + (n.published ? ' on' : '') }, n.published ? 'เผยแพร่' : 'ฉบับร่าง'),
-        blank: () => ({ title: '', slug: '', date: new Date().toISOString().slice(0, 10), tag: '', published: false, image: '', excerpt: '', body: '', seoTitle: '', seoDescription: '' }),
+        blank: () => ({ title: '', slug: '', date: new Date().toISOString().slice(0, 10), tag: 'NEWS', published: false, image: '', excerpt: '', body: '', seoTitle: '', seoDescription: '', titleEn: '', excerptEn: '', bodyEn: '' }),
         form: (n, u) => [
           field(n, 'title', 'หัวข้อข่าว (H1)', { onchange: u }),
           two(check(n, 'published', 'เผยแพร่ (ติ๊ก = แสดงบนเว็บและ sitemap)'), field(n, 'date', 'วันที่', { type: 'date' })),
-          two(field(n, 'tag', 'ป้ายหมวด', { help: 'เช่น ANNOUNCEMENT, EVENT' }), field(n, 'slug', 'URL (slug)', { help: 'เว้นว่าง = สร้างจากหัวข้อ → /news/…' })),
+          two(field(n, 'tag', 'หมวดหมู่', { type: 'select', options: NEWS_TAGS, help: 'แสดงเป็นป้ายบนการ์ดข่าว (PATCH NOTE และ UPDATE เป็นป้ายสีแดง)' }), field(n, 'slug', 'URL (slug)', { help: 'เว้นว่าง = สร้างจากหัวข้อ → /news/…' })),
           field(n, 'image', 'รูปหน้าปก', { type: 'image', help: 'แนะนำกว้าง 1200px ขึ้นไป (Google ใช้แสดงในผลค้นหาข่าว)' }),
           field(n, 'imageAlt', 'คำอธิบายรูปหน้าปก (alt)', { ph: () => n.title, help: 'อธิบายว่าในรูปมีอะไร ช่วย SEO และผู้ใช้ที่มองไม่เห็น · เว้นว่าง = ใช้หัวข้อข่าว' }),
           field(n, 'excerpt', 'สรุปสั้น (แสดงในการ์ด)', { type: 'textarea' }),
           bodyEditor(n),
+          enBox(enField(n, 'title', 'หัวข้อข่าว'), enField(n, 'excerpt', 'สรุปสั้น', { type: 'textarea' }), enField(n, 'body', 'เนื้อหา', { type: 'textarea', big: true, help: 'ใช้รูปแบบเดียวกับเนื้อหาภาษาไทย (## หัวข้อ, ### หัวข้อย่อย, - รายการ)' })),
           seoBox(n, 'seoTitle', 'seoDescription', { url: () => '/news/' + (n.slug || '…'), fbT: () => (n.title || '') + ' | ' + C.site.name, fbD: () => n.excerpt })]
       }) },
     { id: 'gameplay', g: 'เนื้อหา', label: 'Gameplay', desc: 'การ์ดอธิบายระบบเกม แต่ละใบมีรูปและข้อความ', paths: ['gameplay'], url: '/gameplay', count: () => C.gameplay.length,
-      view: () => listEditor(C.gameplay, { title: g => g.title, blank: () => ({ title: '', desc: '', image: '', alt: '' }),
-        form: (g, u) => [field(g, 'title', 'หัวข้อ (H3)', { onchange: u }), field(g, 'desc', 'รายละเอียด', { type: 'textarea' }), field(g, 'image', 'รูปภาพ', { type: 'image' }), field(g, 'alt', 'ข้อความอธิบายรูป (alt)', { help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น' })] }) },
+      view: () => listEditor(C.gameplay, { title: g => g.title, blank: () => ({ title: '', desc: '', image: '', alt: '', titleEn: '', descEn: '', altEn: '' }),
+        form: (g, u) => [field(g, 'title', 'หัวข้อ (H3)', { onchange: u }), field(g, 'desc', 'รายละเอียด', { type: 'textarea' }), field(g, 'image', 'รูปภาพ', { type: 'image', help: 'แนะนำ 1200×900 (4:3) JPG/WebP ไม่เกิน ~300KB · รูปถูกครอบให้เต็มการ์ด วางจุดเด่นไว้ครึ่งบน' }), field(g, 'alt', 'ข้อความอธิบายรูป (alt)', { help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น' }), enBox(enField(g, 'title', 'หัวข้อ'), enField(g, 'desc', 'รายละเอียด', { type: 'textarea' }), enField(g, 'alt', 'alt'))] }) },
     { id: 'prereg', g: 'เนื้อหา', label: 'ลงทะเบียนล่วงหน้า & รางวัล', desc: 'ตัวนับผู้ลงทะเบียนล่วงหน้าและรางวัลตามเป้าหมาย แสดงที่หน้าแรกและหน้า /rewards เตรียมไว้เชื่อมกับระบบเกม', paths: ['prereg'], url: '/rewards', count: () => C.rewards.length,
       view: () => {
         const P = C.prereg, modeSel = h('select', { onchange: e => { P.mode = e.target.value; mark(); } }, h('option', { value: 'mock' }, 'Mockup (ใช้ตัวเลขที่กรอกเอง)'), h('option', { value: 'api' }, 'API จริง (ดึงตัวเลขจากระบบเกม)'));
@@ -811,16 +823,26 @@
       } },
     { id: 'rewards', g: 'เนื้อหา', label: 'รายการรางวัล (เป้าหมาย)', desc: 'รางวัลที่ปลดล็อกเมื่อยอดลงทะเบียนถึงเป้าหมาย เรียงตามเป้าหมายให้อัตโนมัติ', paths: ['rewards'], url: '/rewards', count: () => C.rewards.length,
       view: () => [note('ใส่ "เป้าหมาย (ตัวเลข)" เช่น 5000 ระบบเทียบกับจำนวนผู้ลงทะเบียนเพื่อบอกว่าถึงเป้าหรือยัง ถ้าเว้นว่างจะอ่านจากป้ายเป้าหมาย เช่น 50K = 50,000 · รายการที่ไม่มีตัวเลขเป้าหมายจะไม่แสดงในแถบรางวัล'),
-        listEditor(C.rewards, { title: r => (r.milestone || r.target ? (r.milestone || r.target) + ' · ' : '') + r.title, blank: () => ({ milestone: '', target: '', title: '', desc: '', image: '', alt: '', status: '' }),
-        form: (r, u) => [two(field(r, 'target', 'เป้าหมาย (ตัวเลขผู้ลงทะเบียน)', { ph: '5000', onchange: u }), field(r, 'milestone', 'ป้ายเป้าหมาย (ไม่บังคับ)', { ph: '5,000', help: 'ใช้แสดงในการ์ดรายการ/หน้าเก่า' })), field(r, 'title', 'ชื่อรางวัล', { onchange: u }), field(r, 'desc', 'รายละเอียดรางวัล', { type: 'textarea' }), field(r, 'image', 'รูปรางวัล (ไม่บังคับ)', { type: 'image', ph: '/img/...' }), field(r, 'alt', 'คำอธิบายรูป (alt)')] })] },
+        listEditor(C.rewards, { title: r => (r.milestone || r.target ? (r.milestone || r.target) + ' · ' : '') + r.title, blank: () => ({ milestone: '', target: '', title: '', desc: '', image: '', alt: '', status: '', titleEn: '', descEn: '', altEn: '' }),
+        form: (r, u) => [two(field(r, 'target', 'เป้าหมาย (ตัวเลขผู้ลงทะเบียน)', { ph: '5000', onchange: u }), field(r, 'milestone', 'ป้ายเป้าหมาย (ไม่บังคับ)', { ph: '5,000', help: 'ใช้แสดงในการ์ดรายการ/หน้าเก่า' })), field(r, 'title', 'ชื่อรางวัล', { onchange: u }), field(r, 'desc', 'รายละเอียดรางวัล', { type: 'textarea' }), field(r, 'image', 'รูปรางวัล (ไม่บังคับ)', { type: 'image', ph: '/img/...' }), field(r, 'alt', 'คำอธิบายรูป (alt)'), enBox(enField(r, 'title', 'ชื่อรางวัล'), enField(r, 'desc', 'รายละเอียดรางวัล', { type: 'textarea' }), enField(r, 'alt', 'alt'))] })] },
     { id: 'drivers', g: 'เนื้อหา', label: 'Drivers', desc: 'การ์ดนักซิ่ง/รถ แต่ละใบมีรูป ป้ายมุม และชื่อ', paths: ['drivers'], url: '/drivers', count: () => C.drivers.length,
-      view: () => listEditor(C.drivers, { title: d => d.title, blank: () => ({ title: '', desc: '', image: '', pos: 'center', badge: '' }),
-        form: (d, u) => [field(d, 'title', 'ชื่อ (H3)', { onchange: u }), field(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), field(d, 'image', 'รูปภาพ', { type: 'image' }), field(d, 'alt', 'ข้อความอธิบายรูป (alt)', { ph: () => d.title, help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น · เว้นว่าง = ใช้ชื่อ' }),
+      view: () => listEditor(C.drivers, { title: d => d.title, blank: () => ({ title: '', desc: '', image: '', pos: 'center', badge: '', titleEn: '', descEn: '', altEn: '', badgeEn: '' }),
+        form: (d, u) => [field(d, 'title', 'ชื่อ (H3)', { onchange: u }), field(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), field(d, 'image', 'รูปภาพ', { type: 'image', help: 'แนะนำ 1000×1250 (4:5) หรือ 1000×1000 JPG/WebP ไม่เกิน ~300KB · ถ้าหน้าคนโดนตัด ตั้ง "ตำแหน่งรูป" เป็น center top' }), field(d, 'alt', 'ข้อความอธิบายรูป (alt)', { ph: () => d.title, help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น · เว้นว่าง = ใช้ชื่อ' }), enBox(enField(d, 'title', 'ชื่อ'), enField(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), enField(d, 'badge', 'ป้ายมุมการ์ด'), enField(d, 'alt', 'alt')),
           two(field(d, 'pos', 'ตำแหน่งรูป (CSS)', { help: 'เช่น center, 30% center' }), field(d, 'badge', 'ป้ายมุมการ์ด', { help: 'เช่น COMING SOON' }))] }) },
     { id: 'faq', g: 'เนื้อหา', label: 'FAQ', desc: 'คำถามที่พบบ่อย ระบบส่งข้อมูลให้ Google แสดงเป็นคำถาม-คำตอบอัตโนมัติ', paths: ['faq'], url: '/faq', count: () => C.faq.length,
       view: () => [note('ช่อง English เว้นว่าง = รายการนั้นไม่แสดงในหน้า /en/faq (หน้า English จะแสดงเมื่อมีอย่างน้อย 1 รายการที่กรอกครบทั้งคำถามและคำตอบ และตั้ง H1 ภาษาอังกฤษที่เมนู หน้า FAQ)'),
         ...listEditor(C.faq, { title: f => f.q, blank: () => ({ q: '', a: '', qEn: '', aEn: '' }), form: (f, u) => [field(f, 'q', 'คำถาม (H3)', { onchange: u }), field(f, 'a', 'คำตอบ', { type: 'textarea' }), field(f, 'qEn', 'Question (English)'), field(f, 'aEn', 'Answer (English)', { type: 'textarea' })] })] },
 
+    { id: 'en', g: 'เนื้อหา', label: 'ภาษาอังกฤษ (EN)', desc: 'ข้อความภาษาอังกฤษของหน้า /en (หน้าแรก, News, Gameplay, Drivers, Rewards) ช่องที่เว้นว่างจะแสดงข้อความภาษาไทยแทน · ข่าว Gameplay Drivers และรางวัลแต่ละรายการมีช่อง English อยู่ในแท็บของตัวเอง', paths: ['site', 'home', 'prereg', 'pages.rewards', 'pages.gameplay', 'pages.drivers', 'pages.news'], url: '/en',
+      view: () => {
+        const group = (title, obj, rows) => box(title, ...rows.map(([k, label, big]) => enField(obj, k, label, big ? { type: 'textarea' } : {})));
+        return [
+          note('ปุ่มสลับภาษา TH | EN อยู่บนเมนูของทุกหน้า หน้าภาษาอังกฤษอยู่ที่ /en ข้อความที่ยังไม่ได้แปลจะแสดงเป็นภาษาไทยจนกว่าจะกรอก'),
+          group('ทั้งเว็บ (ชื่อแท็บและคำอธิบายเริ่มต้นบน Google)', C.site, [['defaultTitle', 'Title หลัก'], ['description', 'Description หลัก', true], ['footer', 'ข้อความท้ายเว็บ']]),
+          group('หน้าแรก', C.home, [['badge', 'ป้ายเล็กด้านบน'], ['h1', 'H1'], ['h2', 'H2'], ['h3', 'H3'], ['lead', 'ข้อความอธิบาย', true], ['registerText', 'ข้อความบนปุ่มลงทะเบียน'], ['registerMsg', 'ข้อความเมื่อกดปุ่มที่ยังไม่เปิด', true], ['storesLabel', 'หัวข้อปุ่มดาวน์โหลด'], ['followLabel', 'หัวข้อโซเชียล'], ['soonLabel', 'ข้อความเหนือปุ่มสโตร์ (ยังไม่เปิด)'], ['downloadLabel', 'ข้อความเหนือปุ่มสโตร์ (เปิดแล้ว)'], ['gameplayMore', 'ปุ่มดูทั้งหมด (Gameplay)'], ['latestNewsTitle', 'หัวข้อข่าวล่าสุด'], ['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]),
+          ...['news', 'gameplay', 'drivers', 'rewards'].map(k => group('หน้า ' + PN[k], C.pages[k], [['navLabel', 'ชื่อในเมนู'], ['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['h1', 'H1'], ['h2', 'H2'], ['intro', 'ย่อหน้าแนะนำ', true]].concat(k === 'news' ? [['empty', 'ข้อความเมื่อยังไม่มีข่าว']] : [], [['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]))),
+          group('ลงทะเบียนล่วงหน้า (ตัวนับและรางวัล)', C.prereg, [['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['title', 'หัวข้อ'], ['titleAccent', 'หัวข้อ (ส่วนสีแดง)'], ['intro', 'ข้อความแนะนำ', true], ['statusLabel', 'ป้ายสถานะ'], ['counterLabel', 'ป้ายตัวนับ'], ['unit', 'หน่วย'], ['nextText', 'ข้อความเป้าหมายถัดไป ({n} = จำนวนที่เหลือ)'], ['allDoneText', 'ข้อความเมื่อถึงทุกเป้า'], ['goalsLabel', 'หัวข้อรายการรางวัล'], ['reachedCount', 'ข้อความ "ถึงเป้าหมายแล้ว" (ตัวนับ)'], ['reachedLabel', 'ป้ายถึงเป้าหมายแล้ว'], ['nextLabel', 'ป้ายเป้าหมายถัดไป'], ['lockedLabel', 'ป้ายยังไม่ถึงเป้า'], ['viewLabel', 'ปุ่มดูรางวัล'], ['detailReached', 'สถานะรางวัล (ถึงเป้า)'], ['detailLocked', 'สถานะรางวัล (ยังไม่ถึง)']])];
+      } },
     { id: 'home', g: 'หน้าเว็บ', label: 'หน้าแรก', desc: 'หัวข้อ H1 H2 H3 ข้อความอธิบาย ปุ่มลงทะเบียน และ SEO ของหน้าแรก', paths: ['home'], url: '/',
       view: () => [
         box('พื้นหลังหน้าแรก (Hero)', note('วิดีโอเล่นวนเป็นพื้นหลัง รูปใช้แสดงระหว่างรอวิดีโอโหลดและเมื่อวิดีโอเล่นไม่ได้ · เว้นว่าง = ใช้ไฟล์เริ่มต้น'),
@@ -1089,7 +1111,7 @@
   }
   const MENUS = [
     { id: 'home', label: 'หน้าแรก', hint: 'ข้อความ รูปพื้นหลัง ปุ่มดาวน์โหลด โซเชียล', tabs: [tab('home', 'ข้อความ & พื้นหลัง'), tab('links', 'ปุ่มดาวน์โหลด & โซเชียล')] },
-    { id: 'content', label: 'เนื้อหาเว็บ', hint: 'ข่าว Gameplay Rewards Drivers FAQ', tabs: [tab('news', 'ข่าวสาร', ['p-news']), tab('gameplay', 'Gameplay', ['p-gameplay']), tab('prereg', 'ลงทะเบียนล่วงหน้า & รางวัล', ['rewards', 'p-rewards']), tab('drivers', 'Drivers', ['p-drivers']), tab('faq', 'FAQ', ['p-faq'])] },
+    { id: 'content', label: 'เนื้อหาเว็บ', hint: 'ข่าว Gameplay Rewards Drivers FAQ ภาษาอังกฤษ', tabs: [tab('news', 'ข่าวสาร', ['p-news']), tab('gameplay', 'Gameplay', ['p-gameplay']), tab('prereg', 'ลงทะเบียนล่วงหน้า & รางวัล', ['rewards', 'p-rewards']), tab('drivers', 'Drivers', ['p-drivers']), tab('faq', 'FAQ', ['p-faq']), tab('en', 'ภาษาอังกฤษ (EN)')] },
     { id: 'store', label: 'สโตร์ & กฎหมาย', hint: 'Privacy Terms Support คุกกี้ URL สโตร์', tabs: [tab('ready', 'ความพร้อมส่งสโตร์'), tab('urls', 'URL สำหรับสโตร์'), tab('p-privacy', 'Privacy'), tab('p-terms', 'Terms'), tab('p-support', 'Support & ติดต่อ'), tab('p-delete', 'ลบบัญชี'), tab('p-odds', 'อัตรากล่องสุ่ม'), tab('cookies', 'คุกกี้')] },
     { id: 'report', label: 'รายงาน & ความเร็ว', hint: 'ผู้เข้าชม PageSpeed', tabs: [tab('stats', 'สถิติผู้เข้าชม'), tab('pagespeed', 'PageSpeed')] },
     { id: 'media', label: 'คลังรูป & วิดีโอ', hint: 'ไฟล์ที่อัปโหลด', tabs: [tab('media', 'คลังรูป & วิดีโอ')] },
