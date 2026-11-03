@@ -187,3 +187,9 @@ $$('[data-stay]').forEach(el=>el.addEventListener('click',e=>{e.preventDefault()
 
 /* header turns solid once the page scrolls */
 (function(){const n=document.getElementById('nav');if(!n)return;const f=()=>n.classList.toggle('solid',scrollY>40);addEventListener('scroll',f,{passive:true});f()})();
+
+/* fade-in sections (.rv) on the home page: shown as they scroll into view; shown at once without IntersectionObserver */
+(function(){const els=[...document.querySelectorAll('.rv')];if(!els.length)return;
+if(!('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('in'));return;}
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+els.forEach(e=>io.observe(e));})();

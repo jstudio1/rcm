@@ -44,6 +44,11 @@ test('game band on the home page, FAQ page', async t => {
     assert.match(h, /<h2 class="gb-t">RAYCITY-M<\/h2>/); assert.match(h, /class="gb-b1"[^>]*data-stay/, 'no link yet = "coming soon"'); assert.match(h, /class="gb-img"/);
   });
 
+  await t.test('the home page script reveals fade-in sections (otherwise the band text and picture stay invisible)', () => {
+    const hero = fs.readFileSync(path.join(source, 'public/hero.js'), 'utf8');
+    assert.ok(/querySelectorAll\('\.rv'\)/.test(hero) && /classList\.add\('in'\)/.test(hero), 'hero.js shows .rv elements');
+  });
+
   await t.test('band texts are escaped, links checked, and it can be switched off', async () => {
     await edit(c => { c.home.bandTitle = '<img src=x onerror=alert(1)>'; c.home.bandLink1 = 'javascript:alert(1)'; c.home.bandLink2 = '/register'; c.home.bandImage = 'javascript:alert(1)'; });
     let h = (await get('/')).html;

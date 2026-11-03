@@ -1255,3 +1255,13 @@ body.mnt{min-height:100vh;display:grid;place-items:center;padding:24px;backgroun
   .gb-band::before,.gb-band::after{clip-path:polygon(0 4%,100% 0,100% 96%,0 100%)}
 }
 @media(max-width:560px){.gb-btns>*{flex:1 1 100%}}
+
+/* home: pre-registration, game band and latest news share one blurred background (no hard edges between them) */
+.hflow{position:relative;isolation:isolate;overflow:hidden;background:#0d0e12}
+.hflow::before{content:"";position:absolute;inset:-80px;z-index:-2;background:var(--art) center/cover no-repeat;filter:blur(28px) saturate(1.2);opacity:.5;transform:scale(1.08)}
+.hflow::after{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(50% 22% at 15% 4%,rgba(255,42,42,.2),transparent 70%),radial-gradient(45% 20% at 88% 50%,rgba(255,120,60,.12),transparent 70%),linear-gradient(180deg,rgba(13,14,18,.55) 0%,rgba(13,14,18,.7) 55%,rgba(13,14,18,.85) 85%,var(--bg) 100%)}
+.hflow .pr-sec,.hflow .gb,.hflow .sec.lx{background:transparent}
+.hflow .pr-sec::before,.hflow .pr-sec::after,.hflow .gb::before,.hflow .gb::after,.hflow .sec.lx::before,.hflow .sec.lx::after{content:none}
+/* more room above and below the slanted band */
+.hflow .gb{padding:24px 0 30px}
+@media(max-width:860px){.hflow .gb{padding:16px 0 20px}}
