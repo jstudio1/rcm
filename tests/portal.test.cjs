@@ -37,14 +37,19 @@ test('buttons and member portal', async t => {
 
   await t.test('every download, register and social button can be switched off from the admin', async () => {
     const h0 = (await get('/')).html;
-    for (const need of ['Windows PC', 'App Store', 'Google Play', 'class="dk-cta"', 'aria-label="Facebook"', 'aria-label="YouTube"']) assert.ok(h0.includes(need), need + ' shown by default');
+    for (const need of ['App Store', 'Google Play', 'class="dk-cta"', 'aria-label="Facebook"', 'aria-label="YouTube"']) assert.ok(h0.includes(need), need + ' shown by default');
+    assert.equal(h0.includes('Windows PC'), false, 'the Windows button is off by default');
+    assert.equal(/PC|พีซี|คอมพิวเตอร์/.test(h0.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '')), false, 'no PC wording on the home page');
+    await edit(c => { c.links.show.windows = true; });
+    assert.ok((await get('/')).html.includes('Windows PC'), 'it can still be switched on');
+    await edit(c => { c.links.show.windows = false; });
     await edit(c => { c.links.show.ios = false; c.links.show.facebook = false; c.links.show.register = false; });
     const h1 = (await get('/')).html;
-    assert.equal(h1.includes('App Store'), false); assert.ok(h1.includes('Windows PC') && h1.includes('Google Play'));
+    assert.equal(h1.includes('App Store'), false); assert.ok(h1.includes('Google Play'));
     assert.equal(h1.includes('aria-label="Facebook"'), false); assert.ok(h1.includes('aria-label="TikTok"'));
     assert.match(h1, /<div class="dk-cta"><\/div>/, 'register button is gone');
     assert.equal((await api('content')).json.links.show.ios, 'false', 'the choice is saved');
-    await edit(c => { c.links.show.windows = false; c.links.show.android = false; });
+    await edit(c => { c.links.show.android = false; });
     const h2 = (await get('/')).html;
     assert.equal(/class="plat-h"|class="stores"/.test(h2), false, 'no empty "download on" heading when all three are off');
     await edit(c => { for (const k of Object.keys(c.links.show)) c.links.show[k] = true; });

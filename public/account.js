@@ -31,7 +31,7 @@
   };
   var DEMO = {
     history: [
-      { date: '2026-10-26 21:14', type: 'เข้าสู่ระบบ', detail: 'Windows PC', amount: '' },
+      { date: '2026-10-26 21:14', type: 'เข้าสู่ระบบ', detail: 'Android', amount: '' },
       { date: '2026-10-25 18:02', type: 'เติมเงิน', detail: 'เติม Cash ผ่านพร้อมเพย์', amount: '+1,000 Cash' },
       { date: '2026-10-25 18:10', type: 'ซื้อไอเทม', detail: 'ชุดสีแต่งรถ Neon Pack', amount: '-300 Cash' },
       { date: '2026-10-23 09:40', type: 'แลกรหัส', detail: 'โค้ดต้อนรับ', amount: '+50 Point' }

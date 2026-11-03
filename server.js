@@ -13,6 +13,7 @@ const analytics = require('./lib/analytics');
 const linkcheck = require('./lib/linkcheck');
 const totp = require('./lib/totp');
 const portal = require('./lib/portal');
+const prereg = require('./lib/prereg');
 let linkCheckBusy = false, linkCheckLast = 0;
 const pending2fa = new Map(); // session token -> { secret, exp }: a two-step key that is shown but not yet confirmed
 
@@ -209,7 +210,7 @@ function serveStatic(req, res, root, rel, cache) {
   let file = path.normalize(path.join(root, p));
   if (!file.startsWith(root + path.sep) || p.includes('\0')) return send(res, 403, 'Forbidden', 'text/plain');
   try { file = fs.realpathSync(file); const realRoot = fs.realpathSync(root); if (!file.startsWith(realRoot + path.sep)) return send(res, 403, 'Forbidden', 'text/plain'); } catch (e) { return send(res, 404, 'Not found', 'text/plain'); }
-  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/account.js', '/account.css', '/consent.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
+  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/account.js', '/account.css', '/prereg.js', '/prereg.css', '/consent.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
   const staticExt = path.extname(file).toLowerCase();
   if (/^\/(?:img|uploads)\//i.test(p) && !MEDIA_EXT[staticExt] && staticExt !== '.ico') return send(res, 404, 'Not found', 'text/plain');
   // only known web file types are served (no .rar/.zip/.psd or other stray files left in public/)
@@ -337,7 +338,7 @@ async function adminApi(req, res, url) {
     }
     if (route === 'urls/check' && m === 'POST') {
       const c = store.getContent(), base = String(c.site.url || '').trim().replace(/\/+$/, '');
-      if (!/^https:\/\//i.test(base) || !SITE_URL_RE.test(base)) return json(res, 400, { error: 'ตั้ง "โดเมนหลัก" เป็น https://... ในเมนู ข้อมูลเว็บ & SEO หลัก ก่อน' });
+      if (!/^https:\/\//i.test(base) || !SITE_URL_RE.test(base)) return json(res, 400, { error: 'ตั้ง "โดเมนหลัก" เป็น https://... ในตั้งค่า → เว็บไซต์ & SEO ก่อน' });
       if (linkCheckBusy || Date.now() - linkCheckLast < 10e3) return json(res, 429, { error: 'กำลังตรวจอยู่ หรือเพิ่งตรวจไป รอสักครู่' });
       linkCheckBusy = true;
       try {
@@ -363,7 +364,7 @@ async function adminApi(req, res, url) {
       const known = ['/'].concat(PAGES.map(k => '/' + k), c.news.filter(n => n.published).map(n => '/news/' + encodeURIComponent(n.slug)));
       if (!known.includes(p)) return json(res, 400, { error: 'ไม่พบหน้านี้' });
       const target = siteUrlFor(p, c);
-      if (!target) return json(res, 400, { error: 'ตั้ง "โดเมนหลัก" ในเมนู ข้อมูลเว็บ & SEO หลัก ก่อน (Google ตรวจได้เฉพาะเว็บที่ออนไลน์)' });
+      if (!target) return json(res, 400, { error: 'ตั้ง "โดเมนหลัก" ในตั้งค่า → เว็บไซต์ & SEO ก่อน (Google ตรวจได้เฉพาะเว็บที่ออนไลน์)' });
       if (!psi.start(strategy, p, target, 'manual')) return json(res, 409, { error: 'กำลังตรวจอยู่ รอให้เสร็จก่อน' });
       return json(res, 202, { ok: true });
     }
@@ -562,7 +563,7 @@ const server = http.createServer(async (req, res) => {
 
     const ga = GA_RE.test(c.site.ga4 || '');
     // the member portal may talk to the API address set in the admin (and only that address)
-    const ao = portal.enabled(c) ? portal.apiOrigin(c) : '';
+    const ao = [portal.enabled(c) ? portal.apiOrigin(c) : '', prereg.enabled(c) ? prereg.apiOrigin(c) : ''].filter((o, i, a) => o && a.indexOf(o) === i).join(' ');
     const page = (html, code) => {
       const csp = ga ? GA_CSP : PUBLIC_CSP;
       const extra = ga || ao ? { 'Content-Security-Policy': ao ? csp.replace("connect-src 'self'", "connect-src 'self' " + ao) : csp } : {};

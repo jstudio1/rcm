@@ -2,9 +2,9 @@
   "site": {
     "name": "RAYCITY-M",
     "url": "https://raycitym.com",
-    "defaultTitle": "RAYCITY-M | ตำนานสตรีทเรซกลับมาอีกครั้ง บนมือถือและคอม",
-    "description": "RAYCITY-M ตำนานสตรีทเรซกลับมาอีกครั้ง เล่นได้ทั้งบนมือถือและคอม พบกันเร็วๆ นี้",
-    "keywords": "RAYCITY-M, เกมแข่งรถ, สตรีทเรซ, เกมมือถือ, เกมพีซี",
+    "defaultTitle": "RAYCITY-M | ตำนานสตรีทเรซกลับมาอีกครั้ง บนมือถือ",
+    "description": "RAYCITY-M ตำนานสตรีทเรซกลับมาอีกครั้ง เล่นได้บนมือถือ พบกันเร็วๆ นี้",
+    "keywords": "RAYCITY-M, เกมแข่งรถ, สตรีทเรซ, เกมมือถือ",
     "ogImage": "/img/hero_race_v2_poster.jpg",
     "footer": "© 2026 RAYCITY-M. All rights reserved.",
     "loader": "true",
@@ -23,16 +23,26 @@
       "windows": "",
       "ios": "",
       "android": ""
+    },
+    "show": {
+      "windows": "false",
+      "ios": "true",
+      "android": "true",
+      "register": "true",
+      "facebook": "true",
+      "tiktok": "true",
+      "discord": "true",
+      "youtube": "true"
     }
   },
   "home": {
     "seoTitle": "",
     "seoDescription": "",
-    "badge": "COMING SOON · MOBILE & PC",
+    "badge": "COMING SOON · MOBILE",
     "h1": "RAYCITY-M",
     "h2": "The street legend returns",
-    "h3": "on mobile & PC",
-    "lead": "ตำนานสตรีทเรซที่คุณคิดถึง กลับมาให้ซิ่งอีกครั้ง เล่นได้ทั้งบนมือถือและคอม พบกันเร็วๆ นี้",
+    "h3": "on mobile",
+    "lead": "ตำนานสตรีทเรซที่คุณคิดถึง กลับมาให้ซิ่งอีกครั้ง เล่นได้บนมือถือ พบกันเร็วๆ นี้",
     "registerText": "ลงทะเบียนล่วงหน้า",
     "registerLink": "",
     "registerMsg": "เปิดให้ลงทะเบียนล่วงหน้าเร็วๆ นี้ ติดตามประกาศทางเพจ",
@@ -55,11 +65,11 @@
     "gameplay": {
       "navLabel": "GAMEPLAY",
       "seoTitle": "Gameplay | ซิ่งให้สุด บนทุกหน้าจอ | RAYCITY-M",
-      "seoDescription": "รู้จักระบบเกม RAYCITY-M แข่งสตรีทเรซ แต่งรถ และเล่นได้ทั้งบนมือถือและคอมพิวเตอร์",
+      "seoDescription": "รู้จักระบบเกม RAYCITY-M แข่งสตรีทเรซ แต่งรถ และเล่นได้บนมือถือ",
       "eyebrow": "GAMEPLAY",
       "h1": "ซิ่งให้สุด บนทุกหน้าจอ",
       "h2": "",
-      "intro": "ตำนานสตรีทเรซที่กลับมาในรูปแบบใหม่ เล่นได้ทั้งบนมือถือและคอมพิวเตอร์"
+      "intro": "ตำนานสตรีทเรซที่กลับมาในรูปแบบใหม่ เล่นได้บนมือถือ"
     },
     "drivers": {
       "navLabel": "DRIVERS",
@@ -137,10 +147,10 @@
     },
     {
       "id": "g3",
-      "title": "Mobile & PC",
-      "desc": "เล่นได้ทั้งสองแพลตฟอร์ม ซิ่งต่อได้ทุกที่ทุกเวลา",
+      "title": "Mobile",
+      "desc": "ซิ่งต่อได้ทุกที่ทุกเวลาบนมือถือ",
       "image": "/img/teaser.jpg",
-      "alt": "Mobile & PC"
+      "alt": "Mobile"
     }
   ],
   "drivers": [
@@ -181,7 +191,7 @@
     {
       "id": "f1",
       "q": "RAYCITY-M คืออะไร",
-      "a": "เกมแข่งรถสตรีทที่นำตำนานกลับมาให้ซิ่งอีกครั้ง รองรับทั้งมือถือและคอมพิวเตอร์"
+      "a": "เกมแข่งรถสตรีทที่นำตำนานกลับมาให้ซิ่งอีกครั้ง รองรับมือถือ"
     },
     {
       "id": "f2",
@@ -191,7 +201,7 @@
     {
       "id": "f3",
       "q": "เล่นได้บนแพลตฟอร์มอะไรบ้าง",
-      "a": "Windows PC, iOS (App Store) และ Android (Google Play)"
+      "a": "iOS (App Store) และ Android (Google Play)"
     },
     {
       "id": "f4",
@@ -213,8 +223,8 @@
       "tag": "ANNOUNCEMENT",
       "published": true,
       "image": "/img/keyart_rc_v1_web.jpg",
-      "excerpt": "ตำนานสตรีทเรซกลับมาอีกครั้งบนมือถือและคอม",
-      "body": "## RAYCITY-M กลับมาแล้ว\nตำนานสตรีทเรซกลับมาอีกครั้ง เล่นได้ทั้งบนมือถือและคอมพิวเตอร์\n\n### ติดตามข่าวสาร\nติดตามประกาศและกิจกรรมได้ทางเพจเฟซบุ๊กอย่างเป็นทางการ",
+      "excerpt": "ตำนานสตรีทเรซกลับมาอีกครั้งบนมือถือ",
+      "body": "## RAYCITY-M กลับมาแล้ว\nตำนานสตรีทเรซกลับมาอีกครั้ง เล่นได้บนมือถือ\n\n### ติดตามข่าวสาร\nติดตามประกาศและกิจกรรมได้ทางเพจเฟซบุ๊กอย่างเป็นทางการ",
       "seoTitle": "",
       "seoDescription": ""
     },

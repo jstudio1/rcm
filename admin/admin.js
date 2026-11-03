@@ -1,8 +1,8 @@
 (function () {
   const app = document.getElementById('app');
-  let csrf = '', C = null, saved = null, cur = 'news';
+  let csrf = '', C = null, saved = null, cur = 'home';
   const dirty = new Set();
-  let navBtns = {}, barEls = {};
+  let navBtns = {}, menuBtns = {}, barEls = {};
 
   // ---------- tiny helpers ----------
   const safeLink = value => { const u = String(value || '').trim(); return !/[\\\x00-\x20\x7f]/.test(u) && /^(https?:\/\/[^/]|\/(?!\/)|#|mailto:)/i.test(u) ? u : '#'; };
@@ -55,6 +55,7 @@
   function setStatus(t, k) { const m = barEls.st; if (m) { m.textContent = t; m.className = 'st ' + (k || ''); } }
   function refreshChrome() {
     for (const s of SECTIONS) if (navBtns[s.id]) navBtns[s.id].classList.toggle('dirty', dirty.has(s.id));
+    for (const m of MENUS) if (menuBtns[m.id]) menuBtns[m.id].classList.toggle('dirty', m.tabs.some(t => dirty.has(t.id)));
     if (barEls.one) barEls.one.disabled = !dirty.has(cur);
     if (barEls.all) { barEls.all.style.display = dirty.size > 1 || (dirty.size === 1 && !dirty.has(cur)) ? '' : 'none'; barEls.all.textContent = 'บันทึกทั้งหมด (' + dirty.size + ')'; }
   }
@@ -413,7 +414,7 @@
       };
       const btns = ['mobile', 'desktop'].map(d => h('button', { type: 'button', class: d === 'mobile' ? 'btn sm' : 'ghost sm', disabled: !!run || !S.siteUrl, onclick: go(d) }, (d === 'mobile' ? '📱 ' : '💻 ') + 'ตรวจ' + DEV[d]));
       const top = box('ตรวจความเร็วเว็บ (Google PageSpeed Insights)',
-        !S.siteUrl ? h('div', { class: 'a-note' }, 'ตั้ง "โดเมนหลัก" ในเมนู ข้อมูลเว็บ & SEO หลัก ก่อน Google ตรวจได้เฉพาะเว็บที่ออนไลน์จริง') : null,
+        !S.siteUrl ? h('div', { class: 'a-note' }, 'ตั้ง "โดเมนหลัก" ในตั้งค่า → เว็บไซต์ & SEO ก่อน Google ตรวจได้เฉพาะเว็บที่ออนไลน์จริง') : null,
         h('div', { class: 'ps-run' }, h('label', { class: 'a-f' }, h('span', {}, 'หน้าที่จะตรวจ'), pageSel), h('div', { class: 'bt' }, ...btns)),
         run ? h('div', { class: 'ps-wait' }, h('i', { class: 'sp' }), `กำลังตรวจ${DEV[run.strategy]} หน้า ${run.path} … ${run.elapsed} วินาที (ปกติ 15–40 วินาที)`) : null,
         S.error ? h('div', { class: 'a-err', style: 'text-align:left' }, S.error.msg) : null,
@@ -663,7 +664,7 @@
     const miss = [];
     if (!(C.contact.company || '').trim()) miss.push('ชื่อบริษัท');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((C.contact.email || '').trim())) miss.push('อีเมลซัพพอร์ต');
-    return miss.length ? note('ยังไม่ได้กรอก: ' + miss.join(', ') + ' (ไปที่เมนู "ซัพพอร์ต / ติดต่อเรา") บรรทัดในนโยบาย/ข้อตกลงที่ใช้ข้อมูลนี้จะถูกซ่อนจนกว่าจะกรอก และสโตร์จะไม่ผ่านถ้าไม่มีช่องทางติดต่อ') : null;
+    return miss.length ? note('ยังไม่ได้กรอก: ' + miss.join(', ') + ' (ไปที่ สโตร์ & กฎหมาย → Support & ติดต่อ) บรรทัดในนโยบาย/ข้อตกลงที่ใช้ข้อมูลนี้จะถูกซ่อนจนกว่าจะกรอก และสโตร์จะไม่ผ่านถ้าไม่มีช่องทางติดต่อ') : null;
   };
   const pageShare = k => box('การแชร์ & การค้นหา',
     field(C.pages[k], 'ogImage', 'รูปแชร์ของหน้านี้', { type: 'image', ph: () => C.site.ogImage, help: 'เว้นว่าง = ใช้รูปแชร์หลักของเว็บ' }),
@@ -699,7 +700,7 @@
       const canCheck = /^https:\/\//i.test(D.base);
       host.replaceChildren(
         box('URL สำหรับกรอกในสโตร์',
-          !D.base ? note('ยังไม่ได้ตั้ง "โดเมนหลัก" (เมนู ข้อมูลเว็บ & SEO หลัก) ตอนนี้แสดงเป็นเส้นทางสั้นๆ ต้องตั้งโดเมน https:// ก่อนจึงจะได้ URL เต็มและตรวจลิงก์ได้') : null,
+          !D.base ? note('ยังไม่ได้ตั้ง "โดเมนหลัก" (ตั้งค่า → เว็บไซต์ & SEO) ตอนนี้แสดงเป็นเส้นทางสั้นๆ ต้องตั้งโดเมน https:// ก่อนจึงจะได้ URL เต็มและตรวจลิงก์ได้') : null,
           note('ใส่ URL เหล่านี้ในหน้าส่งแอปของ App Store Connect / Play Console และในแอป ห้ามเปลี่ยนที่อยู่หน้าหลังส่งสโตร์แล้ว เพราะสโตร์ตรวจลิงก์ ถ้าเสียอาจถูกถอดแอป'),
           h('div', { class: 'an-wrap' }, h('table', { class: 'an-tbl' }, h('thead', {}, h('tr', {}, ...['หน้า', 'URL', 'สถานะ', ''].map(t => h('th', {}, t)))), h('tbody', {}, ...rows))),
           h('div', { class: 'an-filter' },
@@ -726,6 +727,7 @@
     const pageOk = (k, en) => { const b = T(P[k][en ? 'bodyEn' : 'body']); return b.length > 400 && !lineMiss(b); };
     const texts = [['privacy', 'body'], ['privacy', 'bodyEn'], ['terms', 'body'], ['terms', 'bodyEn'], ['support', 'body']].map(([k, f]) => P[k][f]).concat(C.supportFaq.map(f => f.a), Object.values(C.cookies));
     const num = v => /^\d{1,3}$/.test(T(v));
+    const has = k => !!(T(P[k].h1) && T(P[k].body));
     const rows = [
       ['ข้อมูลติดต่อ', [
         [!!T(ct.company), 'ใส่ชื่อบริษัท / ผู้ให้บริการ', 'p-support'],
@@ -737,6 +739,7 @@
         [pageOk('terms', false), 'ข้อตกลงการใช้บริการ (ไทย) ครบ' + (lineMiss(P.terms.body) ? ' — ขาด: ' + missing(P.terms.body).join(', ') : ''), 'p-terms'],
         [pageOk('terms', true), 'ข้อตกลงการใช้บริการ (English) ครบ', 'p-terms'],
         [T(P.support.body).length > 200 && C.supportFaq.length >= 5, 'หน้าซัพพอร์ตมีเนื้อหา ช่องทางรายงานผู้เล่น และ FAQ อย่างน้อย 5 ข้อ', 'p-support'],
+        [has('delete'), 'หน้าลบบัญชีและข้อมูล (/delete-account) มีหัวข้อและเนื้อหา (Google Play บังคับ)', 'p-delete'],
         ]],
       ['ค่าที่ต้องตรงกับสโตร์', [
         [num(lg.minAge), 'อายุขั้นต่ำของผู้เล่นกรอกแล้ว (' + (T(lg.minAge) || '-') + ') — ต้องตรงกับ age rating', 'p-privacy'],
@@ -745,23 +748,24 @@
         [!texts.some(t => draft.test(String(t || ''))), 'ไม่มีข้อความร่าง/ตัวอย่างในหน้ากฎหมาย ซัพพอร์ต และแบนเนอร์', null],
         [!/COMING SOON/i.test(C.home.badge || ''), 'ป้ายหน้าแรกไม่ใช่ "COMING SOON" (สโตร์ไม่ชอบฟีเจอร์ที่ยังไม่เปิด)', 'home']]],
       ['เว็บไซต์', [
-        [/^https:\/\//i.test(T(C.site.url)), 'ตั้ง "โดเมนหลัก" เป็น https:// แล้ว (เมนู ข้อมูลเว็บ & SEO หลัก)', 'general'],
+        [/^https:\/\//i.test(T(C.site.url)), 'ตั้ง "โดเมนหลัก" เป็น https:// แล้ว (ตั้งค่า → เว็บไซต์ & SEO)', 'general'],
         [on(C.cookies.enabled), 'เปิดแบนเนอร์ขอความยินยอมคุกกี้', 'cookies']]]
     ];
     const flat = rows.flatMap(r => r[1]), pass = flat.filter(x => x[0]).length;
-    const todo = ['หน้าลบบัญชี (Google บังคับเป็น URL บนเว็บ ใส่ในฟอร์ม Data safety)', 'หน้าอัตราการได้ของจากกล่องสุ่ม (ต้องมีถ้าขายกล่องสุ่มด้วยเงินจริงหรือ Cash)'];
+    const todo = ['ป้าย/ปุ่มดาวน์โหลดทางการของ App Store และ Google Play พร้อมเช็กโดเมนลิงก์', 'ไฟล์ app-ads.txt / .well-known (ถ้าใช้โฆษณาหรือ Universal Links)']
+      .concat(has('odds') ? [] : ['หน้าอัตราการได้ของจากกล่องสุ่ม (ต้องมีถ้าขายกล่องสุ่มด้วยเงินจริงหรือ Cash) — เขียนได้ที่ สโตร์ & กฎหมาย → อัตรากล่องสุ่ม']);
     return [box(null, h('div', { class: 'an-kpis' }, h('div', { class: 'an-kpi red' }, h('small', {}, 'ผ่านแล้ว'), h('b', {}, pass + ' / ' + flat.length), h('div', { class: 'sub' }, pass === flat.length ? 'พร้อมส่งสโตร์ (เท่าที่เว็บตรวจได้)' : 'ยังมีรายการที่ต้องแก้'))),
       h('small', { class: 'h' }, 'หมายเหตุ: ระบบตรวจได้เฉพาะสิ่งที่อยู่ในเว็บนี้ เรื่องสิทธิ์ใช้ชื่อ/โลโก้ ภาพหน้าจอจากเกมจริง บัญชีทดสอบ age rating และฟอร์ม Data safety / App Privacy ทีมต้องตรวจเอง')),
     box('ยังไม่มีในระบบนี้ (ต้องทำเพิ่มก่อนส่งสโตร์ ไม่นับในคะแนน)', ...todo.map(t => h('div', { class: 'rd-row' }, h('span', { class: 'rd-i no' }, '!'), h('span', { class: 'rd-t' }, t)))),
     ...rows.map(([title, items]) => box(title, ...items.map(([ok, text, go]) => h('div', { class: 'rd-row' },
       h('span', { class: 'rd-i ' + (ok ? 'ok' : 'no') }, ok ? '✓' : '✕'), h('span', { class: 'rd-t' }, text),
-      go && !ok ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { cur = go; render(); window.scrollTo(0, 0); } }, 'ไปแก้') : null))))];
+      go && !ok ? h('button', { type: 'button', class: 'ghost sm', onclick: () => open(go) }, 'ไปแก้') : null))))];
   }
   const on = v => v === true || v === 'true' || v === '1';
 
   // ---------- sections ----------
   const PN = { rewards: 'Rewards', gameplay: 'Gameplay', drivers: 'Drivers', news: 'News', faq: 'FAQ' };
-  const SECTIONS = [
+  const PARTS = [
     { id: 'news', g: 'เนื้อหา', label: 'ข่าวสาร', desc: 'เพิ่ม/แก้ไขข่าว กดติ๊ก "เผยแพร่" เมื่อพร้อมขึ้นเว็บ ลากที่ ⋮⋮ เพื่อเรียงลำดับ', paths: ['news'], url: '/news', count: () => C.news.length,
       view: () => listEditor(C.news, {
         addTop: true, title: n => n.title, badge: n => h('span', { class: 'a-bd' + (n.published ? ' on' : '') }, n.published ? 'เผยแพร่' : 'ฉบับร่าง'),
@@ -779,9 +783,36 @@
     { id: 'gameplay', g: 'เนื้อหา', label: 'Gameplay', desc: 'การ์ดอธิบายระบบเกม แต่ละใบมีรูปและข้อความ', paths: ['gameplay'], url: '/gameplay', count: () => C.gameplay.length,
       view: () => listEditor(C.gameplay, { title: g => g.title, blank: () => ({ title: '', desc: '', image: '', alt: '' }),
         form: (g, u) => [field(g, 'title', 'หัวข้อ (H3)', { onchange: u }), field(g, 'desc', 'รายละเอียด', { type: 'textarea' }), field(g, 'image', 'รูปภาพ', { type: 'image' }), field(g, 'alt', 'ข้อความอธิบายรูป (alt)', { help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น' })] }) },
-    { id: 'rewards', g: 'เนื้อหา', label: 'Rewards', desc: 'ของรางวัลตามเป้าหมายการลงทะเบียน ใบสุดท้ายแสดงตัวใหญ่', paths: ['rewards'], url: '/rewards', count: () => C.rewards.length,
-      view: () => listEditor(C.rewards, { title: r => (r.milestone ? r.milestone + ' · ' : '') + r.title, blank: () => ({ milestone: '', title: '', desc: '', status: 'LOCKED' }),
-        form: (r, u) => [two(field(r, 'milestone', 'เป้าหมาย (เช่น 100K)', { onchange: u }), field(r, 'status', 'สถานะ', { help: 'เช่น LOCKED / UNLOCKED' })), field(r, 'title', 'ชื่อรางวัล (H3)', { onchange: u }), field(r, 'desc', 'รายละเอียด', { type: 'textarea' })] }) },
+    { id: 'prereg', g: 'เนื้อหา', label: 'ลงทะเบียนล่วงหน้า & รางวัล', desc: 'ตัวนับผู้ลงทะเบียนล่วงหน้าและรางวัลตามเป้าหมาย แสดงที่หน้าแรกและหน้า /rewards เตรียมไว้เชื่อมกับระบบเกม', paths: ['prereg'], url: '/rewards', count: () => C.rewards.length,
+      view: () => {
+        const P = C.prereg, modeSel = h('select', { onchange: e => { P.mode = e.target.value; mark(); } }, h('option', { value: 'mock' }, 'Mockup (ใช้ตัวเลขที่กรอกเอง)'), h('option', { value: 'api' }, 'API จริง (ดึงตัวเลขจากระบบเกม)'));
+        modeSel.value = P.mode === 'api' ? 'api' : 'mock';
+        return [
+          box('เปิด/ปิดส่วนนี้',
+            check(P, 'enabled', 'แสดงส่วนลงทะเบียนล่วงหน้าและรางวัล (หน้า /rewards)'),
+            check(P, 'onHome', 'แสดงบนหน้าแรกด้วย (ใต้ส่วนหัวของหน้า)'),
+            note('ปุ่ม "ลงทะเบียนล่วงหน้า" ด้านล่างใช้ข้อความ/ลิงก์/สวิตช์เดียวกับปุ่มลงทะเบียนในแท็บ หน้าแรก')),
+          box('จำนวนผู้ลงทะเบียน',
+            h('label', { class: 'a-f' }, h('span', {}, 'แหล่งตัวเลข'), modeSel, h('span', { class: 'h' }, 'Mockup = ตัวเลขที่กรอกด้านล่าง · API จริง = หน้าเว็บถามตัวเลขจากที่อยู่ API ทุก 60 วินาที')),
+            field(P, 'mockCount', 'จำนวนตัวอย่าง / ตัวเลขสำรอง', { ph: '13002', help: 'โหมด Mockup ใช้ตัวเลขนี้ · โหมด API ใช้แสดงระหว่างรอ API หรือถ้า API ล่ม' }),
+            field(P, 'apiUrl', 'ที่อยู่ API (เฉพาะ https://...)', { ph: 'https://api.example.com/prereg/count', help: 'ต้องตอบ JSON เช่น {"count": 13002} · ตั้ง CORS ให้โดเมนเว็บนี้ · ไม่ส่งคุกกี้ · http ใช้ได้เฉพาะ localhost' })),
+          box('ข้อความบนหน้า',
+            two(field(P, 'eyebrow', 'ข้อความเล็กเหนือหัวข้อ'), field(P, 'statusLabel', 'ป้ายสถานะเหนือตัวเลข')),
+            two(field(P, 'title', 'หัวข้อ (ส่วนแรก)'), field(P, 'titleAccent', 'หัวข้อ (ส่วนสีเน้น)')),
+            field(P, 'intro', 'ข้อความแนะนำ', { type: 'textarea' }),
+            two(field(P, 'counterLabel', 'ป้ายตัวนับ'), field(P, 'unit', 'หน่วย', { ph: 'คน' })),
+            field(P, 'nextText', 'ข้อความเป้าหมายถัดไป', { help: 'ใช้ {n} แทนจำนวนที่ขาด เช่น อีกเพียง {n} คน เพื่อถึงเป้าหมายขั้นถัดไป' }),
+            field(P, 'allDoneText', 'ข้อความเมื่อถึงทุกเป้าหมายแล้ว'),
+            two(field(P, 'goalsLabel', 'หัวข้อแถวรางวัล'), field(P, 'reachedCount', 'คำว่า "ถึงเป้าหมายแล้ว" (ตัวนับ 4 / 6)')),
+            two(field(P, 'reachedLabel', 'ป้ายการ์ด: ถึงแล้ว'), field(P, 'nextLabel', 'ป้ายการ์ด: เป้าหมายถัดไป')),
+            two(field(P, 'lockedLabel', 'ป้ายการ์ด: ยังไม่ถึง'), field(P, 'viewLabel', 'ข้อความ "ดูรางวัล"')),
+            two(field(P, 'detailReached', 'รายละเอียดรางวัล: ถึงแล้ว'), field(P, 'detailLocked', 'รายละเอียดรางวัล: ยังไม่ถึง')))
+        ];
+      } },
+    { id: 'rewards', g: 'เนื้อหา', label: 'รายการรางวัล (เป้าหมาย)', desc: 'รางวัลที่ปลดล็อกเมื่อยอดลงทะเบียนถึงเป้าหมาย เรียงตามเป้าหมายให้อัตโนมัติ', paths: ['rewards'], url: '/rewards', count: () => C.rewards.length,
+      view: () => [note('ใส่ "เป้าหมาย (ตัวเลข)" เช่น 5000 ระบบเทียบกับจำนวนผู้ลงทะเบียนเพื่อบอกว่าถึงเป้าหรือยัง ถ้าเว้นว่างจะอ่านจากป้ายเป้าหมาย เช่น 50K = 50,000 · รายการที่ไม่มีตัวเลขเป้าหมายจะไม่แสดงในแถบรางวัล'),
+        listEditor(C.rewards, { title: r => (r.milestone || r.target ? (r.milestone || r.target) + ' · ' : '') + r.title, blank: () => ({ milestone: '', target: '', title: '', desc: '', image: '', alt: '', status: '' }),
+        form: (r, u) => [two(field(r, 'target', 'เป้าหมาย (ตัวเลขผู้ลงทะเบียน)', { ph: '5000', onchange: u }), field(r, 'milestone', 'ป้ายเป้าหมาย (ไม่บังคับ)', { ph: '5,000', help: 'ใช้แสดงในการ์ดรายการ/หน้าเก่า' })), field(r, 'title', 'ชื่อรางวัล', { onchange: u }), field(r, 'desc', 'รายละเอียดรางวัล', { type: 'textarea' }), field(r, 'image', 'รูปรางวัล (ไม่บังคับ)', { type: 'image', ph: '/img/...' }), field(r, 'alt', 'คำอธิบายรูป (alt)')] })] },
     { id: 'drivers', g: 'เนื้อหา', label: 'Drivers', desc: 'การ์ดนักซิ่ง/รถ แต่ละใบมีรูป ป้ายมุม และชื่อ', paths: ['drivers'], url: '/drivers', count: () => C.drivers.length,
       view: () => listEditor(C.drivers, { title: d => d.title, blank: () => ({ title: '', desc: '', image: '', pos: 'center', badge: '' }),
         form: (d, u) => [field(d, 'title', 'ชื่อ (H3)', { onchange: u }), field(d, 'desc', 'คำอธิบาย', { type: 'textarea' }), field(d, 'image', 'รูปภาพ', { type: 'image' }), field(d, 'alt', 'ข้อความอธิบายรูป (alt)', { ph: () => d.title, help: 'ช่วย SEO และผู้ใช้ที่มองไม่เห็น · เว้นว่าง = ใช้ชื่อ' }),
@@ -855,7 +886,7 @@
           two(field(C.contact, 'hours', 'เวลาทำการ'), field(C.contact, 'response', 'เวลาตอบกลับโดยประมาณ')),
           two(field(C.contact, 'hoursEn', 'Opening hours (English)'), field(C.contact, 'responseEn', 'Reply time (English)')),
           field(C.contact, 'address', 'ที่อยู่ (ไม่บังคับ แต่ Google ต้องการที่อยู่ผู้พัฒนาในบางกรณี)', { type: 'textarea' }),
-          h('small', { class: 'h' }, 'Facebook ใช้ลิงก์จากเมนู "ลิงก์โซเชียล & ดาวน์โหลด" โดยอัตโนมัติ')),
+          h('small', { class: 'h' }, 'Facebook ใช้ลิงก์จาก หน้าแรก → ปุ่มดาวน์โหลด & โซเชียล โดยอัตโนมัติ')),
         legalHead('support'),
         box('เนื้อหาหน้าซัพพอร์ต (ติดต่อ / รายงานผู้เล่น / กฎชุมชน)', legalBody(C.pages.support, 'body')),
         box('คำถามที่พบบ่อยเรื่องซัพพอร์ต', note('ค่าเริ่มต้นครอบคลุม: ลืมรหัสผ่าน, ติดตั้ง/อัปเดต, เน็ตมือถือ, รายงานบั๊ก, รายงานผู้เล่น และลบบัญชี แก้คำตอบให้ตรงกับวิธีที่ระบบของท่านใช้จริง (ใช้ตัวแปร {{email}} {{reportEmail}} {{deleteDays}} ได้)'),
@@ -899,7 +930,7 @@
           h('div', { class: 'a-empty', style: 'text-align:left;line-height:1.9' },
             'rc_consent — จำเป็น: จำการเลือกในแบนเนอร์ (6 เดือน)', h('br'),
             'vid — สถิติ: รหัสสุ่มไม่ระบุตัวตน ตั้งเมื่อกด "ยอมรับ" เท่านั้น (1 ปี)', h('br'),
-            '_ga / _ga_* — สถิติ: เฉพาะเมื่อใส่ Google Analytics ในเมนู ข้อมูลเว็บ & SEO หลัก และผู้ใช้ยินยอม', h('br'),
+            '_ga / _ga_* — สถิติ: เฉพาะเมื่อใส่ Google Analytics ในตั้งค่า → เว็บไซต์ & SEO และผู้ใช้ยินยอม', h('br'),
             'rc-sfx / rc-ldr-seen — จำเป็น: จำเสียงและหน้าโหลด (เก็บในเบราว์เซอร์)'))] },
     { id: 'urls', g: 'ตั้งค่าเว็บ', label: 'URL สำหรับสโตร์', desc: 'ที่อยู่หน้านโยบาย ข้อตกลง ซัพพอร์ต (และหน้าลบบัญชี/อัตรากล่องสุ่มเมื่อมี) ให้คัดลอกไปกรอกในสโตร์ พร้อมตรวจว่าทุกลิงก์เปิดได้จริง', paths: [],
       view: () => urlsView() },
@@ -1045,7 +1076,32 @@
         return [pwBox, host];
       } }
   ];
+
+  // ---------- menu structure ----------
+  // A few menus, each with tabs. A tab can bring several of the parts above together (a list + its page settings),
+  // and it keeps the id of its first part, so saving, unsaved-change marks and "go fix it" buttons keep working.
+  const part = id => PARTS.find(x => x.id === id);
+  function tab(id, label, extra) {
+    const ids = [id].concat(extra || []), ps = ids.map(part), main = ps[0];
+    return { id, label, title: main.label, desc: main.desc, url: main.url, count: main.count, parts: ids,
+      paths: [...new Set(ps.flatMap(x => x.paths))],
+      view: () => ps.flatMap((x, i) => (i ? [h('h2', { class: 'a-sub' }, (x.id.startsWith('p-') ? 'ตั้งค่าหน้า: ' : '') + x.label + (x.url && x.id.startsWith('p-') ? '  ·  ' + x.url : ''))] : []).concat(x.view())) };
+  }
+  const MENUS = [
+    { id: 'home', label: 'หน้าแรก', hint: 'ข้อความ รูปพื้นหลัง ปุ่มดาวน์โหลด โซเชียล', tabs: [tab('home', 'ข้อความ & พื้นหลัง'), tab('links', 'ปุ่มดาวน์โหลด & โซเชียล')] },
+    { id: 'content', label: 'เนื้อหาเว็บ', hint: 'ข่าว Gameplay Rewards Drivers FAQ', tabs: [tab('news', 'ข่าวสาร', ['p-news']), tab('gameplay', 'Gameplay', ['p-gameplay']), tab('prereg', 'ลงทะเบียนล่วงหน้า & รางวัล', ['rewards', 'p-rewards']), tab('drivers', 'Drivers', ['p-drivers']), tab('faq', 'FAQ', ['p-faq'])] },
+    { id: 'store', label: 'สโตร์ & กฎหมาย', hint: 'Privacy Terms Support คุกกี้ URL สโตร์', tabs: [tab('ready', 'ความพร้อมส่งสโตร์'), tab('urls', 'URL สำหรับสโตร์'), tab('p-privacy', 'Privacy'), tab('p-terms', 'Terms'), tab('p-support', 'Support & ติดต่อ'), tab('p-delete', 'ลบบัญชี'), tab('p-odds', 'อัตรากล่องสุ่ม'), tab('cookies', 'คุกกี้')] },
+    { id: 'report', label: 'รายงาน & ความเร็ว', hint: 'ผู้เข้าชม PageSpeed', tabs: [tab('stats', 'สถิติผู้เข้าชม'), tab('pagespeed', 'PageSpeed')] },
+    { id: 'media', label: 'คลังรูป & วิดีโอ', hint: 'ไฟล์ที่อัปโหลด', tabs: [tab('media', 'คลังรูป & วิดีโอ')] },
+    { id: 'settings', label: 'ตั้งค่า', hint: 'SEO ระบบสมาชิก รหัสผ่าน 2FA ประวัติ', tabs: [tab('general', 'เว็บไซต์ & SEO'), tab('portal', 'ระบบสมาชิก'), tab('account', 'บัญชี & ความปลอดภัย'), tab('history', 'ประวัติการแก้ไข')] }
+  ];
+  const SECTIONS = MENUS.flatMap(m => m.tabs.map(t => Object.assign(t, { g: m.label, menu: m.id })));
   const sec = id => SECTIONS.find(s => s.id === id);
+  const tabOf = id => SECTIONS.find(s => s.parts.includes(id));
+  const menuOf = id => MENUS.find(m => m.tabs.some(t => t.id === id));
+  const lastTab = {};
+  const open = id => { const t = tabOf(id) || SECTIONS[0]; cur = t.id; render(); window.scrollTo(0, 0); };
+  for (const x of PARTS) if (!tabOf(x.id)) console.error('admin: part not in any menu: ' + x.id);
 
   // ---------- screens ----------
   function loginScreen(err) {
@@ -1059,32 +1115,37 @@
   }
 
   function render() {
-    const s = sec(cur);
-    navBtns = {};
-    const groups = [];
-    for (const x of SECTIONS) { if (!groups.includes(x.g)) groups.push(x.g); }
+    const s = sec(cur), menu = menuOf(cur);
+    lastTab[menu.id] = cur;
+    navBtns = {}; menuBtns = {};
     const side = h('aside', { class: 'a-side' },
       h('div', { class: 'a-brand' }, h('img', { src: C.site.logo || '/img/logo.png', alt: '' }), h('div', {}, h('b', {}, C.site.name || 'Admin'), h('small', {}, 'ADMIN'))),
-      ...groups.flatMap(g => [h('div', { class: 'a-grp' }, g), ...SECTIONS.filter(x => x.g === g).map(x => {
-        const b = h('button', { class: 'a-nav' + (x.id === cur ? ' on' : '') + (dirty.has(x.id) ? ' dirty' : ''), onclick: () => { cur = x.id; render(); if (innerWidth <= 900) document.querySelector('.a-main').scrollIntoView(); else window.scrollTo(0, 0); } },
-          h('span', {}, x.label), x.count ? h('em', { class: 'n', style: 'font-style:normal' }, String(x.count())) : null, h('i'));
-        navBtns[x.id] = b; return b;
-      })]),
+      h('nav', { 'aria-label': 'เมนูหลังบ้าน', class: 'a-menus' }, ...MENUS.map(m => {
+        const b = h('button', { class: 'a-nav' + (m.id === menu.id ? ' on' : '') + (m.tabs.some(t => dirty.has(t.id)) ? ' dirty' : ''), 'aria-current': m.id === menu.id ? 'page' : null,
+          onclick: () => { cur = lastTab[m.id] || m.tabs[0].id; render(); if (innerWidth <= 900) document.querySelector('.a-main').scrollIntoView(); else window.scrollTo(0, 0); } },
+          h('span', {}, m.label, h('small', {}, m.hint)), h('i'));
+        menuBtns[m.id] = b; return b;
+      })),
       h('div', { class: 'a-grow' }),
       h('div', { class: 'a-foot-nav' },
         h('button', { class: 'a-nav', onclick: () => window.open('/', '_blank') }, h('span', {}, 'ดูเว็บไซต์ ↗')),
         h('button', { class: 'a-nav', onclick: async () => { if (dirty.size && !confirm('มีการแก้ไขที่ยังไม่บันทึก ออกจากระบบ?')) return; try { await api('logout', 'POST'); } catch (e) {} csrf = ''; dirty.clear(); loginScreen(); } }, h('span', {}, 'ออกจากระบบ'))));
 
     const head = h('div', { class: 'a-head' },
-      h('div', {}, h('span', { class: 'eyebrow' }, s.g), h('h1', { class: 'disp' }, s.label), h('p', {}, s.desc)),
+      h('div', {}, h('span', { class: 'eyebrow' }, menu.label), h('h1', { class: 'disp' }, s.title), h('p', {}, s.desc)),
       s.url ? h('div', { class: 'acts' }, h('a', { class: 'ghost sm', href: s.url, target: '_blank', rel: 'noopener' }, 'ดูหน้านี้ ↗')) : null);
+    const tabs = menu.tabs.length > 1 ? h('div', { class: 'a-tabs', role: 'tablist', 'aria-label': menu.label }, ...menu.tabs.map(t => {
+      const b = h('button', { type: 'button', role: 'tab', 'aria-selected': t.id === cur ? 'true' : 'false', class: 'a-tab' + (t.id === cur ? ' on' : '') + (dirty.has(t.id) ? ' dirty' : ''),
+        onclick: () => open(t.id) }, h('span', {}, t.label), t.count ? h('em', { class: 'n' }, String(t.count())) : null, h('i'));
+      navBtns[t.id] = b; return b;
+    })) : null;
     const view = [].concat(s.view());
-    const main = h('main', { class: 'a-main' }, head, ...view);
+    const main = h('main', { class: 'a-main' }, head, tabs, ...view);
 
     barEls = { st: h('span', { class: 'st' }) };
     const bar = s.paths.length ? h('div', { class: 'a-bar' }, barEls.st,
       (barEls.all = h('button', { class: 'ghost sm', type: 'button', style: 'display:none', onclick: () => save([...dirty]) }, '')),
-      (barEls.one = h('button', { class: 'btn sm', type: 'button', onclick: () => save([cur]) }, 'บันทึกส่วนนี้'))) : null;
+      (barEls.one = h('button', { class: 'btn sm', type: 'button', onclick: () => save([cur]) }, 'บันทึก (Ctrl+S)'))) : null;
     app.replaceChildren(h('div', { class: 'a-shell' }, side, main, bar));
     if (bar) { setStatus(dirty.has(cur) ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ไม่มีการเปลี่ยนแปลง', dirty.has(cur) ? 'warn' : ''); refreshChrome(); }
   }
