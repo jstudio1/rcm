@@ -91,9 +91,13 @@ const SITE_URL_RE = /^https?:\/\/(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])
 const baseUrl = (req, c) => {
   const set = String(c.site.url || '').trim().replace(/\/+$/, '');
   if (SITE_URL_RE.test(set)) return set;
-  // no domain set in admin: fall back to the request's host, but only if it looks like a real host name
-  const host = (fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host || '';
-  return (isHttps(req) ? 'https' : 'http') + '://' + (HOST_RE.test(host) ? host.toLowerCase() : 'localhost');
+  // no domain set in admin: fall back to the request's host, but only a local one or one listed in SITE_HOSTS.
+  // Any other Host / X-Forwarded-Host could be chosen by a visitor and would end up in canonical and share links.
+  const host = String((fwd(req, 'x-forwarded-host') || [])[0] || req.headers.host || '').toLowerCase();
+  const name = host.replace(/:\d{1,5}$/, '').replace(/^\[|\]$/g, '');
+  const allowed = String(process.env.SITE_HOSTS || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+  const local = name === 'localhost' || name.endsWith('.localhost') || /^127\.\d+\.\d+\.\d+$/.test(name) || name === '::1';
+  return (isHttps(req) ? 'https' : 'http') + '://' + (HOST_RE.test(host) && (local || allowed.includes(name)) ? host : 'localhost');
 };
 // public address of a page on the live site (PageSpeed needs the real domain, not localhost)
 const siteUrlFor = (p, c) => { const s = String(c.site.url || '').trim().replace(/\/+$/, ''); return SITE_URL_RE.test(s) ? s + p : ''; };
@@ -281,15 +285,15 @@ async function adminApi(req, res, url) {
     let b; try { b = JSON.parse(await readBody(req, 4096)); } catch (e) { return json(res, 400, { error: 'bad request' }); }
     if (!b || typeof b !== 'object' || typeof b.user !== 'string' || typeof b.password !== 'string') return json(res, 400, { error: 'bad request' });
     if (b.user.length > 200 || b.password.length > 1024) return json(res, 400, { error: 'bad request' });
-    if (!fails.reserve(who)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
-    const version = store.authVersion();
+    if (!fails.reserve(who, b.user)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
+    const uid = await store.checkLogin(b.user, b.password);
+    const version = uid ? store.authVersion(uid) : '';
     // with two-step login on, the code is always part of the answer: a wrong password and a wrong code look the same
-    const passOk = await store.checkLogin(b.user, b.password);
-    const codeOk = !store.totpEnabled() || (typeof b.code === 'string' && store.totpCheck(b.code));
-    if (passOk && codeOk && version === store.authVersion()) {
-      fails.refund(who);
+    const codeOk = !!uid && (!store.totpEnabled(uid) || (typeof b.code === 'string' && store.totpCheck(uid, b.code)));
+    if (uid && codeOk && version === store.authVersion(uid)) {
+      fails.refund(who, b.user);
       const token = crypto.randomBytes(32).toString('base64url'), csrf = crypto.randomBytes(24).toString('base64url');
-      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf, version, seen: Date.now() });
+      sessions.set(token, { uid, exp: Date.now() + SESSION_MS, csrf, version, seen: Date.now() });
       const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
       return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
     }
@@ -302,7 +306,7 @@ async function adminApi(req, res, url) {
   if (m !== 'GET' && (!/^[A-Za-z0-9_-]{32}$/.test(tok) || tok.length !== s.csrf.length || !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(s.csrf)))) return json(res, 403, { error: 'csrf' });
 
   try {
-    if (route === 'me' && m === 'GET') return json(res, 200, { csrf: s.csrf });
+    if (route === 'me' && m === 'GET') return json(res, 200, { csrf: s.csrf, me: store.profile(s.uid) });
     if (route === 'logout' && m === 'POST') { sessions.delete(s.token); return json(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0' }); }
     if (route === 'content' && m === 'GET') return json(res, 200, store.snapshot());
     if (route === 'history' && m === 'GET') return json(res, 200, { items: store.listHistory() });
@@ -410,56 +414,77 @@ async function adminApi(req, res, url) {
       // wrong "current password" guesses count toward the same lockout as the login form
       const who = ip(req);
       const b = JSON.parse(await readBody(req, 4096)) || {};
-      const user = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'admin.json'), 'utf8')).user;
-      if (!fails.reserve(who)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
-      if (!await store.checkLogin(user, String(b.current || ''))) {
+      const user = store.adminName(s.uid);
+      if (!fails.reserve(who, user)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
+      if (!await store.checkPassword(s.uid, String(b.current || ''))) {
         return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
       }
       const next = typeof b.next === 'string' ? b.next : '';
       if (next.length < 10 || next.length > 200) return json(res, 400, { error: 'รหัสผ่านใหม่ต้องยาว 10–200 ตัวอักษร' });
-      store.setPassword(next, s.version);
+      store.setPassword(s.uid, next, s.version); fails.refund(who, user);
+      // this account's other sessions end (its version changed); this browser gets a fresh one. Other admins stay signed in.
+      sessions.delete(s.token);
       const token = crypto.randomBytes(32).toString('base64url');
-      sessions.set(token, { exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion(), seen: Date.now() });
-      sessions.keepOnly(token);
+      sessions.set(token, { uid: s.uid, exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion(s.uid), seen: Date.now() });
       const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
       return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
     }
+    // ---- own profile; the list of admins; the owner adds, removes and resets other admins (confirming with their own password) ----
+    if (route === 'profile' && m === 'PUT') {
+      const b = JSON.parse(await readBody(req, 4096)) || {};
+      return json(res, 200, { me: store.setProfile(s.uid, b) });
+    }
+    if (route === 'admins' && m === 'GET') return json(res, 200, { items: store.listAdmins(), canManage: (store.profile(s.uid) || {}).role === 'owner' });
+    const am = /^admins(?:\/([a-z0-9]{3,16})\/(remove|password))?$/.exec(route);
+    if (am && m === 'POST') {
+      if ((store.profile(s.uid) || {}).role !== 'owner') return json(res, 403, { error: 'เฉพาะเจ้าของระบบ (บัญชีแรก) เท่านั้นที่จัดการแอดมินได้' });
+      const who = ip(req), b = JSON.parse(await readBody(req, 4096)) || {}, me = store.adminName(s.uid);
+      if (!fails.reserve(who, me)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
+      if (!await store.checkPassword(s.uid, String(b.current || ''))) return json(res, 400, { error: 'รหัสผ่านของคุณไม่ถูกต้อง' });
+      fails.refund(who, me);
+      if (!am[1]) return json(res, 200, { admin: store.addAdmin(b) });
+      if (am[2] === 'remove') { store.removeAdmin(am[1], s.uid); return json(res, 200, { ok: true }); }
+      store.resetPassword(am[1], b.password, b.clear2fa === true); return json(res, 200, { ok: true });
+    }
     // ---- two-step login (authenticator app): status, start, confirm, switch off ----
     // Changing it signs every other session out, so the browser doing it gets a fresh session straight away.
-    if (route === '2fa' && m === 'GET') return json(res, 200, { enabled: store.totpEnabled() });
+    if (route === '2fa' && m === 'GET') return json(res, 200, { enabled: store.totpEnabled(s.uid) });
     if (route.startsWith('2fa/') && m === 'POST') {
       const who = ip(req);
       const b = JSON.parse(await readBody(req, 4096)) || {};
       const fresh = () => {
+        sessions.delete(s.token);
         const token = crypto.randomBytes(32).toString('base64url');
-        sessions.set(token, { exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion(), seen: Date.now() });
-        sessions.keepOnly(token);
+        sessions.set(token, { uid: s.uid, exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion(s.uid), seen: Date.now() });
         const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
         return { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` };
       };
-      if (!fails.reserve(who)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
+      const me = store.adminName(s.uid);
+      if (!fails.reserve(who, me)) return json(res, 429, { error: 'Too many attempts; retry in 15 minutes' });
       if (route === '2fa/begin') {
-        if (store.totpEnabled()) return json(res, 400, { error: 'เปิดใช้อยู่แล้ว' });
-        if (!await store.checkLogin(store.adminName(), String(b.current || ''))) return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
+        if (store.totpEnabled(s.uid)) return json(res, 400, { error: 'เปิดใช้อยู่แล้ว' });
+        if (!await store.checkPassword(s.uid, String(b.current || ''))) return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
         const secret = totp.newSecret();
         pending2fa.set(s.token, { secret, exp: Date.now() + 10 * 60e3 });
-        return json(res, 200, { secret, uri: totp.uri(secret, store.adminName(), 'RAYCITY-M') });
+        return json(res, 200, { secret, uri: totp.uri(secret, me, 'RAYCITY-M') });
       }
       if (route === '2fa/enable') {
         const p = pending2fa.get(s.token);
         if (!p || p.exp < Date.now()) return json(res, 400, { error: 'หมดเวลา เริ่มตั้งค่าใหม่อีกครั้ง' });
-        if (!store.totpEnable(p.secret, String(b.code || ''), s.version)) return json(res, 400, { error: 'รหัสไม่ถูกต้อง ตรวจว่านาฬิกาเครื่องตรงและลองรหัสใหม่' });
-        pending2fa.delete(s.token); fails.refund(who);
+        if (!store.totpEnable(s.uid, p.secret, String(b.code || ''), s.version)) return json(res, 400, { error: 'รหัสไม่ถูกต้อง ตรวจว่านาฬิกาเครื่องตรงและลองรหัสใหม่' });
+        pending2fa.delete(s.token); fails.refund(who, me);
         return json(res, 200, { ok: true }, fresh());
       }
       if (route === '2fa/disable') {
-        if (!await store.checkLogin(store.adminName(), String(b.current || ''))) return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
-        if (!store.totpCheck(String(b.code || ''))) return json(res, 400, { error: 'รหัสไม่ถูกต้อง' });
-        store.totpDisable(s.version); fails.refund(who);
+        if (!await store.checkPassword(s.uid, String(b.current || ''))) return json(res, 400, { error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
+        if (!store.totpCheck(s.uid, String(b.code || ''))) return json(res, 400, { error: 'รหัสไม่ถูกต้อง' });
+        store.totpDisable(s.uid, s.version); fails.refund(who, me);
         return json(res, 200, { ok: true }, fresh());
       }
     }
   } catch (e) {
+    if (e.user) return json(res, 400, { error: e.message });
+    if (![409, 413, 503].includes(e.code) && !(e instanceof SyntaxError)) console.error('admin api ' + route + ':', e.message);
     return json(res, [409, 413, 503].includes(e.code) ? e.code : 400, { error: e.code === 409 ? 'ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่ก่อนบันทึก' : e.code === 503 ? 'ระบบกำลังบันทึก กรุณาลองใหม่' : e.code === 413 ? 'ข้อมูลใหญ่เกินไป' : 'ข้อมูลไม่ถูกต้อง' });
   }
   return json(res, 404, { error: 'not found' });
@@ -506,7 +531,16 @@ function track(req, extra, p, url, c) {
 // Local proxies without a forwarded address are not limited, or everyone behind them would share one allowance.
 const RATE_PER_MIN = Number(process.env.RATE_LIMIT_PER_MIN) || 900;
 const rate = new Map();
+// a local proxy sends visitor addresses but TRUST_PROXY is off: say so once, since every visitor then looks like one address
+let proxyWarned = false;
+function warnProxy(req) {
+  if (proxyWarned || process.env.TRUST_PROXY === '1' || !req.headers['x-forwarded-for']) return;
+  const a = peer(req); if (a !== '' && !LOOPBACK.has(a)) return;
+  proxyWarned = true;
+  console.warn('WARNING: requests arrive through a local proxy with X-Forwarded-For, but TRUST_PROXY is not 1. Login lockouts and the request limit cannot tell visitors apart. Set TRUST_PROXY=1 (see README).');
+}
 function tooMany(req) {
+  warnProxy(req);
   const who = ip(req);
   if (!who || LOOPBACK.has(who)) return false;
   const now = Date.now();
@@ -573,6 +607,14 @@ const server = http.createServer(async (req, res) => {
       if (!code || code === 200) { try { track(req, extra, p, url, c); } catch (e) { console.error('track:', e.message); } }
       return sendPage(req, res, code || 200, html, extra);
     };
+
+    // ---------- maintenance: the whole public site is closed until an admin opens it again ----------
+    // the admin's "preview" button: shows the maintenance page without closing the site
+    if (p === '/' && url.searchParams.get('preview') === 'maintenance') return sendPage(req, res, 200, render.maintenance(c, base, 'th'), { 'Cache-Control': 'no-store' });
+    if (isOn(c.site.maintenance) && (!/\.[a-z0-9]+$/i.test(p) || p === '/sitemap.xml') && p !== '/api/cc') {
+      const html = render.maintenance(c, base, /^\/en(\/|$)/.test(p) ? 'en' : 'th');
+      return sendPage(req, res, 503, html, { 'Retry-After': '3600', 'Cache-Control': 'no-store' });
+    }
 
     // ---------- public pages ----------
     // "/home" is an internal alias of "/" for hosts (e.g. Plesk nginx) that never forward the bare root to Node

@@ -82,9 +82,9 @@ test('hardening round 2', async t => {
     assert.equal((await api(cookie, csrf, '2fa/disable', 'POST', { current: PASS, code: '000000' })).status, 400);
     assert.equal((await api(cookie, csrf, '2fa')).json.enabled, true, 'still on after failed attempts');
     // a code already used to sign in is refused; forget the replay marker to prove a fresh one works
-    const f = path.join(tmp, 'data/admin.json'), a = JSON.parse(fs.readFileSync(f, 'utf8'));
-    assert.ok(a.totp.last >= cur - 1, 'the last used step is remembered');
-    a.totp.last = 0; fs.writeFileSync(f, JSON.stringify(a));
+    const f = path.join(tmp, 'data/admin.json'), a = JSON.parse(fs.readFileSync(f, 'utf8')), u = a.users.find(x => x.user === 'admin');
+    assert.ok(u.totp.last >= cur - 1, 'the last used step is remembered');
+    u.totp.last = 0; fs.writeFileSync(f, JSON.stringify(a));
     const off = await api(cookie, csrf, '2fa/disable', 'POST', { current: PASS, code: totp.hotp(secret, cur) });
     assert.equal(off.status, 200, JSON.stringify(off.json)); assert.ok(off.cookie);
     cookie = off.cookie;

@@ -61,7 +61,7 @@ test('responsive audit: nothing can widen a page, phones get compact controls, l
 
 test('a wrapper that only redraws a box joins the columns like the box (admin account page)', () => {
   const css = fs.readFileSync(path.resolve(__dirname, '../admin/admin.css'), 'utf8');
-  assert.ok(src.includes("const host = h('div', { class: 'a-host' })") && src.includes("e.classList.contains('a-host')"), 'the 2-step box is grouped with the password box');
+  assert.ok(src.includes("const host = h('div', { class: 'a-host' }") && src.includes("e.classList.contains('a-host')"), 'the 2-step box is grouped with the password box');
   assert.ok(/\.a-host\{display:contents\}/.test(css));
 });
 

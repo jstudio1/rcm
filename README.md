@@ -19,6 +19,7 @@ $env:ADMIN_USER="admin"; $env:ADMIN_PASSWORD="รหัสผ่านของ�
 ## ตัวแปรเสริม
 - `PORT` พอร์ต (ค่าเริ่มต้น 3000)
 - `COOKIE_SECURE=1` เมื่อใช้ HTTPS (หรือใช้ proxy ที่ส่ง `X-Forwarded-Proto: https`)
+- `SITE_HOSTS=raycitym.com,www.raycitym.com` (ไม่บังคับ) โดเมนที่ยอมใช้สร้างลิงก์ เมื่อยังไม่ได้ตั้ง "โดเมนหลัก" ในหลังบ้าน
 - `TRUST_PROXY=1` เปิดใช้ X-Forwarded-* เฉพาะ proxy บนเครื่องเดียวกัน หาก proxy อยู่เครื่องอื่นต้องตั้ง TRUST_PROXY_IPS เป็น IP ที่เชื่อถือด้วย (ค่าเริ่มต้นไม่เชื่อ header เหล่านี้)
 
 ## ไฟล์สำคัญ
@@ -121,3 +122,7 @@ $env:ADMIN_USER="admin"; $env:ADMIN_PASSWORD="รหัสผ่านของ�
 - ตั้งค่าที่หลังบ้าน **เนื้อหาเว็บ → ลงทะเบียนล่วงหน้า & รางวัล**: เปิด/ปิด, แสดงบนหน้าแรก, แหล่งตัวเลข, ข้อความทุกจุด และรายการรางวัล (เป้าหมายเป็นตัวเลข เช่น `5000` หรือป้าย `50K`/`1.5M`, ชื่อ, รายละเอียด, รูป) ระบบเรียงตามเป้าหมายและคำนวณสถานะให้เอง
 - **Mockup:** ใช้ตัวเลขที่กรอกเอง · **API จริง:** ใส่ที่อยู่ https ของ endpoint ที่ตอบ `{"count": 13002}` (หรือ `{"total": …}`) หน้าเว็บถามทุก 60 วินาที ไม่ส่งคุกกี้ และเพิ่มเฉพาะ origin นั้นใน CSP `connect-src` ต้องตั้ง CORS ให้โดเมนเว็บนี้ ถ้า API ล่มจะแสดงตัวเลขสำรองที่กรอกไว้
 - ไฟล์: `lib/prereg.js`, `public/prereg.js`, `public/prereg.css`
+
+## Security testing
+
+`npm run pentest` runs about 136 attacks (traversal, auth, CSRF, XSS, uploads, smuggling, floods, maintenance bypass, 2FA) against an isolated copy of the site and prints PASS/FAIL. Results: `SECURITY_TEST_TH.md`.

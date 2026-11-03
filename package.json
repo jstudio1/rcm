@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test tests/*.test.cjs",
-    "fix-uploads": "node scripts/fix-uploads.cjs"
+    "fix-uploads": "node scripts/fix-uploads.cjs",
+    "pentest": "node scripts/pentest.cjs && node scripts/pentest2.cjs"
   },
   "engines": {
     "node": ">=18"

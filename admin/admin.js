@@ -1,6 +1,6 @@
 (function () {
   const app = document.getElementById('app');
-  let csrf = '', C = null, saved = null, cur = 'home';
+  let csrf = '', C = null, saved = null, cur = 'home', ME = null;
   const dirty = new Set();
   let navBtns = {}, menuBtns = {}, subBtns = {}, barEls = {}, subOpen = true, drawerOpen = false;
 
@@ -39,7 +39,7 @@
         const r = await fetch('/admin/api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: u.value, password: p.value, code: o.value }) });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { m.textContent = d.error || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
-        csrf = (await api('me')).csrf;
+        { const me = await api('me'); csrf = me.csrf; ME = me.me || ME; }
         bg.remove(); done();
       } catch (x) { m.textContent = x.message; }
     });
@@ -229,7 +229,7 @@
   // ---------- settings pages: an index of the sections on the left, one section after another on the right ----------
   // Each section is a numbered card with a title and one sentence saying what it changes on the site,
   // so a page reads as "1 พื้นหลัง · 2 หัวข้อใหญ่ · 3 ปุ่มลงทะเบียน …" and is easy to find again next time.
-  const SET_TABS = ['home', 'links', 'prereg', 'en', 'p-privacy', 'p-terms', 'p-support', 'p-delete', 'p-odds', 'cookies', 'general', 'lr-login', 'lr-register', 'lr-api', 'lr-member', 'account'];
+  const SET_TABS = ['home', 'links', 'prereg', 'en', 'p-privacy', 'p-terms', 'p-support', 'p-delete', 'p-odds', 'cookies', 'general', 'lr-login', 'lr-register', 'lr-api', 'lr-member', 'account', 'admins'];
   const SECTION_DESC = {
     'พื้นหลังหน้าแรก (Hero)': 'วิดีโอและรูปด้านหลังหัวข้อใหญ่ ส่วนแรกที่ผู้เข้าชมเห็น',
     'หัวข้อใหญ่': 'ข้อความตัวใหญ่ H1–H3 และคำอธิบายใต้หัวข้อบนหน้าแรก',
@@ -277,7 +277,11 @@
     'ลงทะเบียนล่วงหน้า': 'สิ่งที่ผู้เข้าชมเห็นช่วงก่อนเปิดเกม',
     'การ์ดสมาชิกและชื่อสกุลเงิน': 'ข้อความบนการ์ดสมาชิก และชื่อเงิน/แต้มในหน้าบัญชี',
     'ระบบเติมเงิน': 'เปิด/ปิดหน้าเติมเงิน และชื่อเมนู',
-    'เปลี่ยนรหัสผ่าน': 'รหัสผ่านสำหรับเข้าหลังบ้านนี้'
+    'เปลี่ยนรหัสผ่าน': 'รหัสผ่านสำหรับเข้าหลังบ้านของบัญชีนี้',
+    'ข้อมูลส่วนตัว': 'ชื่อที่แสดงในหลังบ้าน และอีเมลสำหรับติดต่อ',
+    'บัญชีแอดมินทั้งหมด': 'ทุกคนที่เข้าหลังบ้านนี้ได้ พร้อมสถานะ 2 ขั้นตอน',
+    'เพิ่มแอดมิน': 'สร้างบัญชีให้ทีมงาน แต่ละคนใช้ชื่อผู้ใช้และรหัสผ่านของตัวเอง',
+    'ปิดปรับปรุงเว็บไซต์': 'ปิดหน้าเว็บทั้งหมดชั่วคราว ผู้เข้าชมจะเห็นหน้าปิดปรับปรุงจนกว่าจะเปิดอีกครั้ง'
   };
   const descOf = t => SECTION_DESC[t] || (t.startsWith('English version') ? 'ฉบับภาษาอังกฤษของหน้านี้ เว้นว่าง = ไม่มีหน้าอังกฤษ' : '');
   let spy = null;
@@ -313,7 +317,8 @@
       const d = descOf(title), h3 = el.querySelector(':scope > h3');
       if (d && h3 && !el.querySelector(':scope > .a-desc')) h3.after(h('p', { class: 'a-desc' }, d));
       if (d && el.classList.contains('a-seo')) { const sm = el.querySelector(':scope > summary'); if (sm && !el.querySelector(':scope > .a-desc')) sm.after(h('p', { class: 'a-desc' }, d)); }
-      if (g) { nav.append(h('div', { class: 'a-toc-g' }, g)); body.append(h('h2', { class: 'a-gh' }, g)); og = h('optgroup', { label: g }); sel.append(og); }
+      if (g && g !== title) { nav.append(h('div', { class: 'a-toc-g' }, g)); body.append(h('h2', { class: 'a-gh' }, g)); og = h('optgroup', { label: g }); sel.append(og); }
+      else if (g) og = null;
       const short = title.split(/\s+·\s+/)[0];
       const a = h('a', { href: '#' + id, onclick: ev => { ev.preventDefault(); go(el); } }, h('span', { class: 'n' }, String(i + 1)), h('span', {}, short));
       links.push([el, a]); nav.append(a);
@@ -1198,6 +1203,14 @@
             return sel;
           })(), h('span', { class: 'h' }, 'หมายเหตุ: หน้า Loading ทำให้คะแนน PageSpeed ลดลงเล็กน้อย เพราะเนื้อหาจริงแสดงช้าลง ~1 วินาที')),
           note('แสดงอย่างน้อยราว 2 วินาที และไม่เกิน 4 วินาที แม้เน็ตช้า · ผู้ใช้ที่ตั้งค่าลดการเคลื่อนไหวจะเห็นแบบสั้นและเรียบ'))] },
+    { id: 'maint', g: 'ตั้งค่าเว็บ', label: 'ปิดปรับปรุงเว็บไซต์', desc: '', paths: ['site'], url: '/',
+      view: () => [h('div', { class: 'a-box a-danger' }, h('h3', {}, 'ปิดปรับปรุงเว็บไซต์'),
+        note('เมื่อเปิด ทุกหน้าของเว็บ (รวมหน้าข่าว หน้าสมาชิก และ sitemap) จะแสดงหน้าปิดปรับปรุงพร้อมรหัส 503 ให้ Google รู้ว่าปิดชั่วคราว หลังบ้านยังใช้งานได้ตามปกติ กดบันทึกเพื่อให้มีผล และกลับมาปิดสวิตช์นี้เพื่อเปิดเว็บอีกครั้ง'),
+        check(C.site, 'maintenance', 'เปิดโหมดปิดปรับปรุง (ผู้เข้าชมทุกคนจะเห็นหน้าปิดปรับปรุงแทนเว็บไซต์)'),
+        two(field(C.site, 'maintenanceTitle', 'หัวข้อ', { ph: 'ปิดปรับปรุงชั่วคราว' }), field(C.site, 'maintenanceUntil', 'คาดว่าจะกลับมา (ไม่บังคับ)', { ph: 'เช่น 5 พ.ย. 18:00 น.' })),
+        field(C.site, 'maintenanceMsg', 'ข้อความ', { type: 'textarea' }),
+        two(field(C.site, 'maintenanceTitleEn', 'Title (EN)', { ph: 'Down for maintenance' }), field(C.site, 'maintenanceMsgEn', 'Message (EN)', { type: 'textarea' })),
+        h('a', { class: 'ghost sm', href: '/?preview=maintenance', target: '_blank', rel: 'noopener', style: 'justify-self:start' }, 'ดูตัวอย่างหน้าปิดปรับปรุง ↗'))] },
     { id: 'links', g: 'ตั้งค่าเว็บ', label: 'ลิงก์โซเชียล & ดาวน์โหลด', desc: 'ใส่ลิงก์แล้วปุ่มบนหน้าแรกกดไปลิงก์นั้นทันที เว้นว่าง = แสดง "เร็วๆ นี้"', paths: ['links'], url: '/',
       view: () => [
         box('ลิงก์ดาวน์โหลด', note('ใส่ลิงก์แล้วป้าย SOON จะหายไปจากปุ่มนั้น'),
@@ -1310,41 +1323,56 @@
               packagesEditor(m)] }))
         ];
       } },
-    { id: 'account', g: 'ตั้งค่าเว็บ', label: 'บัญชีแอดมิน', desc: 'เปลี่ยนรหัสผ่านผู้ดูแลระบบ', paths: [],
+    { id: 'account', g: 'ตั้งค่าเว็บ', label: 'โปรไฟล์ของฉัน', desc: 'ข้อมูลส่วนตัว รหัสผ่าน และการยืนยันตัวตน 2 ขั้นตอนของบัญชีที่เข้าสู่ระบบอยู่', paths: [],
       view: () => {
+        const me = ME || {};
+        // personal data: saved on its own button (it is not part of the website content)
+        const fld = (label, value, attrs) => { const i = h('input', Object.assign({ type: 'text' }, attrs || {})); i.value = value || ''; return [h('label', { class: 'a-f' }, h('span', {}, label), i), i]; };
+        const [fFirst, iFirst] = fld('ชื่อ', me.first, { maxlength: 60, autocomplete: 'given-name' }), [fLast, iLast] = fld('นามสกุล', me.last, { maxlength: 60, autocomplete: 'family-name' });
+        const [fNick, iNick] = fld('ชื่อเล่น (แสดงในหลังบ้าน)', me.nick, { maxlength: 40, autocomplete: 'nickname' }), [fMail, iMail] = fld('อีเมล', me.email, { type: 'email', maxlength: 200, autocomplete: 'email' });
+        const [fUser] = fld('ผู้ใช้งาน (ใช้เข้าสู่ระบบ เปลี่ยนไม่ได้)', me.user, { readonly: true });
+        const pm = h('div', { class: 'a-err' });
+        const prof = box('ข้อมูลส่วนตัว', h('div', { class: 'a-who' }, h('span', { class: 'av', 'aria-hidden': 'true' }, ((me.nick || me.first || me.user || '?').trim()[0] || '?').toUpperCase()),
+            h('div', {}, h('b', {}, me.nick || [me.first, me.last].filter(Boolean).join(' ') || me.user || ''), h('small', {}, '@' + (me.user || '') + ' · ' + (me.role === 'owner' ? 'เจ้าของระบบ' : 'แอดมิน')))),
+          two(fFirst, fLast), two(fNick, fMail), fUser, pm,
+          h('div', {}, h('button', { class: 'btn sm', type: 'button', onclick: async () => {
+            try { const r = await api('profile', 'PUT', { first: iFirst.value, last: iLast.value, nick: iNick.value, email: iMail.value }); ME = r.me; pm.textContent = ''; toast('บันทึกข้อมูลส่วนตัวแล้ว'); render(); } catch (e) { pm.textContent = e.message; }
+          } }, 'บันทึกข้อมูลส่วนตัว')));
         const cur0 = h('input', { type: 'password', autocomplete: 'current-password' }), n1 = h('input', { type: 'password', autocomplete: 'new-password' }), n2 = h('input', { type: 'password', autocomplete: 'new-password' });
         const msg = h('div', { class: 'a-err' });
-        const pwBox = box('เปลี่ยนรหัสผ่าน', h('label', { class: 'a-f' }, 'รหัสผ่านปัจจุบัน', cur0), h('label', { class: 'a-f' }, 'รหัสผ่านใหม่ (อย่างน้อย 10 ตัวอักษร)', n1), h('label', { class: 'a-f' }, 'ยืนยันรหัสผ่านใหม่', n2), msg,
+        const pwBox = box('เปลี่ยนรหัสผ่าน', h('label', { class: 'a-f' }, h('span', {}, 'รหัสผ่านปัจจุบัน'), cur0), two(h('label', { class: 'a-f' }, h('span', {}, 'รหัสผ่านใหม่ (อย่างน้อย 10 ตัวอักษร)'), n1), h('label', { class: 'a-f' }, h('span', {}, 'ยืนยันรหัสผ่านใหม่'), n2)), msg,
           h('div', {}, h('button', { class: 'btn sm', type: 'button', onclick: async () => {
             if (n1.value !== n2.value) { msg.textContent = 'รหัสผ่านใหม่ไม่ตรงกัน'; return; }
             try { await api('password', 'POST', { current: cur0.value, next: n1.value }); msg.textContent = ''; cur0.value = n1.value = n2.value = ''; toast('เปลี่ยนรหัสผ่านแล้ว'); } catch (e) { msg.textContent = e.message; }
           } }, 'บันทึกรหัสผ่าน')));
-        // two-step login with an authenticator app
-        const host = h('div', { class: 'a-host' });
+        // two-step login with an authenticator app (the title stays the same so the section index reads well)
+        const T2 = 'ยืนยันตัวตน 2 ขั้นตอน (2FA)';
+        const host = h('div', { class: 'a-host' }, box(T2, h('div', { class: 'a-empty' }, 'กำลังโหลด…')));
+        const state = on => h('span', { class: 'a-bd' + (on ? ' on' : '') }, on ? 'เปิดใช้อยู่' : 'ยังไม่เปิด (แนะนำให้เปิด)');
         const paint = async () => {
           let on = false; try { on = (await api('2fa')).enabled; } catch (e) {}
           const m2 = h('div', { class: 'a-err' }), cur = h('input', { type: 'password', autocomplete: 'current-password' });
           const code = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, placeholder: '000000' });
           if (on) {
-            host.replaceChildren(box('ยืนยันตัวตน 2 ขั้นตอน: เปิดใช้อยู่',
+            host.replaceChildren(box(T2, h('div', {}, state(true)),
               note('การเข้าสู่ระบบต้องใช้รหัส 6 หลักจากแอป Authenticator ด้วย ถึงรหัสผ่านรั่วก็เข้าไม่ได้ ถ้าจะปิดต้องใส่รหัสผ่านและรหัสปัจจุบัน'),
-              h('label', { class: 'a-f' }, 'รหัสผ่านปัจจุบัน', cur), h('label', { class: 'a-f' }, 'รหัส 6 หลักในแอป', code), m2,
+              two(h('label', { class: 'a-f' }, h('span', {}, 'รหัสผ่านปัจจุบัน'), cur), h('label', { class: 'a-f' }, h('span', {}, 'รหัส 6 หลักในแอป'), code)), m2,
               h('div', {}, h('button', { class: 'ghost sm', type: 'button', onclick: async () => {
                 try { await api('2fa/disable', 'POST', { current: cur.value, code: code.value }); toast('ปิด 2 ขั้นตอนแล้ว'); paint(); } catch (e) { m2.textContent = e.message; }
               } }, 'ปิด 2 ขั้นตอน'))));
             return;
           }
-          host.replaceChildren(box('ยืนยันตัวตน 2 ขั้นตอน: ยังไม่เปิด (แนะนำ)',
+          host.replaceChildren(box(T2, h('div', {}, state(false)),
             note('ใช้แอป Google Authenticator, Microsoft Authenticator หรือ Authy สร้างรหัส 6 หลักทุก 30 วินาที ใช้ร่วมกับรหัสผ่านตอนเข้าสู่ระบบ ป้องกันคนที่รู้รหัสผ่านแต่ไม่มีมือถือของคุณ'),
-            h('label', { class: 'a-f' }, 'รหัสผ่านปัจจุบัน', cur), m2,
+            h('label', { class: 'a-f' }, h('span', {}, 'รหัสผ่านปัจจุบัน'), cur), m2,
             h('div', {}, h('button', { class: 'btn sm', type: 'button', onclick: async () => {
               try {
                 const r = await api('2fa/begin', 'POST', { current: cur.value });
                 const key = r.secret.match(/.{1,4}/g).join(' ');
-                host.replaceChildren(box('ตั้งค่า 2 ขั้นตอน',
+                host.replaceChildren(box(T2,
                   note('1) เปิดแอป Authenticator แล้วเลือก "เพิ่มบัญชี" > "ใส่คีย์ตั้งค่า" (Enter a setup key)  2) ใส่ชื่อบัญชีอะไรก็ได้ และคีย์ด้านล่าง ชนิด "ตามเวลา" (Time based)  3) ใส่รหัส 6 หลักที่แอปแสดง แล้วกดยืนยัน'),
-                  h('div', { class: 'a-note', style: 'font-size:20px;letter-spacing:.12em;user-select:all;font-family:monospace' }, key),
-                  h('label', { class: 'a-f' }, 'รหัส 6 หลักในแอป', code), m2,
+                  h('div', { class: 'a-key' }, key),
+                  h('label', { class: 'a-f' }, h('span', {}, 'รหัส 6 หลักในแอป'), code), m2,
                   h('div', {}, h('button', { class: 'btn sm', type: 'button', onclick: async () => {
                     try { await api('2fa/enable', 'POST', { code: code.value }); toast('เปิด 2 ขั้นตอนแล้ว'); paint(); } catch (e) { m2.textContent = e.message; }
                   } }, 'ยืนยันและเปิดใช้'))));
@@ -1352,7 +1380,63 @@
             } }, 'เริ่มตั้งค่า'))));
         };
         paint();
-        return [pwBox, host];
+        return [prof, pwBox, host];
+      } },
+    { id: 'admins', g: 'ตั้งค่าเว็บ', label: 'จัดการแอดมิน', desc: 'บัญชีทุกคนที่เข้าหลังบ้านได้ เพิ่มทีมงาน รีเซ็ตรหัสผ่าน หรือลบบัญชี (เฉพาะเจ้าของระบบ)', paths: [],
+      view: () => {
+        const listBody = h('div', { class: 'a-stack' }, h('div', { class: 'a-empty' }, 'กำลังโหลด…')), addBody = h('div', { class: 'a-stack' }, h('div', { class: 'a-empty' }, 'กำลังโหลด…'));
+        const listBox = box('บัญชีแอดมินทั้งหมด', listBody), addBox = box('เพิ่มแอดมิน', addBody);
+        const pwField = (label, gen) => {
+          const i = h('input', { type: 'text', autocomplete: 'new-password', maxlength: 200, spellcheck: 'false' });
+          const b = gen ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { const a = new Uint8Array(12); crypto.getRandomValues(a); i.value = Array.from(a, x => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[x % 57]).join('') + '-' + (a[0] % 90 + 10); } }, 'สุ่มรหัส') : null;
+          return [h('label', { class: 'a-f' }, h('span', {}, label), b ? h('div', { class: 'a-inrow' }, i, b) : i), i];
+        };
+        const mine = () => { const i = h('input', { type: 'password', autocomplete: 'current-password' }); return [h('label', { class: 'a-f' }, h('span', {}, 'รหัสผ่านของคุณ (ยืนยันการทำรายการ)'), i), i]; };
+        const fmt = d => { const t = new Date(d); return isNaN(t) ? '' : t.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }); };
+        const load = async () => {
+          let d; try { d = await api('admins'); } catch (e) { listBody.replaceChildren(h('div', { class: 'a-err' }, e.message)); return; }
+          const rows = d.items.map(a => {
+            const name = a.nick || [a.first, a.last].filter(Boolean).join(' ') || a.user;
+            const extra = h('div', { class: 'a-adm-x' });
+            const act = (label, cls, build) => h('button', { type: 'button', class: cls + ' sm', onclick: () => { extra.replaceChildren(...build()); } }, label);
+            const isMe = ME && a.id === ME.id;
+            const acts = d.canManage && !isMe && a.role !== 'owner' ? h('div', { class: 'a-adm-a' },
+              act('รีเซ็ตรหัสผ่าน', 'ghost', () => {
+                const [fNew, iNew] = pwField('รหัสผ่านใหม่ (12 ตัวขึ้นไป)', true), [fMe, iMe] = mine(), m = h('div', { class: 'a-err' });
+                const clr = h('input', { type: 'checkbox' });
+                return [two(fNew, fMe), h('label', { class: 'a-chk' }, clr, 'ปิด 2 ขั้นตอนของบัญชีนี้ด้วย (กรณีทำมือถือหาย)'), m, h('div', {}, h('button', { type: 'button', class: 'btn sm', onclick: async () => {
+                  try { await api('admins/' + a.id + '/password', 'POST', { password: iNew.value, current: iMe.value, clear2fa: clr.checked }); toast('รีเซ็ตรหัสผ่านของ ' + a.user + ' แล้ว ส่งรหัสใหม่ให้เจ้าของบัญชีทางช่องทางที่ปลอดภัย'); load(); } catch (e) { m.textContent = e.message; }
+                } }, 'ยืนยันรีเซ็ต'))];
+              }),
+              act('ลบบัญชี', 'ghost danger', () => {
+                const [fMe, iMe] = mine(), m = h('div', { class: 'a-err' });
+                return [h('div', { class: 'a-note warn' }, 'ลบบัญชี @' + a.user + ' ถาวร เจ้าของบัญชีจะถูกออกจากระบบทันทีและเข้าหลังบ้านไม่ได้อีก'), fMe, m, h('div', {}, h('button', { type: 'button', class: 'btn sm danger', onclick: async () => {
+                  try { await api('admins/' + a.id + '/remove', 'POST', { current: iMe.value }); toast('ลบบัญชี ' + a.user + ' แล้ว'); load(); } catch (e) { m.textContent = e.message; }
+                } }, 'ยืนยันลบบัญชี'))];
+              })) : null;
+            return h('div', { class: 'a-adm' },
+              h('span', { class: 'av', 'aria-hidden': 'true' }, (name.trim()[0] || '?').toUpperCase()),
+              h('div', { class: 'a-adm-i' }, h('b', {}, name, isMe ? h('em', { class: 'a-bd on' }, 'คุณ') : null),
+                h('small', {}, '@' + a.user + (a.email ? ' · ' + a.email : '')),
+                h('div', { class: 'a-adm-t' }, h('span', { class: 'a-bd' + (a.role === 'owner' ? ' on' : '') }, a.role === 'owner' ? 'เจ้าของระบบ' : 'แอดมิน'), h('span', { class: 'a-bd' + (a.twofa ? ' on' : '') }, a.twofa ? '2FA เปิด' : '2FA ปิด'), a.created ? h('span', { class: 'a-dim' }, 'สร้างเมื่อ ' + fmt(a.created)) : null)),
+              acts, extra);
+          });
+          listBody.replaceChildren(h('div', { class: 'a-adms' }, ...rows));
+          if (!d.canManage) { addBody.replaceChildren(note('เฉพาะเจ้าของระบบ (บัญชีแรกที่สร้างตอนติดตั้ง) เท่านั้นที่เพิ่ม ลบ หรือรีเซ็ตรหัสผ่านแอดมินคนอื่นได้')); return; }
+          const [fU, iU] = (() => { const i = h('input', { type: 'text', maxlength: 32, autocomplete: 'off', spellcheck: 'false', placeholder: 'เช่น somchai' }); return [h('label', { class: 'a-f' }, h('span', {}, 'ผู้ใช้งาน (3–32 ตัว: a-z 0-9 _ . -)'), i), i]; })();
+          const [fP, iP] = pwField('รหัสผ่านเริ่มต้น (12 ตัวขึ้นไป)', true);
+          const t = (label, attrs) => { const i = h('input', Object.assign({ type: 'text' }, attrs)); return [h('label', { class: 'a-f' }, h('span', {}, label), i), i]; };
+          const [fF, iF] = t('ชื่อ', { maxlength: 60 }), [fL, iL] = t('นามสกุล', { maxlength: 60 }), [fN, iN] = t('ชื่อเล่น', { maxlength: 40 }), [fE, iE] = t('อีเมล', { type: 'email', maxlength: 200 });
+          const [fMe, iMe] = mine(), m = h('div', { class: 'a-err' });
+          addBody.replaceChildren(
+            two(fU, fP), two(fF, fL), two(fN, fE), fMe, m,
+            note('บอกรหัสผ่านเริ่มต้นให้ทีมงานทางช่องทางที่ปลอดภัย แล้วให้เปลี่ยนเองที่ โปรไฟล์ของฉัน และเปิด 2 ขั้นตอน แอดมินที่เพิ่มแก้ไขเนื้อหาเว็บได้ทั้งหมด แต่จัดการบัญชีแอดมินคนอื่นไม่ได้'),
+            h('div', {}, h('button', { type: 'button', class: 'btn sm', onclick: async () => {
+              try { const r = await api('admins', 'POST', { user: iU.value, password: iP.value, first: iF.value, last: iL.value, nick: iN.value, email: iE.value, current: iMe.value }); toast('เพิ่มแอดมิน ' + r.admin.user + ' แล้ว'); load(); } catch (e) { m.textContent = e.message; }
+            } }, '+ เพิ่มแอดมิน')));
+        };
+        load();
+        return [listBox, addBox];
       } }
   ];
 
@@ -1372,10 +1456,10 @@
     { id: 'store', label: 'สโตร์ & กฎหมาย', hint: 'Privacy Terms Support คุกกี้ URL สโตร์', tabs: [tab('ready', 'ความพร้อมส่งสโตร์'), tab('urls', 'URL สำหรับสโตร์'), tab('p-privacy', 'Privacy'), tab('p-terms', 'Terms'), tab('p-support', 'Support & ติดต่อ'), tab('p-delete', 'ลบบัญชี'), tab('p-odds', 'อัตรากล่องสุ่ม'), tab('cookies', 'คุกกี้')] },
     { id: 'report', label: 'รายงาน & ความเร็ว', hint: 'ผู้เข้าชม PageSpeed', tabs: [tab('stats', 'สถิติผู้เข้าชม'), tab('pagespeed', 'PageSpeed')] },
     { id: 'media', label: 'คลังรูป & วิดีโอ', hint: 'ไฟล์ที่อัปโหลด', tabs: [tab('media', 'คลังรูป & วิดีโอ')] },
-    { id: 'settings', label: 'ตั้งค่า', hint: 'SEO Login & Register รหัสผ่าน 2FA ประวัติ', groups: [
-      { id: 'site', label: 'เว็บไซต์ & SEO', tabs: [tab('general', 'เว็บไซต์ & SEO')] },
+    { id: 'settings', label: 'ตั้งค่า', hint: 'SEO ปิดปรับปรุง Login & Register แอดมิน ประวัติ', groups: [
+      { id: 'site', label: 'เว็บไซต์ & SEO', tabs: [tab('general', 'เว็บไซต์ & SEO', ['maint'])] },
       { id: 'lr', label: 'Login & Register', tabs: [tab('lr-login', 'ระบบล็อกอิน'), tab('lr-register', 'ระบบสมัครสมาชิก'), tab('lr-api', 'API'), tab('lr-member', 'บัญชีผู้เล่น & เติมเงิน')] },
-      { id: 'acct', label: 'บัญชี & ความปลอดภัย', tabs: [tab('account', 'บัญชี & ความปลอดภัย')] },
+      { id: 'acct', label: 'บัญชีแอดมิน', tabs: [tab('account', 'โปรไฟล์ของฉัน'), tab('admins', 'จัดการแอดมิน')] },
       { id: 'hist', label: 'ประวัติการแก้ไข', tabs: [tab('history', 'ประวัติการแก้ไข')] }] }
   ];
   // a menu with sub-menus (a dropdown) lists all of its tabs too, so saving and the "go fix it" buttons treat it like any other
@@ -1429,6 +1513,7 @@
       })),
       h('div', { class: 'a-grow' }),
       h('div', { class: 'a-foot-nav' },
+        ME ? h('button', { class: 'a-me', type: 'button', title: 'โปรไฟล์ของฉัน', onclick: () => open('account') }, h('span', { class: 'av', 'aria-hidden': 'true' }, ((ME.nick || ME.first || ME.user || '?').trim()[0] || '?').toUpperCase()), h('span', {}, h('b', {}, ME.nick || [ME.first, ME.last].filter(Boolean).join(' ') || ME.user), h('small', {}, '@' + ME.user + ' · ' + (ME.role === 'owner' ? 'เจ้าของระบบ' : 'แอดมิน')))) : null,
         h('button', { class: 'a-nav', onclick: () => window.open('/', '_blank') }, h('span', {}, 'ดูเว็บไซต์ ↗')),
         h('button', { class: 'a-nav', onclick: async () => { if (dirty.size && !confirm('มีการแก้ไขที่ยังไม่บันทึก ออกจากระบบ?')) return; try { await api('logout', 'POST'); } catch (e) {} csrf = ''; dirty.clear(); loginScreen(); } }, h('span', {}, 'ออกจากระบบ'))));
 
@@ -1449,7 +1534,9 @@
       if (e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo') || e.classList.contains('a-host')) && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
       return out;
     }, []);
-    const main = h('main', { class: 'a-main' + (isSet ? ' is-set' : '') }, head, tabs, ...view);
+    const closed = C.site.maintenance === true || C.site.maintenance === 'true';
+    const mbar = closed ? h('div', { class: 'a-mbar', role: 'status' }, h('b', {}, 'เว็บไซต์ปิดปรับปรุงอยู่'), h('span', {}, 'ผู้เข้าชมทุกคนเห็นหน้าปิดปรับปรุง'), cur === 'general' ? null : h('button', { type: 'button', class: 'ghost sm', onclick: () => open('maint') }, 'ไปที่สวิตช์')) : null;
+    const main = h('main', { class: 'a-main' + (isSet ? ' is-set' : '') }, mbar, head, tabs, ...view);
 
     barEls = { st: h('span', { class: 'st' }) };
     const bar = s.paths.length ? h('div', { class: 'a-bar' }, barEls.st,
@@ -1494,7 +1581,7 @@
   addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's' && C) { e.preventDefault(); save([cur]); } });
 
   async function start() {
-    try { csrf = (await api('me')).csrf; saved = await api('content'); C = clone(saved); dirty.clear(); render(); } catch (e) { loginScreen(); }
+    try { const me = await api('me'); csrf = me.csrf; ME = me.me || null; saved = await api('content'); C = clone(saved); dirty.clear(); render(); } catch (e) { loginScreen(); }
   }
   start();
 })();
