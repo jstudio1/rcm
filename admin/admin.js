@@ -235,6 +235,7 @@
     'หัวข้อใหญ่': 'ข้อความตัวใหญ่ H1–H3 และคำอธิบายใต้หัวข้อบนหน้าแรก',
     'ปุ่มลงทะเบียน': 'ปุ่มสีแดงบนหน้าแรก: ข้อความ ลิงก์ และข้อความเมื่อยังไม่เปิด',
     'ป้ายข้อความอื่นๆ': 'ข้อความเล็กรอบปุ่มดาวน์โหลด โซเชียล และหัวข้อส่วนข่าวบนหน้าแรก',
+    'แถบแนะนำเกม': 'แถบเฉียงสีม่วง-แดงพร้อมรูปรถ อยู่ระหว่างส่วนลงทะเบียนล่วงหน้ากับข่าวสารล่าสุด',
     'SEO (การแสดงผลบน Google)': 'ชื่อและคำอธิบายที่ Google แสดงสำหรับหน้านี้',
     'ฉบับภาษาอังกฤษ': 'หน้าเดียวกันภาษาอังกฤษที่ /en/… เว้นว่าง = ไม่มีหน้าอังกฤษ',
     'ลิงก์ดาวน์โหลด': 'ปุ่ม App Store / Google Play บนหน้าแรก ใส่ลิงก์แล้วป้าย SOON จะหายไป',
@@ -1034,7 +1035,7 @@
         return [
           note('ปุ่มสลับภาษา TH | EN อยู่บนเมนูของทุกหน้า หน้าภาษาอังกฤษอยู่ที่ /en ข้อความที่ยังไม่ได้แปลจะแสดงเป็นภาษาไทยจนกว่าจะกรอก'),
           group('ทั้งเว็บ', C.site, [['defaultTitle', 'Title หลัก'], ['description', 'Description หลัก', true], ['footer', 'ข้อความท้ายเว็บ']]),
-          group('หน้าแรก', C.home, [['badge', 'ป้ายเล็กด้านบน'], ['h1', 'H1'], ['h2', 'H2'], ['h3', 'H3'], ['lead', 'ข้อความอธิบาย', true], ['registerText', 'ข้อความบนปุ่มลงทะเบียน'], ['registerMsg', 'ข้อความเมื่อกดปุ่มที่ยังไม่เปิด', true], ['storesLabel', 'หัวข้อปุ่มดาวน์โหลด'], ['followLabel', 'หัวข้อโซเชียล'], ['soonLabel', 'ข้อความเหนือปุ่มสโตร์ (ยังไม่เปิด)'], ['downloadLabel', 'ข้อความเหนือปุ่มสโตร์ (เปิดแล้ว)'], ['gameplayMore', 'ปุ่มดูทั้งหมด (Gameplay)'], ['latestNewsTitle', 'หัวข้อข่าวล่าสุด'], ['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]),
+          group('หน้าแรก', C.home, [['badge', 'ป้ายเล็กด้านบน'], ['h1', 'H1'], ['h2', 'H2'], ['h3', 'H3'], ['lead', 'ข้อความอธิบาย', true], ['registerText', 'ข้อความบนปุ่มลงทะเบียน'], ['registerMsg', 'ข้อความเมื่อกดปุ่มที่ยังไม่เปิด', true], ['storesLabel', 'หัวข้อปุ่มดาวน์โหลด'], ['followLabel', 'หัวข้อโซเชียล'], ['soonLabel', 'ข้อความเหนือปุ่มสโตร์ (ยังไม่เปิด)'], ['downloadLabel', 'ข้อความเหนือปุ่มสโตร์ (เปิดแล้ว)'], ['gameplayMore', 'ปุ่มดูทั้งหมด (Gameplay)'], ['bandTitle', 'แถบแนะนำเกม: หัวข้อ'], ['bandText', 'แถบแนะนำเกม: ข้อความ', true], ['bandBtn1', 'แถบแนะนำเกม: ปุ่มที่ 1'], ['bandBtn2', 'แถบแนะนำเกม: ปุ่มที่ 2'], ['latestNewsTitle', 'หัวข้อข่าวล่าสุด'], ['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]),
           ...['news', 'gameplay', 'drivers', 'rewards'].map(k => group('หน้า ' + PN[k], C.pages[k], [['navLabel', 'ชื่อในเมนู'], ['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['h1', 'H1'], ['h2', 'H2'], ['intro', 'ย่อหน้าแนะนำ', true]].concat(k === 'news' ? [['empty', 'ข้อความเมื่อยังไม่มีข่าว']] : [], [['seoTitle', 'SEO Title'], ['seoDescription', 'SEO Description', true]]))),
           group('ตัวนับลงทะเบียนล่วงหน้า', C.prereg, [['eyebrow', 'ข้อความเล็กเหนือหัวข้อ'], ['title', 'หัวข้อ'], ['titleAccent', 'หัวข้อ (ส่วนสีแดง)'], ['intro', 'ข้อความแนะนำ', true], ['statusLabel', 'ป้ายสถานะ'], ['counterLabel', 'ป้ายตัวนับ'], ['unit', 'หน่วย'], ['nextText', 'ข้อความเป้าหมายถัดไป ({n} = จำนวนที่เหลือ)'], ['allDoneText', 'ข้อความเมื่อถึงทุกเป้า'], ['goalsLabel', 'หัวข้อรายการรางวัล'], ['reachedCount', 'ข้อความ "ถึงเป้าหมายแล้ว" (ตัวนับ)'], ['reachedLabel', 'ป้ายถึงเป้าหมายแล้ว'], ['nextLabel', 'ป้ายเป้าหมายถัดไป'], ['lockedLabel', 'ป้ายยังไม่ถึงเป้า'], ['viewLabel', 'ปุ่มดูรางวัล'], ['detailReached', 'สถานะรางวัล (ถึงเป้า)'], ['detailLocked', 'สถานะรางวัล (ยังไม่ถึง)']])];
       } },
@@ -1046,6 +1047,13 @@
           field(C.home, 'heroImage', 'รูปพื้นหลัง / รูปสำรอง', { type: 'image', ph: '/img/keyart_rc_v1_web.jpg', help: 'แนะนำ 1920×1080 ขึ้นไป ควรเป็นภาพเดียวกับเฟรมแรกของวิดีโอ' })),
         box('หัวข้อใหญ่', field(C.home, 'badge', 'ป้ายเล็กด้านบน'), field(C.home, 'h1', 'H1'), two(field(C.home, 'h2', 'H2'), field(C.home, 'h3', 'H3 (ตัวสีแดง)')), field(C.home, 'lead', 'ข้อความอธิบาย', { type: 'textarea' })),
         box('ปุ่มลงทะเบียน', two(field(C.home, 'registerText', 'ข้อความบนปุ่ม'), field(C.home, 'registerLink', 'ลิงก์ปุ่ม', { help: 'เว้นว่าง = แสดงข้อความ "เร็วๆ นี้"' })), field(C.home, 'registerMsg', 'ข้อความเมื่อกดปุ่ม (ตอนยังไม่มีลิงก์)'), check(C.links.show, 'register', 'แสดงปุ่มลงทะเบียนบนหน้าแรก (ปิด = ซ่อนปุ่ม)')),
+        box('แถบแนะนำเกม',
+          check(C.home, 'bandOn', 'แสดงแถบแนะนำเกมบนหน้าแรก (อยู่ระหว่างส่วนลงทะเบียนล่วงหน้ากับข่าวสารล่าสุด)'),
+          field(C.home, 'bandTitle', 'หัวข้อ', { ph: 'RAYCITY-M' }),
+          field(C.home, 'bandText', 'ข้อความแนะนำเกม', { type: 'textarea', max: 400 }),
+          field(C.home, 'bandImage', 'รูปรถ / รูปประกอบ', { type: 'image', ph: '/img/car1.jpg', help: 'แนะนำ PNG พื้นหลังโปร่ง กว้างราว 1400px (รถหันซ้าย-ขวาก็ได้) · เว้นว่าง = ใช้รูปเริ่มต้น' }),
+          two(field(C.home, 'bandBtn1', 'ปุ่มที่ 1 (ปุ่มทึบ)', { ph: 'ดาวน์โหลดเกม' }), field(C.home, 'bandLink1', 'ลิงก์ปุ่มที่ 1', { ph: 'https://… หรือ /…', help: 'เว้นว่าง = กดแล้วขึ้นข้อความ "เร็วๆ นี้"' })),
+          two(field(C.home, 'bandBtn2', 'ปุ่มที่ 2 (ปุ่มเส้นขอบ)', { ph: 'สร้างบัญชีผู้เล่น' }), field(C.home, 'bandLink2', 'ลิงก์ปุ่มที่ 2', { ph: '/register', help: 'เว้นข้อความปุ่มว่าง = ไม่แสดงปุ่มนั้น' }))),
         box('ป้ายข้อความอื่นๆ', two(field(C.home, 'storesLabel', 'หัวข้อปุ่มดาวน์โหลด'), field(C.home, 'followLabel', 'หัวข้อโซเชียล')), two(field(C.home, 'soonLabel', 'คำว่า "เร็วๆ นี้บน"'), field(C.home, 'downloadLabel', 'คำว่า "ดาวน์โหลดบน"')), two(field(C.home, 'gameplayMore', 'ปุ่มใต้ส่วน Gameplay (หน้าแรก)', { help: 'หัวข้อและรายการของส่วนนี้แก้ที่เมนู Gameplay / หน้า Gameplay' }), field(C.home, 'latestNewsTitle', 'หัวข้อส่วนข่าวใต้หน้าแรก'))),
         seoBox(C.home, 'seoTitle', 'seoDescription', { url: '/', fbT: () => C.site.defaultTitle, fbD: () => C.site.description })] },
     ...Object.keys(PN).map(k => ({
