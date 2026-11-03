@@ -94,7 +94,7 @@
   // Grid of every image/video on the site (built-in /img and admin uploads).
   // kind: 'image' | 'video' | 'all'. onPick(url) makes each tile selectable; without it the grid is a manager.
   function mediaLibrary(o) {
-    let items = [], tab = o.kind || 'all';
+    let items = [], tab = o.kind || 'all', shownN = 36;
     const grid = h('div', { class: 'a-media' }, h('div', { class: 'a-empty' }, 'กำลังโหลด…'));
     const q = h('input', { type: 'search', placeholder: 'ค้นหาชื่อไฟล์…' });
     const tabs = {};
@@ -103,7 +103,7 @@
       const s = q.value.trim().toLowerCase();
       const list = items.filter(it => (tab === 'all' || it.kind === tab) && (!s || it.name.toLowerCase().includes(s)));
       if (!list.length) return grid.replaceChildren(h('div', { class: 'a-empty' }, items.length ? 'ไม่พบไฟล์ที่ตรงกับเงื่อนไข' : 'ยังไม่มีไฟล์'));
-      grid.replaceChildren(...list.map(it => {
+      grid.replaceChildren(...list.slice(0, shownN).map(it => {
         const acts = h('div', { class: 'acts' },
           h('a', { class: 'ghost sm', href: it.url, target: '_blank', rel: 'noopener', onclick: e => e.stopPropagation() }, 'เปิด'),
           !o.onPick ? h('button', { type: 'button', class: 'ghost sm', onclick: async () => { try { await navigator.clipboard.writeText(it.url); toast('คัดลอก ' + it.url); } catch (e) { prompt('คัดลอกลิงก์', it.url); } } }, 'คัดลอกลิงก์') : null,
@@ -116,7 +116,7 @@
           h('div', { class: 'nm' }, it.name), h('div', { class: 'mt' }, (it.deletable ? 'อัปโหลด' : 'ไฟล์ระบบ') + ' · ' + fmtSize(it.size)), acts);
         if (o.onPick) card.addEventListener('click', () => o.onPick(it.url));
         return card;
-      }));
+      }), ...(list.length > shownN ? [h('button', { type: 'button', class: 'ghost a-more', onclick: () => { shownN += 36; draw(); } }, 'แสดงเพิ่ม (เหลืออีก ' + (list.length - shownN) + ' ไฟล์)')] : []));
     };
     const load = () => api('media').then(d => { items = d.items; draw(); }).catch(e => { grid.replaceChildren(h('div', { class: 'a-empty' }, 'โหลดไม่สำเร็จ: ' + e.message)); });
     const up = h('button', { type: 'button', class: 'btn sm', onclick: async () => {
@@ -130,7 +130,7 @@
       if (o.onPick) return o.onPick(u);
       tab = 'all'; q.value = ''; load();
     } }, '+ อัปโหลดไฟล์ใหม่');
-    q.addEventListener('input', draw);
+    q.addEventListener('input', () => { shownN = 36; draw(); });
     const tabBar = h('div', { class: 'a-seg' }, ...(o.kind && o.kind !== 'all' ? [] : [['all', 'ทั้งหมด'], ['image', 'รูปภาพ'], ['video', 'วิดีโอ']].map(([k, l]) => (tabs[k] = h('button', { type: 'button', onclick: () => { tab = k; draw(); } }, l)))));
     load();
     return [h('div', { class: 'a-tools' }, tabBar, q, up), grid];
@@ -788,7 +788,7 @@
         box('URL สำหรับกรอกในสโตร์',
           !D.base ? note('ยังไม่ได้ตั้ง "โดเมนหลัก" (ตั้งค่า → เว็บไซต์ & SEO) ตอนนี้แสดงเป็นเส้นทางสั้นๆ ต้องตั้งโดเมน https:// ก่อนจึงจะได้ URL เต็มและตรวจลิงก์ได้') : null,
           note('ใส่ URL เหล่านี้ในหน้าส่งแอปของ App Store Connect / Play Console และในแอป ห้ามเปลี่ยนที่อยู่หน้าหลังส่งสโตร์แล้ว เพราะสโตร์ตรวจลิงก์ ถ้าเสียอาจถูกถอดแอป'),
-          h('div', { class: 'an-wrap' }, h('table', { class: 'an-tbl' }, h('thead', {}, h('tr', {}, ...['หน้า', 'URL', 'สถานะ', ''].map(t => h('th', {}, t)))), h('tbody', {}, ...rows))),
+          h('div', { class: 'an-wrap' }, h('table', { class: 'an-tbl an-stack' }, h('thead', {}, h('tr', {}, ...['หน้า', 'URL', 'สถานะ', ''].map(t => h('th', {}, t)))), h('tbody', {}, ...rows))),
           h('div', { class: 'an-filter' },
             h('button', { type: 'button', class: 'btn sm', disabled: !canCheck || busy, onclick: async () => {
               busy = true; err = ''; R = {}; draw();
@@ -1329,6 +1329,7 @@
       navBtns[t.id] = b; return b;
     })) : null;
     // on wide screens neighbouring settings boxes sit side by side instead of leaving the right half of the page empty
+    if (tabs) requestAnimationFrame(() => { const on = tabs.querySelector('.on'); if (on) tabs.scrollLeft = Math.max(0, on.offsetLeft - (tabs.clientWidth - on.offsetWidth) / 2); });
     const view = [].concat(s.view()).flat(Infinity).reduce((out, e) => {
       if (e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo')) && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
       return out;

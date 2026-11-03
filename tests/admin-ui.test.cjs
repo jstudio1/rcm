@@ -47,3 +47,14 @@ test('small screens: top bar with a menu button and a slide-in menu; desktop kee
   assert.ok(/\.a-side\{position:fixed[^}]*transform:translateX\(-105%\)/.test(css) && /\.a-side\.open\{transform:none/.test(css), 'the menu slides in over the page');
   assert.ok(/Escape' && drawerOpen/.test(src), 'Esc closes it');
 });
+
+test('responsive audit: nothing can widen a page, phones get compact controls, long lists are paged', () => {
+  const css = fs.readFileSync(path.resolve(__dirname, '../admin/admin.css'), 'utf8');
+  assert.ok(/\.a-box,\.a-in,\.a-pb\{grid-template-columns:minmax\(0,1fr\)\}/.test(css), 'boxes cannot grow past their column');
+  assert.ok(/\.a-list\{grid-template-columns:minmax\(0,1fr\)\}/.test(css), 'old-style list rows cannot grow past the page');
+  assert.ok(/\.a-shell\{grid-template-columns:minmax\(0,1fr\)\}/.test(css), 'the single column is allowed to shrink');
+  assert.ok(/@media\(max-width:560px\)\{[\s\S]*\.a-media\{grid-template-columns:repeat\(2/.test(css) && /\.an-stack thead\{display:none\}/.test(css), 'phones: two-column media, tables as cards');
+  assert.ok(/\.a-chk input\{flex:none\}/.test(css), 'checkboxes keep one size');
+  assert.ok(src.includes('shownN') && src.includes('a-more'), 'media library shows 36 files at a time');
+  assert.ok(src.includes('tabs.scrollLeft'), 'the open tab is scrolled into view on small screens');
+});

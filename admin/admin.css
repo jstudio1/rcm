@@ -406,3 +406,55 @@ textarea.big{min-height:300px}
   body.a-lock{overflow:hidden}
 }
 @media(prefers-reduced-motion:reduce){.a-side,.a-back{transition:none}}
+
+/* ---- robustness and touch sizes (audit) ---- */
+/* long words and addresses must never push a box wider than the screen */
+.a-box,.a-in,.a-pb{grid-template-columns:minmax(0,1fr)}
+.a-f{min-width:0}
+.a-f input,.a-f textarea,.a-f select{min-width:0;max-width:100%}
+.a-g,.a-g *{overflow-wrap:anywhere}
+@media(max-width:900px){
+  .btn.sm,.ghost.sm{min-height:38px}
+  .a-chk input{width:22px;height:22px}
+}
+@media(max-width:560px){
+  .a-media{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .a-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .a-card .cb{padding:10px 10px 12px}
+  .a-card .t{font-size:14px}
+  .a-card .a-chk{padding:4px 0}
+  .a-item>summary{flex-wrap:wrap}
+  .a-item>summary b{flex:1 1 55%;min-width:0;white-space:normal}
+  .a-item .tl{margin-left:auto}
+  .a-mi .acts .sm{padding:8px 12px}
+}
+
+/* ---- audit: phone details ---- */
+.a-chk input{flex:none}
+.a-more{grid-column:1/-1;justify-self:center;padding:12px 24px}
+@media(max-width:560px){
+  .a-head h1{font-size:clamp(28px,8.4vw,36px);line-height:1.1}
+  .a-head p{font-size:14px}
+  /* filters: search on its own row, the selects and the add button two per row */
+  .a-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .a-tools>input{grid-column:1/-1}
+  .a-tools>select,.a-tools>button{width:100%;max-width:none}
+  .a-tools>.a-seg{grid-column:1/-1}
+  .a-tools>.a-seg button{flex:1}
+  /* side editor: the title gets its own row, the buttons sit under it */
+  .a-ph{flex-wrap:wrap;row-gap:8px}
+  .a-ph b{flex:1 1 calc(100% - 44px)}
+  .a-ph .no+b+.ghost{margin-left:auto}
+  /* picture and video previews stay small */
+  .a-imgf .pv{max-width:200px}
+  .a-imgf.a-isvid .pv{max-width:240px}
+  /* the price/URL tables become one card per row */
+  .an-stack thead{display:none}
+  .an-stack,.an-stack tbody,.an-stack tr,.an-stack td{display:block;width:100%}
+  .an-stack tr{padding:12px 0;border-bottom:1px solid var(--ln)}
+  .an-stack td{border:0;padding:3px 0;max-width:none;white-space:normal;word-break:break-all}
+  .an-stack td:first-child{font-weight:500;word-break:normal}
+}
+.a-list{grid-template-columns:minmax(0,1fr)}
+.a-item{min-width:0}
+.a-imgf .pv img{object-fit:contain}
