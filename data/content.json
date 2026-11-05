@@ -7,13 +7,14 @@
     "keywords": "RAYCITY-M, เกมแข่งรถ, สตรีทเรซ, เกมมือถือ",
     "ogImage": "/img/hero_race_v2_poster.jpg",
     "footer": "© 2026 RAYCITY-M. All rights reserved.",
-    "loader": "true",
+    "loader": "false",
     "loaderOnce": "true",
     "loaderScope": "home",
     "loaderStyle": "launcher",
     "defaultTitleEn": "RAYCITY-M | The street racing legend returns on mobile",
     "descriptionEn": "RAYCITY-M: the street racing legend returns. Play it on mobile. Coming soon.",
-    "footerEn": ""
+    "footerEn": "",
+    "homeStyle": "hud"
   },
   "links": {
     "social": {
@@ -68,7 +69,8 @@
     "soonLabelEn": "Coming soon on",
     "downloadLabelEn": "Download on",
     "gameplayMoreEn": "View all",
-    "latestNewsTitleEn": "Latest news"
+    "latestNewsTitleEn": "Latest news",
+    "heroVideoOn": "false"
   },
   "pages": {
     "rewards": {
@@ -1348,5 +1350,9 @@
       "excerptEn": "Sample English summary for PROMOTION number 30, used to test the layout.",
       "bodyEn": "## Demo news 30: promotion announcement\nSample English content for testing the display. This is not a real announcement.\n\n### Details\n- Point one\n- Point two\n- Point three\n\n### Stay tuned\nFollow announcements and events on our official Facebook page."
     }
-  ]
+  ],
+  "portal": {
+    "enabled": "true",
+    "mode": "mock"
+  }
 }

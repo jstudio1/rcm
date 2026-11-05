@@ -14,7 +14,7 @@ document.querySelectorAll('.sl-box').forEach(function(b){
   function go(k){
     i=(k+n)%n;
     slides.forEach(function(s,j){s.classList.toggle('on',j===i);if(j===i)s.removeAttribute('aria-hidden');else s.setAttribute('aria-hidden','true')});
-    dots.forEach(function(d,j){d.classList.remove('on','done');if(j<i)d.classList.add('done');d.removeAttribute('aria-current')});
+    dots.forEach(function(d,j){d.classList.remove('on','seen');if(j<i)d.classList.add('seen');d.removeAttribute('aria-current')});
     void b.offsetWidth; // restart the bar animation
     dots[i].classList.add('on');dots[i].setAttribute('aria-current','true');
     if(cnt)cnt.textContent=pad(i)+' / '+pad(n-1);

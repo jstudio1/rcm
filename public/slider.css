@@ -1,5 +1,7 @@
 /* Home page picture slider: 16:9 frame, cross-fade with a slow zoom, caption, arrows, a progress bar per picture.
    Loaded only on the home page when the slider has pictures. */
+/* inside the blurred .hflow band it shares the same background as the sections above */
+.hflow .sl{background:transparent;padding:30px 0 110px}
 .sl .wrap>.eyebrow{display:block}
 .sl h2{margin:10px 0 28px;font-size:clamp(30px,4.4vw,52px)}
 .sl-box{position:relative}
@@ -29,7 +31,7 @@
 .sl-d{position:relative;flex:1 1 0;min-width:0;height:22px;display:block;background:none}
 .sl-d::before{content:"";position:absolute;left:0;right:0;top:9px;height:4px;border-radius:4px;background:rgba(255,255,255,.16)}
 .sl-d i{position:absolute;left:0;top:9px;height:4px;width:0;border-radius:4px;background:var(--red-2)}
-.sl-d.done i{width:100%;opacity:.55}
+.sl-d.seen i{width:100%;opacity:.55}
 .sl-d.on i{animation:sl-fill var(--ms,5000ms) linear forwards}
 .sl-box.manual .sl-d.on i,.sl-box[data-auto="0"] .sl-d.on i{animation:none;width:100%}
 .sl-box.paused .sl-d.on i,.sl-box.paused .sl-s.on .sl-im{animation-play-state:paused}
