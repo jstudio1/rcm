@@ -1,0 +1,82 @@
+/* Home page style "console": loaded only on the home page when chosen in the admin (Settings > Website & SEO).
+   Its own layout, built only on the site's colours: no top menu bar. The menu is a numbered rail down the left side,
+   the headline sits in the middle, the status is bottom-left and everything you can click (stores, social, register)
+   is one stack in the bottom-right corner. Below 1100px wide the standard compact layout is used. */
+@media (min-width:1101px){
+  /* header: only the logo and the small actions are left along the top */
+  body.hs-c .nav:not(.solid){background:none;border-color:transparent}
+  body.hs-c .nav:not(.solid) .wrap{max-width:none;padding-inline:clamp(24px,3vw,48px)}
+  body.hs-c .nav .right{margin-left:auto}
+  body.hs-c .nav .ob{border-radius:0;border-color:rgba(255,255,255,.4);background:none;padding:10px 20px;letter-spacing:.2em;backdrop-filter:none;-webkit-backdrop-filter:none}
+  body.hs-c .lang{border:0;background:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  body.hs-c .lang a{padding:8px 9px;letter-spacing:.14em;font-size:13px}
+  body.hs-c .lang a.on{background:none;color:#fff;box-shadow:inset 0 -2px 0 var(--red-2)}
+
+  /* the numbered rail (while the page is at the top; after scrolling the normal top menu returns) */
+  body.hs-c .nav:not(.solid) .menu{position:fixed;left:clamp(24px,3vw,48px);top:50%;transform:translateY(-50%);z-index:60;flex-direction:column;gap:2px;padding:0;margin:0;
+    background:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none;counter-reset:rail}
+  body.hs-c .nav:not(.solid) .menu a{counter-increment:rail;display:flex;align-items:center;gap:14px;padding:11px 0;border-radius:0;background:none;font-size:13px;letter-spacing:.3em;color:#aeb3ba;transition:color .3s,transform .4s var(--ease)}
+  body.hs-c .nav:not(.solid) .menu a::before{content:counter(rail,decimal-leading-zero);font-size:11px;letter-spacing:.12em;color:var(--gold);opacity:.75;min-width:20px}
+  body.hs-c .nav:not(.solid) .menu a::after{left:auto;right:auto;position:static;display:block;width:0;height:2px;background:var(--red-2);transform:none;transition:width .35s var(--ease)}
+  body.hs-c .nav:not(.solid) .menu a:hover{color:#fff;transform:translateX(6px)}
+  body.hs-c .nav:not(.solid) .menu a:hover::after,body.hs-c .nav:not(.solid) .menu a.act::after{width:26px;transform:none}
+  body.hs-c .nav:not(.solid) .menu a.act{color:#fff;background:none}
+
+  /* hero: headline in the middle-left, clear of the rail */
+  body.hs-c .hero{align-items:center}
+  body.hs-c .hero .shade{background:linear-gradient(0deg,rgba(11,12,16,.9) 0%,rgba(11,12,16,0) 40%),linear-gradient(90deg,rgba(11,12,16,.82) 0%,rgba(11,12,16,.45) 30%,rgba(11,12,16,0) 56%),linear-gradient(180deg,rgba(11,12,16,.65) 0%,rgba(11,12,16,0) 20%)}
+  body.hs-c .hero .hwrap{max-width:none;padding-block:110px 190px;padding-inline:clamp(215px,17vw,290px) clamp(24px,4vw,56px)}
+  body.hs-c .hero .hl{border-left:0;padding:0;max-width:min(760px,54vw)}
+  body.hs-c .hero .htitle{font-size:clamp(46px,min(6.4vw,11vh),100px)}
+  body.hs-c .hero p.lead{margin-top:18px;max-width:420px}
+
+  /* bottom: status on the left, one stack of actions on the right, a red line along the very bottom edge */
+  body.hs-c .dock{position:absolute;inset:0;background:none;border:0;backdrop-filter:none;-webkit-backdrop-filter:none;pointer-events:none}
+  body.hs-c .dock::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--red-2),rgba(255,42,42,0) 72%)}
+  body.hs-c .hero .dock .dk{position:static;display:block;max-width:none;width:auto;margin:0;padding:0}
+  body.hs-c .dk-st,body.hs-c .dk-cta,body.hs-c .dk-plat{pointer-events:auto}
+  body.hs-c .dk-st{position:absolute;left:clamp(215px,17vw,290px);bottom:clamp(30px,6vh,56px);text-align:left;width:min(420px,32vw)}
+  body.hs-c .dk-st b{font-size:clamp(28px,2.5vw,40px)}
+  body.hs-c .dk-bar{margin:12px 0 10px;max-width:none}
+  body.hs-c .dk-st small{display:block;max-width:360px}
+  body.hs-c .dk-cta{position:absolute;right:clamp(24px,4vw,56px);bottom:clamp(30px,6vh,56px);align-items:flex-end}
+  body.hs-c .dk-cta .btn{border-radius:999px;padding:19px 46px;font-size:18px;min-width:0}
+  body.hs-c .dk-plat{position:absolute;right:clamp(24px,4vw,56px);bottom:clamp(128px,19vh,160px);display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+  body.hs-c .dk-plat .plat-h{display:none}
+  body.hs-c .hero .dk-plat .stores{margin:0;gap:10px}
+  body.hs-c .hero .dk-plat .store{border-radius:999px;padding:9px 18px 9px 14px;background:rgba(12,13,16,.6)}
+  body.hs-c .dk-soc{margin:0;justify-content:flex-end}
+}
+/* below 1100px wide: the rail becomes a numbered strip you can swipe, just under the header; the hero and the
+   bottom area keep the open, card-less console look (a red line along the bottom edge, round buttons) */
+@media (max-width:1100px){
+  body.hs-c .lang{border:0;background:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  body.hs-c .lang a{padding:8px 9px;letter-spacing:.14em;font-size:13px}
+  body.hs-c .lang a.on{background:none;color:#fff;box-shadow:inset 0 -2px 0 var(--red-2)}
+  body.hs-c .nav:not(.solid) .menu{display:flex;position:fixed;top:calc(74px + env(safe-area-inset-top,0px));left:0;right:0;z-index:49;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+    gap:4px;padding:2px 14px;margin:0;border:0;border-radius:0;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;counter-reset:rail}
+  body.hs-c .nav:not(.solid) .menu::-webkit-scrollbar{display:none}
+  body.hs-c .nav:not(.solid) .menu a{counter-increment:rail;flex:none;display:flex;align-items:center;gap:8px;padding:9px 10px;font-size:12px;letter-spacing:.22em;color:#aeb3ba;white-space:nowrap}
+  body.hs-c .nav:not(.solid) .menu a::before{content:counter(rail,decimal-leading-zero);font-size:10px;letter-spacing:.1em;color:var(--gold);opacity:.8}
+  body.hs-c .nav:not(.solid) .menu a::after{left:10px;right:10px;bottom:3px}
+  body.hs-c .nav:not(.solid) .menu a.act{color:#fff}
+}
+@media (max-width:900px){
+  body.hs-c .hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;z-index:4;background:linear-gradient(90deg,var(--red-2),rgba(255,42,42,0) 75%)}
+  body.hs-c .hero .shade{background:linear-gradient(0deg,#0b0c10 8%,rgba(11,12,16,.7) 38%,rgba(11,12,16,.1) 68%),linear-gradient(180deg,rgba(11,12,16,.75),transparent 26%)}
+  body.hs-c .hero .hwrap{padding-block:150px 14px}
+  body.hs-c .hero .hl{text-align:left}
+  body.hs-c .hero .htitle{font-size:clamp(44px,13vw,64px)}
+  body.hs-c .hero p.lead{text-align:left;margin:12px 0 0;max-width:none;font-size:14px}
+  body.hs-c .dock{background:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none;margin-bottom:calc(22px + env(safe-area-inset-bottom,0px))}
+  body.hs-c .hero .dock .dk{padding:0;gap:14px}
+  body.hs-c .dk-st{text-align:left}
+  body.hs-c .dk-bar{margin:10px 0 6px}
+  body.hs-c .dk-cta .btn{border-radius:999px;padding:17px 24px;font-size:17px}
+  body.hs-c .dk-plat .plat-h{display:none}
+  body.hs-c .store{border-radius:999px;flex-direction:row;justify-content:center;gap:8px;padding:12px 10px}
+  body.hs-c .store svg{width:20px;height:20px}
+  body.hs-c .store small{display:none}
+  body.hs-c .store b{font-size:14px}
+  body.hs-c .dk-soc{justify-content:center}
+}

@@ -58,7 +58,7 @@ const SFX=(function(){
 
 /* tile grid over the burnout loop video (RayCity login style) */
 (function(){
-  const box=document.getElementById('tiles');if(!box)return;
+  const box=document.getElementById('tiles');if(!box||box.dataset.off==='1')return; // both video and picture switched off in the admin: no jigsaw
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const small=matchMedia('(max-width: 900px)').matches;
   const POSX=small?.74:.5;

@@ -219,7 +219,7 @@ function serveStatic(req, res, root, rel, cache) {
   let file = path.normalize(path.join(root, p));
   if (!file.startsWith(root + path.sep) || p.includes('\0')) return send(res, 403, 'Forbidden', 'text/plain');
   try { file = fs.realpathSync(file); const realRoot = fs.realpathSync(root); if (!file.startsWith(realRoot + path.sep)) return send(res, 403, 'Forbidden', 'text/plain'); } catch (e) { return send(res, 404, 'Not found', 'text/plain'); }
-  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/account.js', '/account.css', '/prereg.js', '/prereg.css', '/consent.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
+  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/account.js', '/account.css', '/home-modern.css', '/home-console.css', '/home-hud.css', '/prereg.js', '/prereg.css', '/consent.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
   const staticExt = path.extname(file).toLowerCase();
   if (/^\/(?:img|uploads)\//i.test(p) && !MEDIA_EXT[staticExt] && staticExt !== '.ico') return send(res, 404, 'Not found', 'text/plain');
   // only known web file types are served (no .rar/.zip/.psd or other stray files left in public/)
@@ -620,11 +620,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---------- public pages ----------
+    // ?home=modern|classic shows a home page layout without changing the setting (admin preview buttons)
+    const homePreview = ['classic', 'modern', 'console', 'hud'].includes(url.searchParams.get('home')) ? url.searchParams.get('home') : undefined;
     // "/home" is an internal alias of "/" for hosts (e.g. Plesk nginx) that never forward the bare root to Node
     // ?loader=preview[&style=tacho] shows a loading-screen design even while it's switched off (admin preview buttons)
     if (p === '/' || p === '/home') {
       const pv = url.searchParams.get('loader') === 'preview' ? (LOADER_STYLES.includes(url.searchParams.get('style')) ? url.searchParams.get('style') : (c.site.loaderStyle || 'launcher')) : null;
-      return page(render.home(c, base, { loaderPreview: pv }));
+      return page(render.home(c, base, { loaderPreview: pv, homeStyle: homePreview }));
     }
     if (['/rewards', '/gameplay', '/drivers', '/news', '/faq', '/privacy', '/terms', '/support'].includes(p)) return page(render[p.slice(1)](c, base));
     // member portal: only exists while it is switched on in the admin (and registration only while it is open)
@@ -635,7 +637,7 @@ const server = http.createServer(async (req, res) => {
     // the English site: same pages and data, English twin fields where they are filled in
     if (p === '/en' || /^\/en\/(rewards|gameplay|drivers|news)$/.test(p)) {
       const lc = render.localize(c);
-      return page(p === '/en' ? render.home(lc, base, {}) : render[p.slice(4)](lc, base));
+      return page(p === '/en' ? render.home(lc, base, { homeStyle: homePreview }) : render[p.slice(4)](lc, base));
     }
     if (p.startsWith('/en/news/')) {
       let slug; try { slug = decodeURIComponent(p.slice(9)).replace(/\/$/, ''); } catch (e) { return page(render.notFound(c, base), 404); }

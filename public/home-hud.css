@@ -1,0 +1,98 @@
+/* Home page style "hud": loaded only on the home page when chosen in the admin (Settings > Website & SEO).
+   A racing-cockpit look built mobile-first: the menu becomes an app-style tab bar fixed along the bottom edge
+   (chamfered corners, one icon per page), the header keeps only the logo and language, the actions live in one
+   chamfered HUD panel with a neon edge, the register button has a rotating light ring, the progress bar is made of
+   slanted segments and the headline carries a red/gold chromatic edge over faint scan lines. Motion stops for
+   people who asked their device for less of it. */
+@property --hud-a{syntax:'<angle>';inherits:false;initial-value:0deg}
+@keyframes hud-spin{to{--hud-a:360deg}}
+@keyframes hud-seg{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+@keyframes hud-pulse{0%,100%{opacity:.55}50%{opacity:1}}
+
+/* ---- header: logo and language only (the menu moved to the tab bar) ---- */
+body.hs-d{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+body.hs-d .burger,body.hs-d .drawer{display:none!important}
+body.hs-d .nav .right .ob,body.hs-d .nav .right .acct-link{display:none}
+body.hs-d .nav .wrap{max-width:none;padding-inline:clamp(16px,3vw,48px)}
+body.hs-d .nav .right{margin-left:auto}
+body.hs-d .nav.solid{background:rgba(10,11,14,.8);backdrop-filter:none;-webkit-backdrop-filter:none}
+body.hs-d .lang{border:0;background:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+body.hs-d .lang a{padding:8px 9px;font-size:13px;letter-spacing:.14em}
+body.hs-d .lang a.on{background:none;color:#fff;box-shadow:inset 0 -2px 0 var(--red-2)}
+
+/* ---- the tab bar ---- */
+body.hs-d .nav .menu{display:flex;position:fixed;z-index:70;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));margin:0;padding:6px;gap:2px;border:0;border-radius:0;
+  background:linear-gradient(180deg,rgba(24,25,30,.92),rgba(10,11,14,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.14);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px)}
+body.hs-d .nav .menu a{position:relative;flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 2px 7px;border-radius:0;background:none;
+  font-size:10px;letter-spacing:.12em;color:#9ba1a9;white-space:nowrap;transition:color .25s}
+body.hs-d .nav .menu a::before{content:"";width:22px;height:22px;background:currentColor;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat}
+body.hs-d .nav .menu a::after{left:30%;right:30%;top:0;bottom:auto;height:2px;transform:scaleX(0);background:var(--red-2)}
+body.hs-d .nav .menu a:hover,body.hs-d .nav .menu a:focus-visible{color:#fff}
+body.hs-d .nav .menu a:hover::after,body.hs-d .nav .menu a.act::after{transform:scaleX(1)}
+body.hs-d .nav .menu a.act{color:var(--red-2);background:none}
+body.hs-d .nav .menu a:nth-child(1){--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M3 9h18v4H3zM5 13v8h14v-8M12 9v12M12 9c-3 0-4-4-1-4 2 0 1 4 1 4zm0 0c3 0 4-4 1-4-2 0-1 4-1 4z'/%3E%3C/svg%3E")}
+body.hs-d .nav .menu a:nth-child(2){--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='2.5'/%3E%3Cpath d='M12 3v6.5M4.2 16.5l5.6-3.2M19.8 16.5l-5.6-3.2'/%3E%3C/svg%3E")}
+body.hs-d .nav .menu a:nth-child(3){--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M4 14a8 8 0 0 1 16 0v5H4zM4 14h16M9 14v5M15 14v5M8 9.5h8'/%3E%3C/svg%3E")}
+body.hs-d .nav .menu a:nth-child(4){--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M4 5h13v14H4zM17 9h3v8a2 2 0 0 1-2 2M7 9h7M7 12h7M7 15h5'/%3E%3C/svg%3E")}
+body.hs-d .nav .menu a:nth-child(5){--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8M12 17h.01'/%3E%3C/svg%3E")}
+
+/* ---- hero: scan lines, corner brackets, chromatic headline, speed streak ---- */
+body.hs-d .hero .shade{background:linear-gradient(0deg,#0b0c10 8%,rgba(11,12,16,.7) 36%,rgba(11,12,16,.08) 68%),linear-gradient(90deg,rgba(11,12,16,.7),rgba(11,12,16,0) 60%),linear-gradient(180deg,rgba(11,12,16,.75),transparent 24%)}
+body.hs-d .hero .shade::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px);mix-blend-mode:overlay;pointer-events:none}
+body.hs-d .hero .soft::before,body.hs-d .hero .soft::after{content:"";position:absolute;top:calc(78px + env(safe-area-inset-top,0px));width:26px;height:26px;border:0 solid var(--red-2);opacity:.9}
+body.hs-d .hero .soft::before{left:clamp(10px,2vw,30px);border-left-width:2px;border-top-width:2px}
+body.hs-d .hero .soft::after{right:clamp(10px,2vw,30px);border-right-width:2px;border-top-width:2px}
+body.hs-d .hero .hl{border:0;padding:0;text-align:left;position:relative}
+body.hs-d .hero .htitle{text-shadow:2px 0 rgba(255,42,42,.65),-2px 0 rgba(255,196,20,.4)}
+body.hs-d .hero .htitle em{text-shadow:none}
+body.hs-d .hero .hl::after{content:"";display:block;width:min(260px,60%);height:5px;margin-top:18px;background:linear-gradient(90deg,var(--red-2),var(--gold) 60%,rgba(255,196,20,0));transform:skewX(-35deg);transform-origin:left}
+body.hs-d .hero p.lead{text-align:left;margin:16px 0 0;max-width:460px}
+
+/* ---- the HUD panel (status, register, stores, social) ---- */
+body.hs-d .dock{background:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none;margin:0 14px calc(92px + env(safe-area-inset-bottom,0px));
+  filter:drop-shadow(0 0 1px rgba(255,42,42,.95)) drop-shadow(0 0 16px rgba(255,42,42,.22))}
+body.hs-d .hero .dock .dk{display:flex;flex-direction:column;gap:14px;max-width:none;width:auto;margin:0;padding:20px 18px 16px;
+  background:linear-gradient(160deg,rgba(20,21,26,.9),rgba(10,11,14,.94));
+  clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px)}
+body.hs-d .dk-st{text-align:left}
+body.hs-d .dk-st b{font-size:26px}
+body.hs-d .dk-bar{height:10px;border-radius:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.13) 0 10px,transparent 10px 14px);transform:skewX(-20deg);margin:10px 0 8px;max-width:none}
+body.hs-d .dk-bar i{width:34%;border-radius:0;background:repeating-linear-gradient(90deg,var(--red-2) 0 10px,transparent 10px 14px);animation:hud-seg 2.2s linear infinite}
+body.hs-d .dk-cta{display:flex;flex-direction:column;align-items:stretch}
+body.hs-d .dk-cta .btn{border:2px solid transparent;border-radius:0;min-width:0;padding:17px 24px;font-size:17px;letter-spacing:.02em;
+  background:linear-gradient(180deg,#e10600,#9a0000) padding-box,conic-gradient(from var(--hud-a),#ff2a2a,#ffc414,#ff2a2a 55%,#ff2a2a) border-box;animation:hud-spin 3.2s linear infinite;
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+body.hs-d .dk-plat{display:flex;flex-direction:column;align-items:stretch}
+body.hs-d .dk-plat .plat-h{margin:0 0 8px;font-size:10px;letter-spacing:.3em;text-align:left;animation:hud-pulse 2.4s ease-in-out infinite}
+body.hs-d .hero .stores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row;gap:8px;margin:0}
+body.hs-d .store{flex-direction:row;justify-content:flex-start;text-align:left;gap:10px;padding:10px 12px;border-radius:0;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.16);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+body.hs-d .store svg{width:22px;height:22px}
+body.hs-d .store small{display:block;font-size:9px}
+body.hs-d .store b{font-size:14px}
+body.hs-d .hero .dk-plat .store em,body.hs-d .store em{right:6px;top:4px;left:auto;transform:none;font-size:9px;padding:1px 5px}
+body.hs-d .dk-soc{justify-content:space-between;margin-top:12px}
+body.hs-d .dk-soc .social{justify-content:flex-start}
+body.hs-d .social .so,body.hs-d .snd{border-radius:0;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+
+/* ---- wide screens: the tab bar floats in the middle, the HUD panel is a column on the right ---- */
+@media (min-width:901px){
+  body.hs-d .nav .menu{left:50%;right:auto;width:min(640px,66vw);transform:translateX(-50%)}
+  body.hs-d .nav .menu a{font-size:11px;letter-spacing:.18em;flex-direction:row;justify-content:center;gap:9px;padding:13px 4px}
+  body.hs-d .nav .menu a::before{width:20px;height:20px}
+  body.hs-d .hero{align-items:center}
+  body.hs-d .hero .hwrap{max-width:none;padding-block:120px 150px;padding-inline:clamp(24px,5vw,96px) calc(clamp(24px,4vw,56px) + min(400px,34vw))}
+  body.hs-d .hero .htitle{font-size:clamp(46px,min(6.4vw,11vh),100px)}
+  body.hs-d .dock{position:absolute;right:clamp(24px,4vw,56px);left:auto;bottom:clamp(96px,14vh,130px);width:min(390px,33vw);margin:0}
+  body.hs-d .hero .dock .dk{padding:24px 22px 20px}
+}
+@media (max-width:900px){
+  body.hs-d .hero .hwrap{padding-block:110px 16px}
+  body.hs-d .hero .htitle{font-size:clamp(44px,13vw,64px)}
+  body.hs-d .hero p.lead{font-size:14px;max-width:none}
+}
+@media (prefers-reduced-motion:reduce){
+  body.hs-d .dk-cta .btn,body.hs-d .dk-bar i,body.hs-d .dk-plat .plat-h{animation:none}
+  body.hs-d .dk-bar i{width:100%;opacity:.4}
+}
