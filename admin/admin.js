@@ -965,6 +965,49 @@
       go && !ok ? h('button', { type: 'button', class: 'ghost sm', onclick: () => open(go) }, 'ไปแก้') : null))))];
   }
   const on = v => v === true || v === 'true' || v === '1';
+  // ---------- SEO checklist: things a person can fix in the admin that decide how Google sees the site ----------
+  function seoView() {
+    const T = v => String(v || '').trim(), P = C.pages;
+    const isDemo = n => /ตัวอย่าง|demo|lorem|ไม่ใช่ประกาศจริง|not a real/i.test([n.title, n.slug, n.body, n.excerpt].join(' '));
+    const pub = C.news.filter(n => on(n.published)), demo = pub.filter(isDemo);
+    const lenOk = (v, a, b) => T(v).length >= a && T(v).length <= b;
+    const keys = ['rewards', 'gameplay', 'drivers', 'news', 'faq'];
+    const badTitle = keys.filter(k => !lenOk(P[k].seoTitle, 25, 65)), badDesc = keys.filter(k => !lenOk(P[k].seoDescription, 70, 160));
+    const enGeneric = keys.filter(k => /^(rewards|gameplay|drivers|news|faq)\s*\|/i.test(T(P[k].seoTitle)));
+    const shortNews = pub.filter(n => !isDemo(n) && T(n.body).length < 400);
+    const noAlt = pub.filter(n => T(n.image) && !T(n.imageAlt));
+    const noEn = pub.filter(n => !T(n.titleEn));
+    const social = Object.values(C.links.social).filter(v => T(v)).length;
+    const rows = [
+      ['ต้องแก้ก่อนเปิดตัวจริง', [
+        [!demo.length, 'ไม่มีข่าวตัวอย่างที่เผยแพร่อยู่ (ตอนนี้ ' + demo.length + ' ข่าว) Google จะมองเป็นเนื้อหาซ้ำ/ไร้คุณภาพ ปิดติ๊ก "เผยแพร่" หรือลบทิ้ง', 'news'],
+        [/^https:\/\/[^/]+$/i.test(T(C.site.url).replace(/\/+$/, '')), 'โดเมนหลักเป็น https:// (ตั้งที่ ข้อมูลเว็บ & SEO หลัก) เพื่อให้ canonical, sitemap และการเปลี่ยนเส้นทางถูกต้อง', 'general'],
+        [T(C.site.googleVerify).length >= 8, 'ใส่รหัสยืนยัน Google Search Console (หรือยืนยันด้วย DNS แล้วข้อนี้ข้ามได้) แล้วส่ง /sitemap.xml', 'general']]],
+      ['ชื่อหน้าและคำอธิบาย (ที่ขึ้นในผลค้นหา)', [
+        [!badTitle.length, 'ชื่อหน้า (SEO title) ยาว 25–65 ตัวอักษรทุกหน้า' + (badTitle.length ? ' — ต้องแก้: ' + badTitle.map(k => PN[k]).join(', ') : ''), badTitle.length ? 'p-' + badTitle[0] : null],
+        [!badDesc.length, 'คำอธิบาย (SEO description) ยาว 70–160 ตัวอักษรทุกหน้า' + (badDesc.length ? ' — ต้องแก้: ' + badDesc.map(k => PN[k]).join(', ') : ''), badDesc.length ? 'p-' + badDesc[0] : null],
+        [!enGeneric.length, 'ชื่อหน้าขึ้นต้นด้วยคำภาษาอังกฤษกว้างๆ (Rewards | …) ควรขึ้นต้นด้วยคำที่ผู้เล่นพิมพ์ค้นจริง เช่น "ลงทะเบียนล่วงหน้า…" "เกมแข่งรถมือถือ"' + (enGeneric.length ? ' — ต้องแก้: ' + enGeneric.map(k => PN[k]).join(', ') : ''), enGeneric.length ? 'p-' + enGeneric[0] : null],
+        [lenOk(C.site.defaultTitle, 25, 65) && lenOk(C.home.seoDescription || C.site.description, 70, 160), 'ชื่อและคำอธิบายหน้าแรกอยู่ในความยาวที่เหมาะสม', 'general'],
+        [T(C.home.h1).length > 12, 'หัวข้อใหญ่ H1 ของหน้าแรกมีคำอธิบายเกม ไม่ใช่แค่ชื่อเกม (ตอนนี้ ' + T(C.home.h1).length + ' ตัวอักษร)', 'home']]],
+      ['เนื้อหาข่าว', [
+        [pub.length >= 3 && demo.length < pub.length, 'มีข่าวจริงที่เผยแพร่อย่างน้อย 3 ข่าว (ตอนนี้ ' + (pub.length - demo.length) + ' ข่าวจริง)', 'news'],
+        [!shortNews.length, 'ข่าวจริงมีเนื้อหาอย่างน้อย ~400 ตัวอักษร (ข่าวสั้นไปจะอันดับยาก)' + (shortNews.length ? ' — สั้นไป ' + shortNews.length + ' ข่าว' : ''), 'news'],
+        [!noAlt.length, 'ทุกข่าวที่มีรูปใส่คำอธิบายรูป (alt)' + (noAlt.length ? ' — ขาด ' + noAlt.length + ' ข่าว' : ''), 'news'],
+        [!noEn.length, 'ข่าวที่เผยแพร่มีชื่อภาษาอังกฤษ (ไม่มี = ไม่มีหน้า /en ของข่าวนั้น)' + (noEn.length ? ' — ยังไม่มี ' + noEn.length + ' ข่าว' : ''), 'news']]],
+      ['ความน่าเชื่อถือและการติดตาม', [
+        [social >= 1, 'ใส่ลิงก์โซเชียลอย่างน้อย 1 ช่องทาง (ใช้ใน structured data และเพิ่มความน่าเชื่อถือ)', 'links'],
+        [!!T(C.site.ogImage), 'มีรูปแชร์ (og:image) สำหรับ Facebook / LINE / X', 'general'],
+        [GA_OK(C.site.ga4), 'ตั้ง Google Analytics 4 (G-XXXXXXXXXX) ถ้าต้องการตามสถิติจาก Google (ไม่บังคับ ระบบมีสถิติของตัวเองแล้ว)', 'general'],
+        [!!T(C.contact.email), 'ใส่อีเมลติดต่อ (แสดงท้ายเว็บและใน security.txt)', 'p-support']]]
+    ];
+    const flat = rows.flatMap(r => r[1]), pass = flat.filter(x => x[0]).length;
+    return [box(null, h('div', { class: 'an-kpis' }, h('div', { class: 'an-kpi red' }, h('small', {}, 'ผ่านแล้ว'), h('b', {}, pass + ' / ' + flat.length), h('div', { class: 'sub' }, pass === flat.length ? 'พร้อมแล้ว' : 'ยังเหลือ ' + (flat.length - pass) + ' ข้อ'))),
+      h('small', { class: 'h' }, 'ระบบตรวจได้เฉพาะสิ่งที่อยู่ในเว็บนี้ ส่วนความเร็วจริงดูที่เมนู PageSpeed ส่วนอันดับในผลค้นหาต้องดูใน Google Search Console · อย่าลืมเช็กเองว่าทั้ง https://โดเมน และ https://www.โดเมน เปิดได้ (หรือ www ส่งต่อมาที่โดเมนหลัก)')),
+      ...rows.map(([title, items]) => box(title, ...items.map(([ok, text, go]) => h('div', { class: 'rd-row' },
+        h('span', { class: 'rd-i ' + (ok ? 'ok' : 'no') }, ok ? '✓' : '✕'), h('span', { class: 'rd-t' }, text),
+        go && !ok ? h('button', { type: 'button', class: 'ghost sm', onclick: () => open(go) }, 'ไปแก้') : null))))];
+  }
+  const GA_OK = v => /^G-[A-Z0-9]{4,15}$/.test(String(v || ''));
 
   // ---------- sections ----------
   const PN = { rewards: 'Rewards', gameplay: 'Gameplay', drivers: 'Drivers', news: 'News', faq: 'FAQ' };
@@ -1159,6 +1202,8 @@
             'rc-sfx / rc-ldr-seen — จำเป็น: จำเสียงและหน้าโหลด (เก็บในเบราว์เซอร์)'))] },
     { id: 'urls', g: 'ตั้งค่าเว็บ', label: 'URL สำหรับสโตร์', desc: 'ที่อยู่หน้านโยบาย ข้อตกลง ซัพพอร์ต (และหน้าลบบัญชี/อัตรากล่องสุ่มเมื่อมี) ให้คัดลอกไปกรอกในสโตร์ พร้อมตรวจว่าทุกลิงก์เปิดได้จริง', paths: [],
       view: () => urlsView() },
+    { id: 'seo', g: 'ตั้งค่าเว็บ', label: 'เช็กลิสต์ SEO', desc: 'ตรวจว่าเว็บพร้อมให้ Google เจอและแสดงผลดีไหม (ชื่อหน้า คำอธิบาย ข่าวตัวอย่าง โดเมน โซเชียล) อัปเดตตามที่แก้ทันที', paths: [],
+      view: () => seoView() },
     { id: 'ready', g: 'ตั้งค่าเว็บ', label: 'ความพร้อมส่งสโตร์', desc: 'เช็กลิสต์ว่าหน้าเว็บที่ Apple / Google ต้องการครบและไม่มีข้อความร่างหลุดหรือไม่ อัปเดตตามที่แก้ในหลังบ้านทันที (ยังไม่ต้องกดบันทึก)', paths: [],
       view: () => readinessView() },
     { id: 'general', g: 'ตั้งค่าเว็บ', label: 'ข้อมูลเว็บ & SEO หลัก', desc: 'ชื่อเว็บ โดเมน รูปแชร์ และค่า SEO เริ่มต้นของทั้งเว็บ', paths: ['site'], url: '/',
@@ -1480,7 +1525,7 @@
     { id: 'home', label: 'หน้าแรก', hint: 'ข้อความ รูปพื้นหลัง ปุ่มดาวน์โหลด โซเชียล', tabs: [tab('home', 'ข้อความ & พื้นหลัง'), tab('links', 'ปุ่มดาวน์โหลด & โซเชียล')] },
     { id: 'content', label: 'เนื้อหาเว็บ', hint: 'ข่าว Gameplay Rewards Drivers FAQ ภาษาอังกฤษ', tabs: [tab('news', 'ข่าวสาร', ['p-news']), tab('gameplay', 'Gameplay', ['p-gameplay']), tab('prereg', 'ลงทะเบียนล่วงหน้า & รางวัล', ['rewards', 'p-rewards']), tab('drivers', 'Drivers', ['p-drivers']), tab('faq', 'FAQ', ['p-faq']), tab('en', 'ภาษาอังกฤษ (EN)')] },
     { id: 'store', label: 'สโตร์ & กฎหมาย', hint: 'Privacy Terms Support คุกกี้ URL สโตร์', tabs: [tab('ready', 'ความพร้อมส่งสโตร์'), tab('urls', 'URL สำหรับสโตร์'), tab('p-privacy', 'Privacy'), tab('p-terms', 'Terms'), tab('p-support', 'Support & ติดต่อ'), tab('p-delete', 'ลบบัญชี'), tab('p-odds', 'อัตรากล่องสุ่ม'), tab('cookies', 'คุกกี้')] },
-    { id: 'report', label: 'รายงาน & ความเร็ว', hint: 'ผู้เข้าชม PageSpeed', tabs: [tab('stats', 'สถิติผู้เข้าชม'), tab('pagespeed', 'PageSpeed')] },
+    { id: 'report', label: 'รายงาน & ความเร็ว', hint: 'ผู้เข้าชม PageSpeed เช็กลิสต์ SEO', tabs: [tab('stats', 'สถิติผู้เข้าชม'), tab('pagespeed', 'PageSpeed'), tab('seo', 'เช็กลิสต์ SEO')] },
     { id: 'media', label: 'คลังรูป & วิดีโอ', hint: 'ไฟล์ที่อัปโหลด', tabs: [tab('media', 'คลังรูป & วิดีโอ')] },
     { id: 'settings', label: 'ตั้งค่า', hint: 'SEO ปิดปรับปรุง Login & Register แอดมิน ประวัติ', groups: [
       { id: 'site', label: 'เว็บไซต์ & SEO', tabs: [tab('general', 'เว็บไซต์ & SEO', ['maint'])] },
@@ -1557,7 +1602,7 @@
     const isSet = SET_TABS.includes(s.id);
     if (spy) { spy.disconnect(); spy = null; }
     const view = isSet ? [settingsLayout([].concat(s.view()).flat(Infinity))] : [].concat(s.view()).flat(Infinity).reduce((out, e) => {
-      if (e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo') || e.classList.contains('a-host')) && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
+      if (e && e.classList && (e.classList.contains('a-box') || e.classList.contains('a-seo') || e.classList.contains('a-host')) && !['stats', 'pagespeed', 'media', 'history', 'ready', 'urls', 'seo'].includes(s.id)) { const last = out[out.length - 1]; if (last && last.classList && last.classList.contains('a-cols')) last.append(e); else out.push(h('div', { class: 'a-cols' }, e)); } else out.push(e);
       return out;
     }, []);
     const closed = C.site.maintenance === true || C.site.maintenance === 'true';

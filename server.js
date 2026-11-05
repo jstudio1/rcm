@@ -74,6 +74,9 @@ const peer = req => (req.peer !== undefined ? req.peer : (req.peer = req.socket.
 const trustedPeers = new Set((process.env.TRUST_PROXY_IPS || '').split(',').map(s => s.trim()).filter(Boolean));
 const fromProxy = req => { const a = peer(req); return process.env.TRUST_PROXY === '1' && (a === '' || LOOPBACK.has(a) || trustedPeers.has(a)); };
 const fwd = (req, name) => fromProxy(req) && req.headers[name] ? String(req.headers[name]).split(',').map(s => s.trim()) : null;
+// Cookies get "Secure" when the visitor is on https, when COOKIE_SECURE=1, or when the admin set the main domain to https://
+// (so a proxy that forgets to forward the scheme can never leave the admin cookie without it; the site redirects http to https anyway)
+const secureCookie = req => isHttps(req) || process.env.COOKIE_SECURE === '1' || /^https:\/\//i.test(String(store.getContent().site.url || '').trim());
 const isHttps = req => !!req.socket.encrypted || (fwd(req, 'x-forwarded-proto') || [])[0] === 'https';
 // 'https' / 'http' only when we are SURE how the visitor connected; null when a proxy on this machine (Plesk nginx,
 // Passenger) may be hiding it. Redirects only ever act on a sure 'http', so a host that forgets to forward the
@@ -294,7 +297,7 @@ async function adminApi(req, res, url) {
       fails.refund(who, b.user);
       const token = crypto.randomBytes(32).toString('base64url'), csrf = crypto.randomBytes(24).toString('base64url');
       sessions.set(token, { uid, exp: Date.now() + SESSION_MS, csrf, version, seen: Date.now() });
-      const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
+      const secure = secureCookie(req) ? '; Secure' : '';
       return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
     }
     return json(res, 401, { error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
@@ -426,7 +429,7 @@ async function adminApi(req, res, url) {
       sessions.delete(s.token);
       const token = crypto.randomBytes(32).toString('base64url');
       sessions.set(token, { uid: s.uid, exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion(s.uid), seen: Date.now() });
-      const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
+      const secure = secureCookie(req) ? '; Secure' : '';
       return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` });
     }
     // ---- own profile; the list of admins; the owner adds, removes and resets other admins (confirming with their own password) ----
@@ -456,7 +459,7 @@ async function adminApi(req, res, url) {
         sessions.delete(s.token);
         const token = crypto.randomBytes(32).toString('base64url');
         sessions.set(token, { uid: s.uid, exp: Date.now() + SESSION_MS, csrf: s.csrf, version: store.authVersion(s.uid), seen: Date.now() });
-        const secure = (isHttps(req) || process.env.COOKIE_SECURE === '1') ? '; Secure' : '';
+        const secure = secureCookie(req) ? '; Secure' : '';
         return { 'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${secure}` };
       };
       const me = store.adminName(s.uid);
@@ -499,7 +502,7 @@ function consentOf(req, c) {
   const m = /^([\w-]{1,12})\.([01])$/.exec(cookies(req).rc_consent || '');
   return !m || m[1] !== consentVersion(c) ? null : m[2] === '1';
 }
-const cookieAttrs = req => `Path=/; HttpOnly; SameSite=Lax${isHttps(req) || process.env.COOKIE_SECURE === '1' ? '; Secure' : ''}`;
+const cookieAttrs = req => `Path=/; HttpOnly; SameSite=Lax${secureCookie(req) ? '; Secure' : ''}`;
 const clearVid = req => `vid=; Max-Age=0; ${cookieAttrs(req)}`;
 
 // ---- visitor statistics. With consent: id cookie (vid) + full IP. Without: counted anonymously (masked IP, no cookie), or not at all ----
@@ -669,6 +672,7 @@ const server = http.createServer(async (req, res) => {
       const exp = new Date(Date.now() + 365 * 86400e3).toISOString().replace(/\.\d+Z$/, 'Z');
       return send(res, 200, `Contact: mailto:${mail}\nExpires: ${exp}\nPreferred-Languages: th, en\nCanonical: ${base}/.well-known/security.txt\n`, 'text/plain; charset=utf-8', { 'Cache-Control': 'public, max-age=86400' });
     }
+    if (p === '/feed.xml') return send(res, 200, render.feed(c, base), 'application/rss+xml; charset=utf-8', { 'Cache-Control': 'no-cache' });
     if (p === '/robots.txt') return send(res, 200, render.robots(base), MIME['.txt'], { 'Cache-Control': 'public, max-age=3600' });
 
     // ---------- static files ----------
@@ -699,6 +703,8 @@ server.headersTimeout = 20e3;
 server.requestTimeout = 300e3;
 
 const created = store.ensureAdmin();
+try { const n = store.sealSecrets(); if (n) console.log('Two-step secrets encrypted with DATA_KEY: ' + n); } catch (e) { console.error('sealing two-step secrets:', e.message); }
+if (!String(process.env.DATA_KEY || '').length) console.log('Tip: set DATA_KEY (16+ characters, outside the project folder) to keep two-step secrets encrypted on disk.');
 server.listen(PORT, () => {
   console.log(`Site:   http://localhost:${PORT}/`);
   console.log(`Admin:  http://localhost:${PORT}/admin`);
