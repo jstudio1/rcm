@@ -9,7 +9,7 @@ const tmp = fs.mkdtempSync(path.join(process.env.RCM_TEST_TMP || os.tmpdir(), 'r
 for (const f of ['server.js', 'lib', 'admin', 'views']) { try { fs.cpSync(path.join(source, f), path.join(tmp, f), { recursive: true }); } catch (e) {} }
 fs.mkdirSync(path.join(tmp, 'public', 'uploads'), { recursive: true }); fs.mkdirSync(path.join(tmp, 'public', 'img'), { recursive: true });
 fs.writeFileSync(path.join(tmp, 'public', 'style.css'), 'body{}');
-for (const f of ['consent.js', 'home-modern.css', 'home-console.css', 'home-hud.css', 'home-focus.css']) fs.copyFileSync(path.join(source, 'public', f), path.join(tmp, 'public', f));
+for (const f of ['consent.js', 'slider.js', 'slider.css', 'home-modern.css', 'home-console.css', 'home-hud.css', 'home-focus.css']) fs.copyFileSync(path.join(source, 'public', f), path.join(tmp, 'public', f));
 fs.mkdirSync(path.join(tmp, 'data'));
 const seed = require(path.join(tmp, 'lib/seed'))(); seed.site.url = '';
 fs.writeFileSync(path.join(tmp, 'data/content.json'), JSON.stringify(seed));
@@ -121,6 +121,25 @@ test('home page style', async t => {
     assert.equal(/class="snd"/.test((await get('/en')).html), false);
     await edit(c => { c.home.soundOn = true; });
     assert.match((await get('/')).html, /class="snd"/);
+  });
+  await t.test('home slider: sits above Gameplay, follows the admin settings, English twins, safe links', async () => {
+    const sec = html => /<section class="sec sl" id="slides"[\s\S]*?<\/section>/.exec(html);
+    let h = (await get('/')).html, m = sec(h);
+    assert.ok(m, 'slider shown by default'); assert.ok(h.indexOf('id="slides"') < h.indexOf('id="gameplay"'), 'above the Gameplay section');
+    assert.equal((m[0].match(/class="sl-s[ "]/g) || []).length, 4); assert.equal((m[0].match(/class="sl-d[ "]/g) || []).length, 4);
+    assert.match(m[0], /data-auto="1"/); assert.match(m[0], /data-ms="5000"/); assert.match(h, /\/slider\.css/); assert.match(h, /\/slider\.js/);
+    assert.equal((await get('/slider.js')).status, 200); assert.equal((await get('/slider.css')).status, 200);
+    await edit(c => { c.home.slidesSeconds = '8'; c.home.slidesAuto = false; c.slides[0].link = 'javascript:alert(1)'; c.slides[1].link = '/news'; c.slides[1].titleEn = 'English slide'; });
+    h = (await get('/')).html; m = sec(h);
+    assert.match(m[0], /data-ms="8000"/); assert.match(m[0], /data-auto="0"/); assert.equal(/javascript:/.test(m[0]), false); assert.match(m[0], /href="\/news"/);
+    assert.match(sec((await get('/en')).html)[0], /English slide/); assert.equal(/English slide/.test(m[0]), false);
+    await edit(c => { c.slides = c.slides.slice(0, 1); });
+    m = sec((await get('/')).html); assert.equal(/sl-nav|sl-d"/.test(m[0]), false, 'one picture: no arrows or dots'); assert.match(m[0], /data-auto="0"/);
+    await edit(c => { c.slides = []; });
+    assert.equal(sec((await get('/')).html), null, 'no pictures: no section');
+    await edit(c => { c.slides = [{ image: '/img/track.jpg', title: 'A' }, { image: '/img/car1.jpg', title: 'B' }]; c.home.slidesOn = false; });
+    assert.equal(sec((await get('/')).html), null, 'switched off');
+    assert.equal((await api('content')).json.slides.length, 2, 'saved');
   });
   await t.test('layout guards that browsers cannot be asked about here: store names stay visible on small laptops, panels stretch their children', async () => {
     // the classic layout turns store buttons into 48px icon tiles between 901px and 1180px; every other style must undo that

@@ -1,0 +1,52 @@
+/* Home page picture slider: 16:9 frame, cross-fade with a slow zoom, caption, arrows, a progress bar per picture.
+   Loaded only on the home page when the slider has pictures. */
+.sl .wrap>.eyebrow{display:block}
+.sl h2{margin:10px 0 28px;font-size:clamp(30px,4.4vw,52px)}
+.sl-box{position:relative}
+.sl-view{position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:18px;background:#0b0c10;border:1px solid var(--ln-2);box-shadow:0 30px 70px -30px rgba(0,0,0,.8);touch-action:pan-y}
+.sl-s{position:absolute;inset:0;margin:0;opacity:0;visibility:hidden;transition:opacity .9s var(--ease),visibility 0s linear .9s}
+.sl-s.on{opacity:1;visibility:visible;z-index:1;transition-delay:0s}
+.sl-a{display:block;position:absolute;inset:0}
+.sl-im{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.07)}
+.sl-s.on .sl-im{animation:sl-zoom var(--ms,5000ms) linear forwards}
+.sl-box[data-auto="0"] .sl-s.on .sl-im,.sl-box.manual .sl-s.on .sl-im{animation:none;transform:none}
+@keyframes sl-zoom{to{transform:scale(1)}}
+.sl-s::after{content:"";position:absolute;inset:auto 0 0 0;height:52%;background:linear-gradient(0deg,rgba(8,9,12,.88),rgba(8,9,12,0));pointer-events:none}
+.sl-cap{position:absolute;z-index:2;left:clamp(18px,3.4vw,44px);right:clamp(70px,12vw,150px);bottom:clamp(18px,3.4vw,40px);display:flex;flex-direction:column;gap:6px}
+.sl-cap b{font-size:clamp(24px,3.6vw,46px);line-height:1;text-shadow:0 2px 14px rgba(0,0,0,.55)}
+.sl-cap span{font-size:clamp(13px,1.5vw,18px);color:var(--sil);max-width:640px;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+.sl-s.on .sl-cap>*{animation:sl-rise .8s var(--ease) both}
+.sl-s.on .sl-cap>*:nth-child(2){animation-delay:.12s}
+@keyframes sl-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.sl-nav{position:absolute;z-index:3;top:calc(50% - 40px);width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(11,12,16,.55);border:1px solid var(--ln-2);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;transition:opacity .3s,background .3s,border-color .3s}
+.sl-nav.prev{left:14px}.sl-nav.next{right:14px}
+.sl-nav svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.sl-box:hover .sl-nav,.sl-box:focus-within .sl-nav{opacity:1}
+.sl-nav:hover{background:var(--red);border-color:var(--red)}
+@media (hover:none){.sl-nav{opacity:.9;width:40px;height:40px;top:calc(50% - 34px)}}
+.sl-bar{display:flex;align-items:center;gap:14px;margin-top:14px}
+.sl-dots{flex:1;display:flex;gap:6px;min-width:0}
+.sl-d{position:relative;flex:1 1 0;min-width:0;height:22px;display:block;background:none}
+.sl-d::before{content:"";position:absolute;left:0;right:0;top:9px;height:4px;border-radius:4px;background:rgba(255,255,255,.16)}
+.sl-d i{position:absolute;left:0;top:9px;height:4px;width:0;border-radius:4px;background:var(--red-2)}
+.sl-d.done i{width:100%;opacity:.55}
+.sl-d.on i{animation:sl-fill var(--ms,5000ms) linear forwards}
+.sl-box.manual .sl-d.on i,.sl-box[data-auto="0"] .sl-d.on i{animation:none;width:100%}
+.sl-box.paused .sl-d.on i,.sl-box.paused .sl-s.on .sl-im{animation-play-state:paused}
+@keyframes sl-fill{to{width:100%}}
+.sl-count{flex:none;font-family:var(--f-disp);font-weight:700;font-size:15px;letter-spacing:.14em;color:var(--mu)}
+.sl-pp{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;border:1px solid var(--ln-2);background:rgba(11,12,16,.5);transition:background .3s,border-color .3s}
+.sl-pp:hover{background:rgba(255,255,255,.1);border-color:#fff}
+.sl-pp svg{width:16px;height:16px;fill:#fff}
+.sl-pp .pl{display:none}.sl-pp[aria-pressed="true"] .ps{display:none}.sl-pp[aria-pressed="true"] .pl{display:block}
+.sl-box[data-auto="0"] .sl-pp{display:none}
+@media (max-width:640px){
+  .sl-view{border-radius:12px}
+  .sl-cap{right:18px}
+  .sl-count{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .sl-s{transition:opacity .5s linear,visibility 0s linear .5s}
+  .sl-s.on .sl-im{animation:none;transform:none}
+  .sl-s.on .sl-cap>*{animation:none}
+}

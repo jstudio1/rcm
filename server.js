@@ -220,7 +220,7 @@ function serveStatic(req, res, root, rel, cache) {
   let file = path.normalize(path.join(root, p));
   if (!file.startsWith(root + path.sep) || p.includes('\0')) return send(res, 403, 'Forbidden', 'text/plain');
   try { file = fs.realpathSync(file); const realRoot = fs.realpathSync(root); if (!file.startsWith(realRoot + path.sep)) return send(res, 403, 'Forbidden', 'text/plain'); } catch (e) { return send(res, 404, 'Not found', 'text/plain'); }
-  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/account.js', '/account.css', '/home-modern.css', '/home-console.css', '/home-hud.css', '/home-focus.css', '/prereg.js', '/prereg.css', '/consent.js', '/hero.js', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
+  if (!/^\/(?:img|uploads|fonts)\//i.test(p) && !['/favicon.ico', '/fonts.css', '/ga.js', '/account.js', '/account.css', '/home-modern.css', '/home-console.css', '/home-hud.css', '/home-focus.css', '/prereg.js', '/prereg.css', '/consent.js', '/hero.js', '/slider.js', '/slider.css', '/loader.js', '/site.js', '/style.css'].includes(p)) return send(res, 404, 'Not found', 'text/plain');
   const staticExt = path.extname(file).toLowerCase();
   if (/^\/(?:img|uploads)\//i.test(p) && !MEDIA_EXT[staticExt] && staticExt !== '.ico') return send(res, 404, 'Not found', 'text/plain');
   // only known web file types are served (no .rar/.zip/.psd or other stray files left in public/)
