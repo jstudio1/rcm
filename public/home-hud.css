@@ -50,9 +50,9 @@ body.hs-d .hero .hl::after{content:"";display:block;width:min(260px,60%);height:
 body.hs-d .hero p.lead{text-align:left;margin:16px 0 0;max-width:460px}
 
 /* ---- the HUD panel (status, register, stores, social) ---- */
-body.hs-d .dock{background:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none;margin:0 14px calc(92px + env(safe-area-inset-bottom,0px));
+body.hs-d .dock{background:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none;margin:0 14px calc(104px + env(safe-area-inset-bottom,0px));
   filter:drop-shadow(0 0 1px rgba(255,42,42,.95)) drop-shadow(0 0 16px rgba(255,42,42,.22))}
-body.hs-d .hero .dock .dk{display:flex;flex-direction:column;gap:14px;max-width:none;width:auto;margin:0;padding:20px 18px 16px;
+body.hs-d .hero .dock .dk{display:flex;flex-direction:column;align-items:stretch;gap:14px;max-width:none;width:auto;margin:0;padding:20px 18px 16px;
   background:linear-gradient(160deg,rgba(20,21,26,.9),rgba(10,11,14,.94));
   clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px)}
 body.hs-d .dk-st{text-align:left}
@@ -81,6 +81,11 @@ body.hs-d .social .so,body.hs-d .snd{border-radius:0;clip-path:polygon(8px 0,100
   body.hs-d .nav .menu{left:50%;right:auto;width:min(640px,66vw);transform:translateX(-50%)}
   body.hs-d .nav .menu a{font-size:11px;letter-spacing:.18em;flex-direction:row;justify-content:center;gap:9px;padding:13px 4px}
   body.hs-d .nav .menu a::before{width:20px;height:20px}
+  /* small laptops: the classic layout turns store buttons into icon tiles; here there is room for the names */
+  body.hs-d .hero .dk-plat .stores{justify-content:flex-start}
+  body.hs-d .hero .dk-plat .store{width:auto;height:auto;justify-content:flex-start}
+  body.hs-d .hero .dk-plat .store small{display:block}
+  body.hs-d .hero .dk-plat .store div{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal}
   body.hs-d .hero{align-items:center}
   body.hs-d .hero .hwrap{max-width:none;padding-block:120px 150px;padding-inline:clamp(24px,5vw,96px) calc(clamp(24px,4vw,56px) + min(400px,34vw))}
   body.hs-d .hero .htitle{font-size:clamp(46px,min(6.4vw,11vh),100px)}

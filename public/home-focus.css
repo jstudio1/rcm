@@ -1,0 +1,86 @@
+/* Home page style "focus": loaded only on the home page when chosen in the admin (Settings > Website & SEO).
+   Built around ease of use rather than decoration:
+   - one reading column: headline, short text, status, then the register button, store buttons and social links in the order
+     a visitor decides (what is it > when > what do I do > where do I get it), so the eye travels down one edge
+   - the key art stays clear on the right (desktop) instead of being covered by panels
+   - a solid, readable top bar with plain visible menu links; on phones the menu button says "Menu" in words
+   - big targets (56px register button, 52px store buttons), brighter secondary text, clear keyboard focus rings
+   - the register button sits in the thumb zone at the bottom of a phone screen, with room for the home indicator
+   - nothing important is hidden behind hover, no motion beyond what the page already has. */
+body.hs-e :focus-visible{outline:3px solid var(--gold);outline-offset:3px;border-radius:6px}
+
+/* ---- top bar: always solid, links in plain sight ---- */
+body.hs-e .nav{background:rgba(11,12,16,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.1)}
+body.hs-e .nav .wrap{padding-block:10px}
+body.hs-e .nav .logo .lg{height:42px}
+body.hs-e .lang{border:1px solid rgba(255,255,255,.28);background:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+body.hs-e .lang a{padding:9px 13px;font-size:13px}
+body.hs-e .nav .right .ob{border-radius:8px;padding:10px 16px;font-size:12px;letter-spacing:.14em;border-color:var(--gold);color:var(--gold);background:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+body.hs-e .nav .right .ob:hover{background:var(--gold);color:#1b1500}
+@media (min-width:1101px){
+  body.hs-e .nav .wrap{max-width:none;padding-inline:clamp(24px,6vw,120px);gap:28px}
+  body.hs-e .nav .menu{margin:0 0 0 24px;padding:0;gap:2px;background:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none}
+  body.hs-e .nav .menu a{padding:12px 16px;font-size:14px;letter-spacing:.16em;color:#e8eaed;border-radius:0;background:none}
+  body.hs-e .nav .menu a::after{left:16px;right:16px;bottom:5px;height:3px}
+  body.hs-e .nav .menu a:hover{color:#fff}
+  body.hs-e .nav .menu a.act{color:#fff;background:none}
+  body.hs-e .nav .menu a.act::after{transform:scaleX(1)}
+}
+/* on phones the menu button carries a word, not just three lines */
+@media (max-width:1100px){
+  body.hs-e .burger{width:104px;height:44px;border:1px solid rgba(255,255,255,.32);border-radius:999px}
+  body.hs-e .burger span{left:16px;right:auto;width:18px}
+  body.hs-e .burger::after{position:absolute;left:42px;top:50%;transform:translateY(-50%);font-family:var(--f-ui);font-weight:700;font-size:13px;letter-spacing:.14em;color:#fff}
+  body.hs-e:lang(th) .burger::after{content:"เมนู";font-size:15px;letter-spacing:.04em}
+  body.hs-e:lang(en) .burger::after{content:"MENU"}
+  body.hs-e .burger{width:88px}
+  body.hs-e .burger::after{left:40px}
+  body.hs-e .nav .wrap{gap:10px;padding-inline:14px}
+  body.hs-e .nav .right{gap:8px}
+  body.hs-e .lang a{padding:9px 10px;font-size:12px}
+}
+
+/* ---- hero: the page content becomes one column, vertically centred on wide screens ---- */
+body.hs-e .hero .shade{background:linear-gradient(90deg,rgba(11,12,16,.92) 0%,rgba(11,12,16,.8) 28%,rgba(11,12,16,.32) 52%,rgba(11,12,16,0) 68%),linear-gradient(0deg,rgba(11,12,16,.7),rgba(11,12,16,0) 34%),linear-gradient(180deg,rgba(11,12,16,.55),rgba(11,12,16,0) 20%)}
+body.hs-e .hero{display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
+body.hs-e .hero .hwrap{align-self:stretch;max-width:none;padding-block:104px 0;padding-inline:clamp(24px,6vw,120px)}
+body.hs-e .hero .hl{border:0;padding:0;text-align:left;max-width:620px}
+body.hs-e .hero .htitle{font-size:clamp(44px,min(6vw,10vh),88px)}
+body.hs-e .hero p.lead{text-align:left;margin:16px 0 0;max-width:46ch;font-size:clamp(16px,1.25vw,19px);line-height:1.6;color:#fff;text-shadow:0 1px 10px rgba(0,0,0,.7)}
+/* the actions follow the text in the same column instead of sitting in a bar at the bottom */
+body.hs-e .dock{position:static;align-self:stretch;margin:0;background:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none}
+body.hs-e .hero .dock .dk{display:flex;flex-direction:column;align-items:stretch;gap:18px;width:min(620px,100%);max-width:none;margin:0;padding:26px clamp(24px,6vw,120px) clamp(28px,6vh,64px);box-sizing:content-box}
+body.hs-e .dk-st{text-align:left}
+body.hs-e .dk-st b{font-size:22px;letter-spacing:.06em}
+body.hs-e .dk-st em{font-size:12px;margin-left:10px;color:#c9cdd3}
+body.hs-e .dk-bar{height:6px;margin:10px 0 8px;max-width:none}
+body.hs-e .dk-st small{display:block;font-size:14px;color:#d5d8dd;line-height:1.5}
+body.hs-e .dk-cta{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+body.hs-e .dk-cta .btn{min-height:56px;min-width:0;display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 24px;border-radius:14px;font-size:18px}
+body.hs-e .dk-plat{display:flex;flex-direction:column;align-items:stretch}
+body.hs-e .dk-plat .plat-h{margin:0 0 10px;font-size:12px;letter-spacing:.2em;color:#c9cdd3;text-align:left}
+body.hs-e .hero .stores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row;gap:10px;margin:0}
+body.hs-e .store{min-height:52px;flex-direction:row;justify-content:flex-start;text-align:left;gap:12px;padding:8px 14px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.24)}
+body.hs-e .hero .dk-plat .stores{justify-content:flex-start}
+body.hs-e .hero .dk-plat .store{width:auto;height:auto;justify-content:flex-start}
+body.hs-e .hero .dk-plat .store div{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal}
+body.hs-e .store svg{width:24px;height:24px}
+body.hs-e .store small{display:block;font-size:11px;color:#c9cdd3}
+body.hs-e .store b{font-size:15px}
+body.hs-e .store em{right:8px;top:-9px;left:auto;transform:none}
+/* the social buttons and the sound button share the full width in equal parts, so their edges line up with the store buttons above */
+body.hs-e .dk-soc{display:grid;grid-template-columns:repeat(auto-fit,minmax(44px,1fr));gap:8px;margin-top:2px;width:100%}
+body.hs-e .dk-soc .social{display:contents}
+body.hs-e .dk-soc .social span{display:none}
+body.hs-e .social .so,body.hs-e .snd{width:auto;height:48px;border-radius:12px}
+
+/* ---- phones: bottom-aligned so the register button is under the thumb ---- */
+@media (max-width:900px){
+  body.hs-e .hero{justify-content:flex-end}
+  body.hs-e .hero .shade{background:linear-gradient(0deg,#0b0c10 14%,rgba(11,12,16,.82) 44%,rgba(11,12,16,.2) 72%),linear-gradient(180deg,rgba(11,12,16,.7),rgba(11,12,16,0) 22%)}
+  body.hs-e .hero .hwrap{padding:96px 18px 0}
+  body.hs-e .hero .htitle{font-size:clamp(42px,12.5vw,60px)}
+  body.hs-e .hero p.lead{font-size:16px;max-width:none}
+  body.hs-e .hero .dock .dk{width:auto;padding:20px 18px calc(22px + env(safe-area-inset-bottom,0px));box-sizing:border-box;gap:16px}
+  body.hs-e .dk-cta .btn{order:0}
+}

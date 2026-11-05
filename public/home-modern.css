@@ -43,6 +43,10 @@ body.hs-b .acct-link{border:0;border-bottom:2px solid var(--red-2);padding:8px 4
   body.hs-b .hero .dk-plat .stores{gap:10px}
   body.hs-b .hero .dk-plat .store{padding:10px 16px 10px 12px;border-radius:14px}
   body.hs-b .hero .dk-plat .store svg{width:24px;height:24px}
+  /* small laptops: the classic layout turns store buttons into icon tiles; here there is room for the names */
+  body.hs-b .hero .dk-plat .stores{justify-content:flex-start}
+  body.hs-b .hero .dk-plat .store{width:auto;height:auto;justify-content:flex-start}
+  body.hs-b .hero .dk-plat .store div{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal}
   body.hs-b .hero .dk-plat .store small{display:block;font-size:10px}
   body.hs-b .hero .dk-plat .store b{font-size:15px}
   body.hs-b .dk-soc{justify-content:flex-start;margin-top:12px}

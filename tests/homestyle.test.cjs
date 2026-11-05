@@ -9,7 +9,7 @@ const tmp = fs.mkdtempSync(path.join(process.env.RCM_TEST_TMP || os.tmpdir(), 'r
 for (const f of ['server.js', 'lib', 'admin', 'views']) { try { fs.cpSync(path.join(source, f), path.join(tmp, f), { recursive: true }); } catch (e) {} }
 fs.mkdirSync(path.join(tmp, 'public', 'uploads'), { recursive: true }); fs.mkdirSync(path.join(tmp, 'public', 'img'), { recursive: true });
 fs.writeFileSync(path.join(tmp, 'public', 'style.css'), 'body{}');
-for (const f of ['consent.js', 'home-modern.css', 'home-console.css', 'home-hud.css']) fs.copyFileSync(path.join(source, 'public', f), path.join(tmp, 'public', f));
+for (const f of ['consent.js', 'home-modern.css', 'home-console.css', 'home-hud.css', 'home-focus.css']) fs.copyFileSync(path.join(source, 'public', f), path.join(tmp, 'public', f));
 fs.mkdirSync(path.join(tmp, 'data'));
 const seed = require(path.join(tmp, 'lib/seed'))(); seed.site.url = '';
 fs.writeFileSync(path.join(tmp, 'data/content.json'), JSON.stringify(seed));
@@ -27,10 +27,11 @@ const api = async (p, method = 'GET', body) => {
   return { status: r.status, json: await r.json().catch(() => null) };
 };
 const edit = async fn => { const c = (await api('content')).json; fn(c); const r = await api('content', 'PUT', c); assert.equal(r.status, 200, JSON.stringify(r.json)); return r.json; };
-const modern = h => /<body class="hs-b"/.test(h) && /home-modern\.css\?v=/.test(h) && !/home-(console|hud)\.css/.test(h);
-const hud = h => /<body class="hs-d"/.test(h) && /home-hud\.css\?v=/.test(h) && !/home-(modern|console)\.css/.test(h);
-const consoleStyle = h => /<body class="hs-c"/.test(h) && /home-console\.css\?v=/.test(h) && !/home-(modern|hud)\.css/.test(h);
-const classic = h => !/class="hs-[bcd]"/.test(h) && !/home-(modern|console|hud)\.css/.test(h);
+const modern = h => /<body class="hs-b"/.test(h) && /home-modern\.css\?v=/.test(h) && !/home-(console|hud|focus)\.css/.test(h);
+const hud = h => /<body class="hs-d"/.test(h) && /home-hud\.css\?v=/.test(h) && !/home-(modern|console|focus)\.css/.test(h);
+const focus = h => /<body class="hs-e"/.test(h) && /home-focus\.css\?v=/.test(h) && !/home-(modern|console|hud)\.css/.test(h);
+const consoleStyle = h => /<body class="hs-c"/.test(h) && /home-console\.css\?v=/.test(h) && !/home-(modern|hud|focus)\.css/.test(h);
+const classic = h => !/class="hs-[bcde]"/.test(h) && !/home-(modern|console|hud|focus)\.css/.test(h);
 
 test('home page style', async t => {
   for (let i = 0; i < 80; i++) { try { await fetch(base + '/robots.txt'); break; } catch { await wait(50); } }
@@ -68,6 +69,17 @@ test('home page style', async t => {
     const menu = /<nav class="menu"[\s\S]*?<\/nav>/.exec((await get('/?home=hud')).html)[0];
     assert.equal((menu.match(/<a /g) || []).length, 5);
   });
+  await t.test('focus: its own stylesheet and body class, Thai and English home page only', async () => {
+    await edit(c => { c.site.homeStyle = 'focus'; });
+    assert.ok(focus((await get('/')).html)); assert.ok(focus((await get('/en')).html));
+    for (const p of ['/rewards', '/news', '/faq', '/privacy']) assert.ok(classic((await get(p)).html), p + ' is unchanged');
+    assert.ok(hud((await get('/?home=hud')).html)); assert.ok(classic((await get('/?home=classic')).html));
+    await edit(c => { c.site.homeStyle = 'classic'; });
+    assert.ok(focus((await get('/?home=focus')).html), 'focus preview without saving');
+    const h = (await get('/?home=focus')).html;
+    assert.match(h, /<nav class="menu"/, 'the menu links are real links in the page');
+    assert.match(h, /<button class="burger"[^>]*aria-label="[^"]+"/, 'the menu button keeps its accessible name');
+  });
   await t.test('preview links work without saving, and cannot be abused', async () => {
     assert.ok(classic((await get('/?home=classic')).html), 'classic preview while modern is saved');
     await edit(c => { c.site.homeStyle = 'classic'; });
@@ -102,8 +114,27 @@ test('home page style', async t => {
     t0 = tiles((await get('/')).html); assert.match(t0, /data-video="[^"]+\.mp4"/); assert.match(t0, /data-image="[^"]+"/);
     await edit(c => { c.home.heroVideoOn = true; c.home.heroImageOn = true; });
   });
+  await t.test('layout guards that browsers cannot be asked about here: store names stay visible on small laptops, panels stretch their children', async () => {
+    // the classic layout turns store buttons into 48px icon tiles between 901px and 1180px; every other style must undo that
+    for (const [file, cls] of [['home-modern.css', 'hs-b'], ['home-console.css', 'hs-c'], ['home-hud.css', 'hs-d'], ['home-focus.css', 'hs-e']]) {
+      const css = fs.readFileSync(path.join(source, 'public', file), 'utf8').replace(/\s+/g, ' ');
+      assert.ok(css.includes('body.' + cls + ' .hero .dk-plat .store div{position:static;'), file + ' brings the store names back');
+      assert.ok(css.includes('body.' + cls + ' .hero .dk-plat .store{width:auto;height:auto;'), file + ' undoes the 48px icon tiles');
+    }
+    // a column of blocks must stretch to one width (a leftover align-items:center once left them different widths and off-centre)
+    const hudCss = fs.readFileSync(path.join(source, 'public/home-hud.css'), 'utf8').replace(/\s+/g, ' ');
+    assert.match(hudCss, /body\.hs-d \.hero \.dock \.dk\{display:flex;flex-direction:column;align-items:stretch;/);
+    const focusCss = fs.readFileSync(path.join(source, 'public/home-focus.css'), 'utf8').replace(/\s+/g, ' ');
+    assert.match(focusCss, /body\.hs-e \.hero \.dock \.dk\{display:flex;flex-direction:column;align-items:stretch;/);
+    // the classic phone layout centres the intro text; each style that left-aligns its headline must left-align it too
+    for (const [file, cls] of [['home-modern.css', 'hs-b'], ['home-console.css', 'hs-c'], ['home-hud.css', 'hs-d'], ['home-focus.css', 'hs-e']]) {
+      const css = fs.readFileSync(path.join(source, 'public', file), 'utf8').replace(/\s+/g, ' ');
+      assert.match(css, new RegExp('body\.' + cls + ' \.hero p\.lead\{[^}]*text-align:left'), file + ': intro text is left-aligned like the headline');
+    }
+    assert.match(focusCss, /body\.hs-e \.dk-soc\{display:grid;grid-template-columns:repeat\(auto-fit,minmax\(44px,1fr\)\)/, 'social buttons share the full width');
+  });
   await t.test('the stylesheets are served and every rule is scoped to the home body class', async () => {
-   for (const [file, cls] of [['home-modern.css', 'hs-b'], ['home-console.css', 'hs-c'], ['home-hud.css', 'hs-d']]) {
+   for (const [file, cls] of [['home-modern.css', 'hs-b'], ['home-console.css', 'hs-c'], ['home-hud.css', 'hs-d'], ['home-focus.css', 'hs-e']]) {
     const css = await get('/' + file); assert.equal(css.status, 200); assert.match(css.type, /text\/css/);
     const rules = css.html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@keyframes\s+[\w-]+\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '').replace(/@property[^{]*\{[^}]*\}/g, '').replace(/@media[^{]*\{/g, '').split('{').slice(0, -1).map(x => x.split('}').pop().trim()).filter(Boolean);
     for (const sel of rules) for (const one of sel.split(',')) assert.match(one.trim(), new RegExp('^body\\.' + cls + '\\b'), file + ': every rule starts with body.' + cls + ': ' + one.trim());
