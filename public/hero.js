@@ -64,6 +64,7 @@ const SFX=(function(){
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const small=matchMedia('(max-width: 900px)').matches;
   const POSX=small?.74:.5;
+  const plain=box.dataset.tiles==='0';
   // background video (720p on phones); the key art is the poster and the fallback
   const v=document.createElement('video');v.className='bgv';v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('muted','');
   // file paths come from the admin (home > hero background) via data attributes
@@ -98,7 +99,7 @@ const SFX=(function(){
     }
     for(let r=1;r<rows;r++)for(let c=1;c<cols;c++){const d=document.createElement('span');d.className='dot';d.style.left=(c*tw)+'px';d.style.top=(r*th)+'px';box.appendChild(d)}
     // tiles wave in when the page is revealed: right away, or after the loading screen opens
-    if(!built&&!reduce){if(document.documentElement.classList.contains('ldr-on'))document.addEventListener('rc-loaded',()=>setTimeout(intro,250),{once:true});else setTimeout(intro,400)}
+    if(!built&&!reduce&&!plain){if(document.documentElement.classList.contains('ldr-on'))document.addEventListener('rc-loaded',()=>setTimeout(intro,250),{once:true});else setTimeout(intro,400)}
     built=true;
   }
   // copy the part of the current video frame (or the still) that sits under this tile
@@ -113,6 +114,7 @@ const SFX=(function(){
   }
   const EASE='cubic-bezier(.22,.61,.2,1)';
   function flip(i,dx,dy,delay){
+    if(plain)return; // effect switched off in the admin: the grid lines stay, the tiles never flip
     const o=tiles[i];if(!o||o.busy)return;o.busy=true;delay=delay||0;
     const horiz=Math.abs(dx)>=Math.abs(dy), sgn=(horiz?dx:-dy)>=0?1:-1, ax=horiz?'rotateY':'rotateX';
     const dur=900+Math.random()*140;

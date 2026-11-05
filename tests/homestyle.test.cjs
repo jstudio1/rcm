@@ -122,6 +122,17 @@ test('home page style', async t => {
     await edit(c => { c.home.soundOn = true; });
     assert.match((await get('/')).html, /class="snd"/);
   });
+  await t.test('hero jigsaw effect can be switched off: grid stays, no flipping, no sound button', async () => {
+    const tiles = html => /<div class="tiles"[^>]*>/.exec(html)[0];
+    let h = (await get('/')).html; assert.equal(/data-tiles="0"/.test(tiles(h)), false); assert.match(h, /class="snd"/);
+    await edit(c => { c.home.heroTilesOn = false; });
+    h = (await get('/')).html; assert.match(tiles(h), /data-tiles="0"/); assert.match(tiles(h), /data-video="[^"]+\.mp4"/, 'the video is still the background (the grid lines stay: the script still builds them)'); assert.equal(/class="snd"/.test(h), false, 'no jigsaw, no flip sounds');
+    assert.match(tiles((await get('/en')).html), /data-tiles="0"/);
+    assert.equal((await api('content')).json.home.heroTilesOn, 'false', 'saved');
+    const f = path.join(tmp, 'data/content.json'), c = JSON.parse(fs.readFileSync(f, 'utf8')); delete c.home.heroTilesOn; fs.writeFileSync(f, JSON.stringify(c)); await wait(1200);
+    assert.equal(/data-tiles="0"/.test(tiles((await get('/')).html)), false, 'sites saved before the switch keep the jigsaw');
+    await edit(c => { c.home.heroTilesOn = true; });
+  });
   await t.test('home slider: sits above Gameplay, follows the admin settings, English twins, safe links', async () => {
     const sec = html => /<section class="sec sl" id="slides"[\s\S]*?<\/section>/.exec(html);
     let h = (await get('/')).html, m = sec(h);

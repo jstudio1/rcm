@@ -39,14 +39,18 @@
     nextText(nextIdx < 0 ? 0 : goals[nextIdx] - count);
   }
   function show(n) { if (numEl) { numEl.textContent = fmt(n); numEl.setAttribute('data-n', String(n)); } }
+  var run = 0; // each count-up gets a number; a newer one stops the older one, so two never fight over the figure
   function countTo(to) {
+    var me = ++run;
     if (reduce || !numEl || Math.abs(to - shown) < 2) { shown = to; show(to); return; }
     var from = shown, t0 = null;
     (function step(t) {
+      if (me !== run) return;
       if (t0 === null) t0 = t;
       var k = Math.min(1, (t - t0) / 900), e = 1 - Math.pow(1 - k, 3);
-      show(Math.round(from + (to - from) * e));
-      if (k < 1) requestAnimationFrame(step); else shown = to;
+      shown = Math.round(from + (to - from) * e);
+      show(shown);
+      if (k < 1) requestAnimationFrame(step); else { shown = to; show(to); }
     })(performance.now());
   }
 
@@ -60,9 +64,11 @@
   });
 
   // count up when the section scrolls into view
+  // `latest` is the newest number known (the server's at first, then the game's); the count-up shows whatever is newest when the visitor gets there
+  var latest = shown, seen = true;
   if ('IntersectionObserver' in window && !reduce && numEl) {
-    var final = shown; show(0); shown = 0;
-    new IntersectionObserver(function (es, ob) { if (es[0].isIntersecting) { ob.disconnect(); countTo(final); } }, { threshold: 0.3 }).observe(root);
+    seen = false; show(0); shown = 0;
+    new IntersectionObserver(function (es, ob) { if (es[0].isIntersecting) { ob.disconnect(); seen = true; countTo(latest); } }, { threshold: 0.3 }).observe(root);
   }
 
   // live number from the game (API mode)
@@ -76,7 +82,7 @@
         .then(function (r) { if (!r.ok) throw new Error('bad status'); return r.json(); })
         .then(function (d) {
           var n = Number(d && (d.count != null ? d.count : d.total));
-          if (isFinite(n) && n >= 0) { n = Math.floor(n); apply(n); countTo(n); }
+          if (isFinite(n) && n >= 0) { n = Math.floor(n); latest = n; apply(n); if (seen) countTo(n); }
         })
         .catch(function () {})
         .then(function () { if (timer) clearTimeout(timer); busy = false; });
