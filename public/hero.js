@@ -9,6 +9,8 @@ const nav=$('#nav');
    choice is remembered. Each flip = a short air "whoosh" + a soft "clack" as it lands,
    panned left/right by where the tile sits, with small random pitch so it never sounds canned. */
 const SFX=(function(){
+  const tl=document.getElementById('tiles');
+  if(tl&&tl.dataset.sfx==='0')return {flip(){}}; // sound switched off in the admin: no engine, no button
   const AC=window.AudioContext||window.webkitAudioContext;
   let on=true,ctx=null,master=null,noise=null,last=0;
   try{on=localStorage.getItem('rc-sfx')!=='off'}catch(e){}

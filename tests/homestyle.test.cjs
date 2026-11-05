@@ -114,6 +114,14 @@ test('home page style', async t => {
     t0 = tiles((await get('/')).html); assert.match(t0, /data-video="[^"]+\.mp4"/); assert.match(t0, /data-image="[^"]+"/);
     await edit(c => { c.home.heroVideoOn = true; c.home.heroImageOn = true; });
   });
+  await t.test('sound effects can be switched off: no speaker button, the page tells hero.js', async () => {
+    let h = (await get('/')).html; assert.match(h, /class="snd"/); assert.equal(/data-sfx="0"/.test(h), false);
+    await edit(c => { c.home.soundOn = false; });
+    h = (await get('/')).html; assert.equal(/class="snd"/.test(h), false); assert.match(/<div class="tiles"[^>]*>/.exec(h)[0], /data-sfx="0"/);
+    assert.equal(/class="snd"/.test((await get('/en')).html), false);
+    await edit(c => { c.home.soundOn = true; });
+    assert.match((await get('/')).html, /class="snd"/);
+  });
   await t.test('layout guards that browsers cannot be asked about here: store names stay visible on small laptops, panels stretch their children', async () => {
     // the classic layout turns store buttons into 48px icon tiles between 901px and 1180px; every other style must undo that
     for (const [file, cls] of [['home-modern.css', 'hs-b'], ['home-console.css', 'hs-c'], ['home-hud.css', 'hs-d'], ['home-focus.css', 'hs-e']]) {

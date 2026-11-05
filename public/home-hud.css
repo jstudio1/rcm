@@ -6,13 +6,16 @@
    people who asked their device for less of it. */
 @property --hud-a{syntax:'<angle>';inherits:false;initial-value:0deg}
 @keyframes hud-spin{to{--hud-a:360deg}}
-@keyframes hud-seg{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+/* loading bar: the slanted segments light up one by one, hold full for a moment, then start over */
+@keyframes hud-load{0%{width:0;opacity:1}78%{width:100%;opacity:1}92%{width:100%;opacity:1}100%{width:100%;opacity:0}}
 @keyframes hud-pulse{0%,100%{opacity:.55}50%{opacity:1}}
 
 /* ---- header: logo and language only (the menu moved to the tab bar) ---- */
 body.hs-d{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
 body.hs-d .burger,body.hs-d .drawer{display:none!important}
-body.hs-d .nav .right .ob,body.hs-d .nav .right .acct-link{display:none}
+body.hs-d .nav .right .ob{display:none}
+body.hs-d .nav .right .acct-link{display:inline-flex;align-items:center;margin:0 2px 0 0;padding:7px 11px;font-size:13px;letter-spacing:.06em;white-space:nowrap;flex:none;border:0;background:rgba(255,255,255,.08);box-shadow:inset 0 -2px 0 var(--red-2);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+body.hs-d .nav .right .acct-link:hover{background:rgba(255,42,42,.2)}
 body.hs-d .nav .wrap{max-width:none;padding-inline:clamp(16px,3vw,48px)}
 body.hs-d .nav .right{margin-left:auto}
 body.hs-d .nav.solid{background:rgba(10,11,14,.8);backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -58,7 +61,7 @@ body.hs-d .hero .dock .dk{display:flex;flex-direction:column;align-items:stretch
 body.hs-d .dk-st{text-align:left}
 body.hs-d .dk-st b{font-size:26px}
 body.hs-d .dk-bar{height:10px;border-radius:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.13) 0 10px,transparent 10px 14px);transform:skewX(-20deg);margin:10px 0 8px;max-width:none}
-body.hs-d .dk-bar i{width:34%;border-radius:0;background:repeating-linear-gradient(90deg,var(--red-2) 0 10px,transparent 10px 14px);animation:hud-seg 2.2s linear infinite}
+body.hs-d .dk-bar i{width:0;border-radius:0;background:repeating-linear-gradient(90deg,var(--red-2) 0 10px,transparent 10px 14px);box-shadow:0 0 10px rgba(255,42,42,.6);animation:hud-load 3.6s steps(22,end) infinite}
 body.hs-d .dk-cta{display:flex;flex-direction:column;align-items:stretch}
 body.hs-d .dk-cta .btn{border:2px solid transparent;border-radius:0;min-width:0;padding:17px 24px;font-size:17px;letter-spacing:.02em;
   background:linear-gradient(180deg,#e10600,#9a0000) padding-box,conic-gradient(from var(--hud-a),#ff2a2a,#ffc414,#ff2a2a 55%,#ff2a2a) border-box;animation:hud-spin 3.2s linear infinite;
@@ -72,8 +75,9 @@ body.hs-d .store svg{width:22px;height:22px}
 body.hs-d .store small{display:block;font-size:9px}
 body.hs-d .store b{font-size:14px}
 body.hs-d .hero .dk-plat .store em,body.hs-d .store em{right:6px;top:4px;left:auto;transform:none;font-size:9px;padding:1px 5px}
-body.hs-d .dk-soc{justify-content:space-between;margin-top:12px}
-body.hs-d .dk-soc .social{justify-content:flex-start}
+/* social icons and the sound button form one centred row */
+body.hs-d .dk-soc{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:12px}
+body.hs-d .dk-soc .social{justify-content:center;margin:0}
 body.hs-d .social .so,body.hs-d .snd{border-radius:0;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
 
 /* ---- wide screens: the tab bar floats in the middle, the HUD panel is a column on the right ---- */
@@ -92,12 +96,16 @@ body.hs-d .social .so,body.hs-d .snd{border-radius:0;clip-path:polygon(8px 0,100
   body.hs-d .dock{position:absolute;right:clamp(24px,4vw,56px);left:auto;bottom:clamp(96px,14vh,130px);width:min(390px,33vw);margin:0}
   body.hs-d .hero .dock .dk{padding:24px 22px 20px}
 }
+@media (max-width:480px){
+  body.hs-d .nav .logo b{font-size:19px}
+  body.hs-d .nav .right .acct-link{padding:6px 9px;font-size:12px}
+  body.hs-d .lang a{padding:8px 6px}
+}
 @media (max-width:900px){
   body.hs-d .hero .hwrap{padding-block:110px 16px}
   body.hs-d .hero .htitle{font-size:clamp(44px,13vw,64px)}
   body.hs-d .hero p.lead{font-size:14px;max-width:none}
 }
 @media (prefers-reduced-motion:reduce){
-  body.hs-d .dk-cta .btn,body.hs-d .dk-bar i,body.hs-d .dk-plat .plat-h{animation:none}
-  body.hs-d .dk-bar i{width:100%;opacity:.4}
+  body.hs-d .dk-cta .btn,body.hs-d .dk-plat .plat-h{animation:none}
 }
