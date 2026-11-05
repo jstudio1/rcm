@@ -229,7 +229,7 @@
       var n = input({ type: 'text', maxlength: 40, placeholder: 'ชื่อไอเทม', 'aria-label': 'ชื่อไอเทม' }, nm || ''), q = input({ type: 'number', min: 1, step: 1, inputmode: 'numeric', 'aria-label': 'จำนวน' }, qty || 100);
       var rm = h('button', { type: 'button', class: 'ghost sm', 'aria-label': 'ลบรางวัลนี้', onclick: function () { if (rows.length > 1) { rows.splice(rows.indexOf(o), 1); row.remove(); } } }, 'ลบ');
       var row = h('div', { class: 'gd-rw' }, type, n, q, rm), o = { type: type, name: n, qty: q };
-      var sync = function () { n.style.visibility = type.value === 'item' ? 'visible' : 'hidden'; }; type.addEventListener('change', sync); sync();
+      var sync = function () { n.style.display = type.value === 'item' ? '' : 'none'; }; type.addEventListener('change', sync); sync();
       rows.push(o); rwHost.append(row);
     }
     addReward('cash', '', 1000);

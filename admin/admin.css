@@ -795,3 +795,41 @@ input::placeholder,textarea::placeholder{color:rgba(255,255,255,.3)}
 .a-main>*{animation:a-in .38s var(--ease) both}
 .a-main>*:nth-child(2){animation-delay:.04s}.a-main>*:nth-child(3){animation-delay:.08s}.a-main>*:nth-child(n+4){animation-delay:.12s}
 @media(prefers-reduced-motion:reduce){.a-main>*{animation:none}.a-chk input[type=checkbox],.a-chk input[type=checkbox]::before{transition:none}}
+
+
+/* ---- form controls: one height, one font, one look (inputs, selects, dates, numbers) ---- */
+.a-main input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=range]),.a-dlg input:not([type=checkbox]):not([type=radio]):not([type=hidden]),.a-main select,.a-dlg select{box-sizing:border-box;min-height:46px;padding:11px 14px;font-family:var(--f-body);font-size:15px;font-weight:400;line-height:1.35}
+.a-main select,.a-dlg select{appearance:none;-webkit-appearance:none;padding-right:40px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ea3ab' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:16px}
+.a-main select option,.a-dlg select option{background:#14151a;color:#fff}
+.a-main textarea,.a-dlg textarea{padding:12px 14px;line-height:1.55}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=date]::-webkit-calendar-picker-indicator{opacity:.55;cursor:pointer;filter:invert(1)}
+input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:1}
+.a-main .ghost.sm,.a-dlg .ghost.sm{min-height:36px}
+/* game forms: fields line up on a clean two-column grid, labels and hints share one rhythm */
+.gd-form{gap:18px}
+.gd-grid{align-items:start;gap:18px 20px}
+.gd-form .a-f{gap:8px}
+.gd-form .a-f>span:first-child{font-size:14px;color:#e6e8ea;font-weight:400}
+.gd-form .a-f .h{font-size:12.5px;line-height:1.5}
+.gd-full{justify-items:start}
+.gd-full .a-err{justify-self:stretch;min-height:0;text-align:left}
+.gd-full .a-err:empty{display:none}
+.gd-full .btn{min-width:210px;padding:13px 28px}
+.gd-sub{font-family:var(--f-ui);font-weight:600;font-size:15px;letter-spacing:0;color:#fff}
+/* reward rows (type, item name, quantity, remove) */
+.gd-rws{gap:10px;justify-self:stretch;width:100%}
+.gd-rw{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--ln);border-radius:14px;background:rgba(255,255,255,.025)}
+.gd-rw select{flex:0 0 170px;width:auto}
+.gd-rw input[type=text]{flex:2 1 0;min-width:0}
+.gd-rw input[type=number]{flex:1 1 0;min-width:120px}
+.gd-rw>.ghost{flex:none}
+@media (max-width:900px){.gd-rw{flex-wrap:wrap}.gd-rw select{flex:1 1 140px}.gd-rw input[type=text]{flex:1 1 100%;order:3}.gd-rw input[type=number]{flex:1 1 120px}}
+/* generated codes: easy to read and copy */
+.gd-codes{padding:14px;border-radius:14px;line-height:1.7;letter-spacing:.04em;color:#f1f3f5;min-height:120px}
+.gd-acts .btn.sm,.gd-acts .ghost.sm{min-height:38px}
+.gd-dlg .gd-form{gap:16px}
+.gd .an-bar>input[type=search],.gd .an-bar>input[type=text]{min-height:46px}
+/* the chevron must survive the "background:" shorthand used by the older per-page select rules */
+.a-main select,.a-dlg select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ea3ab' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px!important}
