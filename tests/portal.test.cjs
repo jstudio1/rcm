@@ -10,6 +10,7 @@ for (const f of ['server.js', 'lib', 'admin', 'views']) { try { fs.cpSync(path.j
 fs.mkdirSync(path.join(tmp, 'public', 'uploads'), { recursive: true }); fs.mkdirSync(path.join(tmp, 'public', 'img'), { recursive: true });
 fs.writeFileSync(path.join(tmp, 'public', 'style.css'), 'body{}');
 for (const f of ['consent.js', 'account.js', 'account.css']) fs.copyFileSync(path.join(source, 'public', f), path.join(tmp, 'public', f));
+fs.cpSync(path.join(source, 'public', 'img', 'pay'), path.join(tmp, 'public', 'img', 'pay'), { recursive: true });
 fs.mkdirSync(path.join(tmp, 'data'));
 const seed = require(path.join(tmp, 'lib/seed'))(); seed.site.url = '';
 fs.writeFileSync(path.join(tmp, 'data/content.json'), JSON.stringify(seed));
@@ -134,11 +135,22 @@ test('buttons and member portal', async t => {
     });
     const m2 = cfgOf((await get('/account/topup')).html).topup.methods;
     assert.equal(m2.length, 4); assert.equal(m2.some(x => x.name === 'Razer Gold'), false);
-    assert.equal(m2[0].mode, 'code'); assert.equal(m2[0].logo, '', 'unsafe logo address dropped'); assert.deepEqual(m2[0].packages, [{ price: '1,000', cash: '9', point: '5' }], 'numbers only; empty price row dropped');
+    assert.equal(m2[0].mode, 'code'); assert.equal(m2[0].logo, '/img/pay/truemoney-cashcard.webp', 'unsafe logo address dropped, the standard logo of the channel is used instead'); assert.deepEqual(m2[0].packages, [{ price: '1,000', cash: '9', point: '5' }], 'numbers only; empty price row dropped');
     // switched off: no menu entry, no page
     await edit(c => { c.portal.topupEnabled = false; });
     assert.equal((await get('/account/topup')).status, 404); assert.equal((await get('/account')).html.includes('href="/account/topup"'), false);
     await edit(c => { c.portal.topupEnabled = true; c.topup.methods.forEach(x => { x.enabled = true; }); c.portal.cashName = 'แคช'; c.portal.pointName = 'แต้มพ้อย'; c.portal.memberLabel = 'RAYCITY-M MEMBER'; });
+  });
+
+  await t.test('top-up channels show their standard logos, a custom logo wins, and the files are served', async () => {
+    const want = { 'truemoney-cashcard': 'truemoney-cashcard', 'razer-gold': 'razer-gold', promptpay: 'promptpay', alipay: 'alipay', 'truemoney-wallet': 'truemoney-wallet' };
+    const m = cfgOf((await get('/account/topup')).html).topup.methods;
+    for (const x of m) assert.equal(x.logo, '/img/pay/' + want[x.id] + '.webp', x.id + ' uses its standard logo');
+    for (const id of Object.keys(want)) { const r = await fetch(base + '/img/pay/' + id + '.webp'); assert.equal(r.status, 200, id); assert.match(r.headers.get('content-type'), /image\/webp/); assert.ok((await r.arrayBuffer()).byteLength > 1000); }
+    await edit(c => { c.topup.methods[2].logo = 'https://cdn.example.com/pp.png'; c.topup.methods[3].logo = '//evil.example.com/x.png'; });
+    const m2 = cfgOf((await get('/account/topup')).html).topup.methods;
+    assert.equal(m2[2].logo, 'https://cdn.example.com/pp.png', 'a logo set in the admin wins'); assert.equal(m2[3].logo, '/img/pay/alipay.webp', 'a protocol-relative address is not trusted');
+    await edit(c => { c.topup.methods[2].logo = ''; c.topup.methods[3].logo = ''; });
   });
 
   await t.test('script: top-up and member card are built with DOM nodes; only https goes to the payment redirect', () => {

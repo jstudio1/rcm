@@ -21,3 +21,6 @@ data/*.tmp
 data/uploads-quota.lock
 data/visits/
 data/analytics.salt
+
+# Game operations mockup state (what admins did in the sample back office)
+data/gameops.json

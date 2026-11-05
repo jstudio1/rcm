@@ -965,6 +965,8 @@
       go && !ok ? h('button', { type: 'button', class: 'ghost sm', onclick: () => open(go) }, 'ไปแก้') : null))))];
   }
   const on = v => v === true || v === 'true' || v === '1';
+  // standard logos of the top-up channels (public/img/pay), used when a channel has no logo of its own
+  const PAY_LOGOS = { 'truemoney-cashcard': '/img/pay/truemoney-cashcard.webp', 'razer-gold': '/img/pay/razer-gold.webp', promptpay: '/img/pay/promptpay.webp', alipay: '/img/pay/alipay.webp', 'truemoney-wallet': '/img/pay/truemoney-wallet.webp' };
   // ---------- SEO checklist: things a person can fix in the admin that decide how Google sees the site ----------
   function seoView() {
     const T = v => String(v || '').trim(), P = C.pages;
@@ -1412,7 +1414,7 @@
               two(field(m, 'name', 'ชื่อช่องทาง (แสดงบนแผ่น)', { onchange: u }), check(m, 'enabled', 'แสดงช่องทางนี้')),
               field(m, 'title', 'หัวข้อในหน้า (ชื่อเต็ม)', { ph: () => m.name }),
               field(m, 'mode', 'รูปแบบการเติม', { type: 'select', options: [['code', 'กรอกรหัสบัตร (CashCard / Razer Gold)'], ['checkout', 'เลือกแพ็กเกจแล้วชำระเงิน (PromptPay / Alipay / Wallet)']] }),
-              field(m, 'logo', 'โลโก้ (ไม่บังคับ)', { type: 'image', help: 'แนะนำ PNG/WebP พื้นหลังโปร่ง กว้างราว 300px' }),
+              field(m, 'logo', 'โลโก้ (ไม่บังคับ)', { type: 'image', ph: () => PAY_LOGOS[m.id] || '', help: 'เว้นว่าง = ใช้โลโก้มาตรฐานของช่องทางนี้ (ถ้ามี) · แนะนำ PNG/WebP พื้นหลังโปร่ง กว้างราว 300px' }),
               two(field(m, 'codeLabel', 'หัวข้อช่องกรอกรหัส (โหมดรหัสบัตร)'), field(m, 'codePh', 'ข้อความในช่องกรอก')),
               field(m, 'note', 'หมายเหตุใต้ช่อง', { type: 'textarea' }),
               packagesEditor(m)] }))
@@ -1536,6 +1538,9 @@
   ];
 
   // ---------- menu structure ----------
+  // plugins (admin/gameops.js) add their own parts; they get the page helpers they need and return { parts, menu }
+  const PLUGINS = (window.RC_ADMIN_PLUGINS || []).map(f => { try { return f({ h, box, note, api, toast, nf, lineChart }); } catch (e) { console.error('admin plugin:', e); return null; } }).filter(Boolean);
+  for (const p of PLUGINS) PARTS.push(...p.parts);
   // A few menus, each with tabs. A tab can bring several of the parts above together (a list + its page settings),
   // and it keeps the id of its first part, so saving, unsaved-change marks and "go fix it" buttons keep working.
   const part = id => PARTS.find(x => x.id === id);
@@ -1557,6 +1562,10 @@
       { id: 'acct', label: 'บัญชีแอดมิน', tabs: [tab('account', 'โปรไฟล์ของฉัน'), tab('admins', 'จัดการแอดมิน')] },
       { id: 'hist', label: 'ประวัติการแก้ไข', tabs: [tab('history', 'ประวัติการแก้ไข')] }] }
   ];
+  for (const p of PLUGINS) {
+    const m = p.menu, at = MENUS.findIndex(x => x.id === m.before);
+    MENUS.splice(at < 0 ? MENUS.length : at, 0, { id: m.id, label: m.label, hint: m.hint, groups: m.groups.map(g => ({ id: g.id, label: g.label, tabs: g.tabs.map(([id, label, extra]) => tab(id, label, extra)) })) });
+  }
   // a menu with sub-menus (a dropdown) lists all of its tabs too, so saving and the "go fix it" buttons treat it like any other
   for (const m of MENUS) if (m.groups) m.tabs = m.groups.flatMap(g => g.tabs);
   const SECTIONS = MENUS.flatMap(m => m.tabs.map(t => Object.assign(t, { g: m.label, menu: m.id })));

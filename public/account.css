@@ -121,7 +121,7 @@
 .tp-tile{display:grid;place-items:center;min-height:96px;padding:12px;border:1px solid var(--ln);border-radius:14px;background:#17181c;color:#fff;font:inherit;cursor:pointer;transition:border-color .25s,background .25s}
 .tp-tile:hover{border-color:rgba(255,255,255,.28)}
 .tp-tile[aria-pressed=true]{border-color:#d9484a;background:#26272c;box-shadow:0 0 0 1px #d9484a inset}
-.tp-tile img{max-width:100%;max-height:56px;object-fit:contain}
+.tp-tile img{max-width:100%;max-height:80px;object-fit:contain}
 .tp-ic{display:grid;gap:8px;justify-items:center}
 .tp-ic svg{width:30px;height:30px;color:#ff7b74}.tp-ic b{font-size:15px}
 .tp-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);border:1px solid var(--ln);border-radius:16px;overflow:hidden;background:#1c1d22}

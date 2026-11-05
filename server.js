@@ -13,6 +13,7 @@ const analytics = require('./lib/analytics');
 const linkcheck = require('./lib/linkcheck');
 const totp = require('./lib/totp');
 const portal = require('./lib/portal');
+const gameops = require('./lib/gameops');
 const prereg = require('./lib/prereg');
 let linkCheckBusy = false, linkCheckLast = 0;
 const pending2fa = new Map(); // session token -> { secret, exp }: a two-step key that is shown but not yet confirmed
@@ -382,6 +383,15 @@ async function adminApi(req, res, url) {
       try { psi.saveSettings(b); } catch (e) { if (e.user) return json(res, 400, { error: e.message }); throw e; }
       return json(res, 200, psi.status());
     }
+    // ---- game operations back office (a mockup: dashboard, players, histories, coupons, reward codes) ----
+    if (route.startsWith('gameops/')) {
+      let body = {};
+      if (m === 'POST') { try { body = JSON.parse(await readBody(req, 20000)) || {}; } catch (e) { return json(res, 400, { error: 'ข้อมูลไม่ถูกต้อง' }); } }
+      try {
+        const out = gameops.handle(route, m, Object.fromEntries(url.searchParams), body, store.adminName(s.uid) || 'admin');
+        return out === undefined ? json(res, 404, { error: 'not found' }) : json(res, 200, out);
+      } catch (e) { if (e.user) return json(res, 400, { error: e.message }); throw e; }
+    }
     if (route === 'media' && m === 'GET') return json(res, 200, { items: listMedia() });
     // raw file body; the type comes from Content-Type and must match the file's first bytes
     if (route === 'upload' && m === 'POST') {
@@ -578,7 +588,7 @@ const server = http.createServer(async (req, res) => {
       const sec = { 'Content-Security-Policy': ADMIN_CSP, 'X-Frame-Options': 'DENY', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store', 'Cross-Origin-Resource-Policy': 'same-origin' };
       if (p.startsWith('/admin/api/')) { for (const [k, v] of Object.entries(sec)) res.setHeader(k, v); return await adminApi(req, res, url); }
       if (p === '/admin' || p === '/admin/') return send(res, 200, fs.readFileSync(path.join(ADMIN_DIR, 'index.html')), 'text/html; charset=utf-8', sec);
-      if (p === '/admin/admin.js' || p === '/admin/admin.css') return send(res, 200, fs.readFileSync(path.join(ADMIN_DIR, p.slice(7))), MIME[path.extname(p)], sec);
+      if (p === '/admin/admin.js' || p === '/admin/admin.css' || p === '/admin/gameops.js') return send(res, 200, fs.readFileSync(path.join(ADMIN_DIR, p.slice(7))), MIME[path.extname(p)], sec);
       return send(res, 404, 'Not found', 'text/plain', sec);
     }
 
