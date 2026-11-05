@@ -647,3 +647,9 @@ textarea.big{min-height:300px}
 .gd-pays .gd-pay img{height:28px;max-width:76px}
 .an-tbl th .gd-pay img{height:28px;max-width:80px}
 .gd-pay.has-img.big img{height:52px;max-width:160px}
+
+/* readability: the greys used for small helper text were below 4.5:1 on the dark panels */
+.a-menus .a-nav small{color:var(--mu)}
+.a-menus .a-nav.on small{color:var(--sil)}
+.a-f .h,.a-secs .a-sec .a-f .h{color:var(--mu)}
+.a-chev{color:var(--mu)}
